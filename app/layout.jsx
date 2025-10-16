@@ -15,7 +15,8 @@ export default function RootLayout({ children }) {
             <div className="container-default h-14 flex items-center justify-between">
               <div className="font-semibold">Hansen IT • CRM</div>
               <nav className="text-sm text-white/80 flex items-center gap-4">
-                <Link href="/dashboard">Dashboard</Link>
+                <Link href="/dashboard">Tabell</Link>
+                <Link href="/dashboard/kanban">Kanban</Link>
                 <Link href="/login">Logg inn</Link>
               </nav>
             </div>
