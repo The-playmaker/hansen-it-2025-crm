@@ -1,4 +1,5 @@
 import './globals.css';
+import Link from 'next/link';
 
 export const metadata = {
   title: 'Hansen IT – CRM Dashboard',
@@ -13,7 +14,10 @@ export default function RootLayout({ children }) {
           <header className="border-b border-white/10 bg-black/40 backdrop-blur">
             <div className="container-default h-14 flex items-center justify-between">
               <div className="font-semibold">Hansen IT • CRM</div>
-              <nav className="text-sm text-white/80">Dashboard</nav>
+              <nav className="text-sm text-white/80 flex items-center gap-4">
+                <Link href="/dashboard">Dashboard</Link>
+                <Link href="/login">Logg inn</Link>
+              </nav>
             </div>
           </header>
           <main className="flex-1">{children}</main>

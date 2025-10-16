@@ -6,6 +6,7 @@ export async function PATCH(req, { params }) {
   const patch = {};
   if ('status' in body) patch.status = body.status;
   if ('assigned_to' in body) patch.assigned_to = body.assigned_to;
+  if ('internal_notes' in body) patch.internal_notes = body.internal_notes;
 
   const { data, error } = await supabaseAdmin
     .from('requests')

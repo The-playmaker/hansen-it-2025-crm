@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { FiRefreshCw } from 'react-icons/fi';
+import { FiRefreshCw, FiLogOut } from 'react-icons/fi';
+import { supabase } from '../../lib/supabaseClient';
+import DetailModal from '../../components/DetailModal';
 
 const STATUS = ['Ny', 'Pågår', 'Fullført'];
 const PRIORITY_COLOR = { hast: 'border-red-400 text-red-300', normal: 'border-white/30 text-white/70' };
@@ -10,6 +12,19 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [savingId, setSavingId] = useState(null);
+  const [session, setSession] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [open, setOpen] = useState(false);
+
+  // Auth guard
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      if (!data.session) window.location.href = '/login';
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -25,6 +40,23 @@ export default function Dashboard() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // Realtime
+  useEffect(() => {
+    const channel = supabase
+      .channel('requests-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, payload => {
+        setItems(prev => {
+          const rec = payload.new || payload.old;
+          if (payload.eventType === 'INSERT') return [rec, ...prev];
+          if (payload.eventType === 'UPDATE') return prev.map(it => it.id === rec.id ? rec : it);
+          if (payload.eventType === 'DELETE') return prev.filter(it => it.id !== rec.id);
+          return prev;
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const updateItem = async (id, patch) => {
     setSavingId(id);
@@ -43,13 +75,21 @@ export default function Dashboard() {
     }
   };
 
+  const openDetail = (it) => { setSelected(it); setOpen(true); };
+  const saveDetail = async (patch) => { if (selected) await updateItem(selected.id, patch); };
+
   return (
     <section className="container-default py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold">Innboks</h1>
-        <button onClick={fetchData} className="border border-white/20 rounded px-3 py-2 text-sm hover:bg-white/5 flex items-center gap-2">
-          <FiRefreshCw /> Oppdater
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => window.location.href='/logout'} className="border border-white/20 rounded px-3 py-2 text-sm hover:bg-white/5 flex items-center gap-2">
+            <FiLogOut /> Logg ut
+          </button>
+          <button onClick={fetchData} className="border border-white/20 rounded px-3 py-2 text-sm hover:bg-white/5 flex items-center gap-2">
+            <FiRefreshCw /> Oppdater
+          </button>
+        </div>
       </div>
 
       {loading && <p>Henter...</p>}
@@ -71,7 +111,7 @@ export default function Dashboard() {
             </thead>
             <tbody>
               {items.map(it => (
-                <tr key={it.id} className="border-t border-white/10 align-top">
+                <tr key={it.id} className="border-t border-white/10 align-top hover:bg-white/5 cursor-pointer" onClick={() => openDetail(it)}>
                   <td className="py-3 pr-4">{new Date(it.created_at).toLocaleString()}</td>
                   <td className="py-3 pr-4">
                     <div className="font-semibold">{it.name || '—'}</div>
@@ -79,25 +119,16 @@ export default function Dashboard() {
                   </td>
                   <td className="py-3 pr-4">{it.email || '—'}</td>
                   <td className="py-3 pr-4">{it.company || '—'}</td>
+                  <td className="py-3 pr-4"><span className={`badge ${PRIORITY_COLOR[(it.priority||'normal')]}`}>{it.priority || 'normal'}</span></td>
                   <td className="py-3 pr-4">
-                    <span className={`badge ${PRIORITY_COLOR[(it.priority||'normal')]}`}>{it.priority || 'normal'}</span>
-                  </td>
-                  <td className="py-3 pr-4">
-                    <select
-                      className="select"
-                      disabled={savingId === it.id}
-                      value={it.status || 'Ny'}
-                      onChange={(e) => updateItem(it.id, { status: e.target.value })}
-                    >
+                    <select className="select" disabled={savingId === it.id} value={it.status || 'Ny'}
+                      onChange={(e) => { e.stopPropagation(); updateItem(it.id, { status: e.target.value }); }}>
                       {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </td>
                   <td className="py-3 pr-4">
-                    <input
-                      className="input"
-                      placeholder="Navn på ansvarlig"
-                      value={it.assigned_to || ''}
-                      disabled={savingId === it.id}
+                    <input className="input" placeholder="Navn på ansvarlig" value={it.assigned_to || ''} disabled={savingId === it.id}
+                      onClick={(e)=>e.stopPropagation()}
                       onChange={(e) => updateItem(it.id, { assigned_to: e.target.value })}
                     />
                   </td>
@@ -108,6 +139,8 @@ export default function Dashboard() {
           {items.length === 0 && <p className="text-white/70 mt-6">Ingen forespørsler ennå.</p>}
         </div>
       )}
+
+      <DetailModal open={open} onClose={()=>setOpen(false)} item={selected} onSave={saveDetail} />
     </section>
   );
 }
