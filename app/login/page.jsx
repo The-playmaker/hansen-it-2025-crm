@@ -7,7 +7,7 @@ export default function LoginPage() {
       provider: 'azure',
       options: {
         scopes: 'email openid profile',
-        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/dashboard` : undefined,
+        redirectTo: "https://crm.hansen-it.com/dashboard",
       }
     });
   };
