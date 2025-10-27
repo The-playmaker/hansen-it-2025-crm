@@ -10,7 +10,7 @@ export default function DashboardLayout({ children }) {
           {/* Sidebar (skjult på mobil) */}
           <Sidebar />
 
-          {/* Innhold */}
+          {/* Innholder */}
           <div className="flex-1 min-h-screen">
             {/* Topbar (mobil-nav + statusplass) */}
             <header className="md:hidden sticky top-0 z-10 h-14 border-b border-white/10 bg-black/60 backdrop-blur">
