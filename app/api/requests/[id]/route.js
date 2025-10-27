@@ -1,19 +1,42 @@
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-export async function PATCH(req, { params }) {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+export async function GET(request, { params }) {
   const id = params.id;
-  const body = await req.json();
-  const patch = {};
-  if ('status' in body) patch.status = body.status;
-  if ('assigned_to' in body) patch.assigned_to = body.assigned_to;
-  if ('internal_notes' in body) patch.internal_notes = body.internal_notes;
 
-  const { data, error } = await supabaseAdmin
-    .from('requests')
-    .update(patch)
-    .eq('id', id)
-    .select()
+  const { data, error } = await supabase
+    .from("requests")
+    .select("*")
+    .eq("id", id)
     .single();
-  if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 });
-  return new Response(JSON.stringify({ data }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+
+  if (error) {
+    console.error("Supabase error:", error);
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(data);
+}
+
+export async function PATCH(request, { params }) {
+  const id = params.id;
+  const body = await request.json();
+
+  const { data, error } = await supabase
+    .from("requests")
+    .update(body)
+    .eq("id", id)
+    .select();
+
+  if (error) {
+    console.error("Supabase update error:", error);
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  return NextResponse.json(data);
 }
