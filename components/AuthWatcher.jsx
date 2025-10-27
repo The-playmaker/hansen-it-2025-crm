@@ -11,15 +11,14 @@ export default function AuthWatcher() {
       if (typeof window !== "undefined" && window.location.href.includes("code=")) {
         try {
           const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-          if (error) console.error("Auth redirect error:", error);
-          if (data?.session) router.replace("/dashboard");
-        } catch (err) {
-          console.error("exchangeCodeForSession error:", err);
+          if (!error && data?.session) router.replace("/dashboard");
+        } catch (e) {
+          console.error(e);
         }
       }
     })();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_e, session) => {
       const path = window.location.pathname;
       if (session && path === "/login") router.push("/dashboard");
       if (!session && path.startsWith("/dashboard")) router.push("/login");
