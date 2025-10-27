@@ -1,44 +1,38 @@
 "use client";
-
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function AuthWatcher() {
   const router = useRouter();
 
   useEffect(() => {
-    const handleOAuthRedirect = async () => {
-      try {
-        // Ny metode – bytter kode mot session etter Supabase redirect
-        const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-        if (error) console.error("Auth redirect error:", error);
-        if (data?.session) {
-          console.log("✅ Session lagret for:", data.session.user.email);
-          router.replace("/dashboard");
+    const handleOAuth = async () => {
+      if (typeof window !== "undefined" && window.location.href.includes("code=")) {
+        try {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+          if (error) console.error("Auth redirect error:", error);
+          if (data?.session) router.replace("/dashboard");
+        } catch (err) {
+          console.error("exchangeCodeForSession error:", err);
         }
-      } catch (err) {
-        console.error(err);
       }
     };
+    handleOAuth();
 
-    handleOAuthRedirect();
-
-    const checkSession = async () => {
+    const sync = async () => {
       const { data } = await supabase.auth.getSession();
-      const session = data.session;
+      const session = data?.session;
       const path = window.location.pathname;
-
       if (!session && path.startsWith("/dashboard")) router.push("/login");
       else if (session && path === "/login") router.push("/dashboard");
     };
+    sync();
 
-    checkSession();
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_evt, session) => {
       const path = window.location.pathname;
       if (session && path === "/login") router.push("/dashboard");
-      else if (!session && path.startsWith("/dashboard")) router.push("/login");
+      if (!session && path.startsWith("/dashboard")) router.push("/login");
     });
 
     return () => listener.subscription.unsubscribe();
