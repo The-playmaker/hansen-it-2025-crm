@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS services (
   description TEXT,
   icon_name TEXT DEFAULT 'Wrench',
   sort_order INTEGER DEFAULT 0,
+  -- NEW FIELDS FOR LANDING PAGE
+  href TEXT,
+  features TEXT[], -- Array of strings
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -118,3 +121,7 @@ WITH CHECK (bucket_id = 'quote-attachments');
 CREATE POLICY "Public can read attachments"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'quote-attachments');
+
+-- If table already exists, add columns (run this part separately or as part of migration)
+ALTER TABLE services ADD COLUMN IF NOT EXISTS href TEXT;
+ALTER TABLE services ADD COLUMN IF NOT EXISTS features TEXT[];

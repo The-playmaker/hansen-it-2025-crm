@@ -28,7 +28,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 ## 3. Update HomePage (`app/page.jsx` or `app/page.js`)
 
-Replace your static `HomePage` with one that fetches data. Since you are using Next.js App Router (indicated by `app/page.jsx`), you can fetch data directly in the server component.
+Replace your static `HomePage` with one that fetches data. This version maps the dynamic data to your `ServiceCard` component.
 
 ```jsx
 import HeroSection from "@/components/HeroSection";
@@ -70,13 +70,8 @@ export default async function HomePage() {
                 key={service.id}
                 title={service.name}
                 description={service.short_description}
-                href="#" // specific links might need to be handled differently or stored in DB
-                features={
-                  // If you stored features as a bulleted list in description, you might parse it here.
-                  // Or just display the full description.
-                  // For now, we use a placeholder or parse if you add a 'features' JSON column later.
-                  []
-                }
+                href={service.href || '#'} // Use the link from DB or default
+                features={service.features || []} // Use features array from DB
               />
             ))
           ) : (
@@ -89,12 +84,15 @@ export default async function HomePage() {
 }
 ```
 
-## 4. Ensure Database Access
+## 4. Ensure Database Access and Schema
 
-Make sure you have run the updated `migration.sql` in your CRM Supabase project. It contains a policy to allow public read access to the `services` table:
+1.  **Run Migration**: Make sure you have run the updated `migration.sql` in your CRM Supabase project. It adds the `features` and `href` columns and enables public read access.
 
-```sql
-CREATE POLICY "Allow public read access" ON services FOR SELECT USING (true);
-```
+    ```sql
+    -- Essential parts of the update
+    ALTER TABLE services ADD COLUMN IF NOT EXISTS href TEXT;
+    ALTER TABLE services ADD COLUMN IF NOT EXISTS features TEXT[];
+    CREATE POLICY "Allow public read access" ON services FOR SELECT USING (true);
+    ```
 
-Without this, the landing page will not be able to fetch the services.
+2.  **Add Data**: Go to your CRM Admin Dashboard (`/admin/services`) and add your services. Fill in the "Link" and "Features" fields.
