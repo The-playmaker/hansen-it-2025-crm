@@ -19,8 +19,13 @@ export default function AdminServices() {
     name: '',
     short_description: '',
     description: '',
+    href: '',
+    features: [], // array of strings
     icon_name: 'Wrench',
   });
+
+  // Helper to handle features text area (one per line)
+  const [featuresText, setFeaturesText] = useState('');
 
   useEffect(() => {
     fetchServices();
@@ -44,28 +49,46 @@ export default function AdminServices() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Convert features text to array
+    const featuresArray = featuresText
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+    const payload = {
+        ...formData,
+        features: featuresArray
+    };
+
     try {
       if (editingId) {
         await supabase
           .from('services')
-          .update(formData)
+          .update(payload)
           .eq('id', editingId);
       } else {
-        await supabase.from('services').insert([formData]);
+        await supabase.from('services').insert([payload]);
       }
 
-      setFormData({
-        name: '',
-        short_description: '',
-        description: '',
-        icon_name: 'Wrench',
-      });
-      setEditingId(null);
-      setShowForm(false);
+      resetForm();
       fetchServices();
     } catch (error) {
       console.error('Error saving service:', error);
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      short_description: '',
+      description: '',
+      href: '',
+      features: [],
+      icon_name: 'Wrench',
+    });
+    setFeaturesText('');
+    setEditingId(null);
+    setShowForm(false);
   };
 
   const handleDelete = async (id) => {
@@ -84,8 +107,11 @@ export default function AdminServices() {
       name: service.name,
       short_description: service.short_description || '',
       description: service.description || '',
+      href: service.href || '',
+      features: service.features || [],
       icon_name: service.icon_name || 'Wrench',
     });
+    setFeaturesText((service.features || []).join('\n'));
     setEditingId(service.id);
     setShowForm(true);
   };
@@ -126,7 +152,7 @@ export default function AdminServices() {
 
               <Input
                 label="Short Description"
-                placeholder="One line description"
+                placeholder="One line description (displayed on card)"
                 value={formData.short_description}
                 onChange={(e) => setFormData({ ...formData, short_description: e.target.value })}
                 required
@@ -140,6 +166,21 @@ export default function AdminServices() {
                 required
               />
 
+              <Input
+                label="Link (href)"
+                placeholder="/automation"
+                value={formData.href}
+                onChange={(e) => setFormData({ ...formData, href: e.target.value })}
+              />
+
+              <Textarea
+                label="Features (one per line)"
+                placeholder="Feature 1\nFeature 2\nFeature 3"
+                value={featuresText}
+                onChange={(e) => setFeaturesText(e.target.value)}
+                rows={5}
+              />
+
               <div className="flex gap-4">
                 <Button variant="primary" type="submit">
                   {editingId ? 'Update Service' : 'Add Service'}
@@ -147,16 +188,7 @@ export default function AdminServices() {
                 <Button
                   variant="secondary"
                   type="button"
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditingId(null);
-                    setFormData({
-                      name: '',
-                      short_description: '',
-                      description: '',
-                      icon_name: 'Wrench',
-                    });
-                  }}
+                  onClick={resetForm}
                 >
                   Cancel
                 </Button>
@@ -177,6 +209,16 @@ export default function AdminServices() {
                   <div className="flex-1">
                     <h3 className="text-xl font-bold text-white mb-2">{service.name}</h3>
                     <p className="text-brand-400 mb-2">{service.short_description}</p>
+                    {service.href && (
+                        <p className="text-xs text-accent-blue mb-2">Link: {service.href}</p>
+                    )}
+                    {service.features && service.features.length > 0 && (
+                        <ul className="list-disc list-inside text-sm text-brand-300 mb-2">
+                            {service.features.map((feat, idx) => (
+                                <li key={idx}>{feat}</li>
+                            ))}
+                        </ul>
+                    )}
                     <p className="text-sm text-brand-500 line-clamp-2">{service.description}</p>
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
