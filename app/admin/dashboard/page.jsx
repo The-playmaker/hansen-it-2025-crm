@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { supabase } from '@/lib/supabaseClient';
 import { LogOut, Settings } from 'lucide-react';
+import { AdminLayout } from '@/components/admin/AdminLayout';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -96,9 +97,9 @@ export default function AdminDashboard() {
   const completedCount = quotes.filter(q => getStatusValue(q.status) === 'completed').length;
 
   return (
-    <div className="min-h-screen bg-brand-950 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-8 pt-8">
+    <AdminLayout title="Admin Dashboard">
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between mb-8">
           <h1 className="text-4xl font-bold text-white">Admin Dashboard</h1>
           <div className="flex items-center gap-4">
             <Button
@@ -233,6 +234,6 @@ export default function AdminDashboard() {
           </div>
         </Card>
       </div>
-    </div>
+    </AdminLayout>
   );
 }
