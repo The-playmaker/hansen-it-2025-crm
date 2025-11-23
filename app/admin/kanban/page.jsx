@@ -158,9 +158,8 @@ export default function AdminBoard() {
                   onDrop={(e) => {
                     e.preventDefault();
                     const idStr = e.dataTransfer.getData('text/plain');
-                    const idNum = Number(idStr);
-                    if (!isNaN(idNum)) {
-                      handleDrop(idNum, col.key);
+                    if (idStr) {
+                      handleDrop(idStr, col.key);
                     }
                   }}
                 >

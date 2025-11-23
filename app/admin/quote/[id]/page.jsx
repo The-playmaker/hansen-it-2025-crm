@@ -24,7 +24,7 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 
 export default function QuoteDetails() {
   const { id } = useParams();
-  const quoteId = id ? Number(id) : null;
+  const quoteId = id; // Assuming UUID, keep as string
   const router = useRouter();
 
   // Basic auth state (assuming RLS handles permissions or we check roles here)
