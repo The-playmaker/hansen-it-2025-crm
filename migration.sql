@@ -102,6 +102,9 @@ CREATE POLICY "Enable all access for authenticated users" ON quote_portal_tokens
 
 CREATE POLICY "Allow public read on portal tokens" ON quote_portal_tokens FOR SELECT USING (true);
 
+-- NEW: Allow public read access to services for the landing page
+CREATE POLICY "Allow public read access" ON services FOR SELECT USING (true);
+
 -- Storage bucket for attachments
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('quote-attachments', 'quote-attachments', true)
