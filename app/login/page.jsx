@@ -7,7 +7,7 @@ export default function LoginPage() {
       provider: "azure",
       options: {
         scopes: "openid email profile offline_access User.Read Mail.Send",
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`,
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/dashboard`,
       },
     });
   };

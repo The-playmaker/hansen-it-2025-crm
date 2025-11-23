@@ -1,0 +1,79 @@
+{
+  "name": "Hansen IT – CRM kontakt til Supabase",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "contact-form",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "Webhook1",
+      "name": "Webhook – Kontakt",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [300, 300],
+      "webhookId": "contact-form"
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/contacts",
+        "options": {},
+        "method": "POST",
+        "authentication": "none",
+        "headers": {
+          "apikey": "={{$env.SUPABASE_KEY}}",
+          "Authorization": "Bearer {{$env.SUPABASE_KEY}}",
+          "Content-Type": "application/json",
+          "Prefer": "return=representation"
+        },
+        "bodyParametersJson": "={\"name\": $json[\"name\"], \"email\": $json[\"email\"], \"company\": $json[\"company\"], \"message\": $json[\"message\"]}"
+      },
+      "id": "HttpRequest1",
+      "name": "HTTP Request – Lagre i Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "responseBody": "{\"status\": \"ok\", \"message\": \"Takk for din henvendelse!\"}",
+        "options": {
+          "responseContentType": "application/json"
+        }
+      },
+      "id": "RespondWebhook1",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1100, 300]
+    }
+  ],
+  "connections": {
+    "Webhook – Kontakt": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request – Lagre i Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request – Lagre i Supabase": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "versionId": "v1",
+  "active": false
+}
