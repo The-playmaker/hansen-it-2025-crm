@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import sdkConfig from "@/lib/casdoorConfig";
 
-export async function GET() {
+export const dynamic = 'force-dynamic';
+
+export async function GET(req) {
   const response = NextResponse.redirect(`${sdkConfig.appUrl}/login`);
 
   response.cookies.set({
