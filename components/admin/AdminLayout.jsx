@@ -30,9 +30,8 @@ export function AdminLayout({ children, title }) {
     localStorage.setItem("admin_sidebar_collapsed", String(collapsed));
   }, [collapsed]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
+  const handleLogout = () => {
+    router.push('/api/casdoor/logout');
   };
 
   return (
