@@ -11,7 +11,3 @@ export default function SettingsLayout({ children }) {
 
   return <>{children}</>;
 }
-const handleLogout = async () => {
-  await fetch("/api/logout", { method: "POST" });
-  router.push("/login");
-};
