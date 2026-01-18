@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
-export async function GET(req) {
-  const cookie = req.cookies.get("casdoorUser");
-  if (!cookie) {
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const c = cookies().get("casdoorUser");
+  if (!c?.value) {
     return NextResponse.json({ error: "Not logged in" }, { status: 401 });
   }
 
-  const user = JSON.parse(cookie.value);
-  return NextResponse.json(user);
+  try {
+    const user = JSON.parse(c.value);
+    return NextResponse.json(user);
+  } catch {
+    return NextResponse.json({ error: "Bad session" }, { status: 401 });
+  }
 }

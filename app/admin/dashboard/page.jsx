@@ -1,4 +1,5 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -6,6 +7,16 @@ import { Card } from '@/components/ui/Card';
 import { supabase } from '@/lib/supabaseClient';
 import { LogOut, Settings } from 'lucide-react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
+import DashboardHeader from "./DashboardHeader";
+
+export default function Page() {
+  return (
+    <div>
+      <DashboardHeader />
+      {/* resten av dashboardet */}
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   const router = useRouter();

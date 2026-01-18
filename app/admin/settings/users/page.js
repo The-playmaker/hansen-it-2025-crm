@@ -3,111 +3,99 @@
 import { useEffect, useState } from "react";
 
 export default function UsersSettings() {
+  const [me, setMe] = useState(null);
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  async function fetchUsers() {
-    const res = await fetch("/api/users");
-    const data = await res.json();
-    setUsers(data);
-  }
+  async function load() {
+    const meRes = await fetch("/api/me", { cache: "no-store" });
+    const meData = meRes.ok ? await meRes.json() : null;
+    setMe(meData);
 
-  async function fetchRoles() {
-    const res = await fetch("/api/roles/all");
-    const data = await res.json();
-    setRoles(data.map(r => r.name));
+    const usersRes = await fetch("/api/users", { cache: "no-store" });
+    const usersData = usersRes.ok ? await usersRes.json() : [];
+    setUsers(usersData);
+
+    const rolesRes = await fetch("/api/roles/all", { cache: "no-store" });
+    const rolesData = rolesRes.ok ? await rolesRes.json() : [];
+    setRoles(rolesData.map((r) => r.name));
+
+    setLoading(false);
   }
 
   useEffect(() => {
-    Promise.all([fetchUsers(), fetchRoles()]).then(() => setLoading(false));
+    load();
   }, []);
 
   async function updateRole(id, role) {
     await fetch(`/api/users/${id}/role`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role })
+      body: JSON.stringify({ role }),
     });
-    fetchUsers();
+    load();
   }
 
   async function deleteUser(id) {
-    if (!confirm("Er du sikker på at du vil slette denne brukeren?")) return;
+    if (!confirm("Slette brukeren?")) return;
     await fetch(`/api/users/${id}`, { method: "DELETE" });
-    fetchUsers();
+    load();
   }
 
-  if (loading) return <div>Laster...</div>;
+  if (loading) return <div>Laster…</div>;
+
+  // Enkel gate: bare admin får inn
+  if (!me || me.role !== "admin") {
+    return <div>Ingen tilgang (admin only).</div>;
+  }
 
   return (
-    <div>
-      <h1>Brukeradministrasjon</h1>
-      <table border="1" cellPadding="5">
+    <div style={{ padding: 16 }}>
+      <h1>Settings · Brukere</h1>
+
+      <table border="1" cellPadding="8" style={{ marginTop: 12 }}>
         <thead>
           <tr>
             <th>Navn</th>
             <th>E-post</th>
             <th>Rolle</th>
-            <th>Handlinger</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
-          {users.map(user => (
-            <tr key={user.id}>
-              <td>{user.name}</td>
-              <td>{user.email}</td>
+          {users.map((u) => (
+            <tr key={u.id}>
+              <td>{u.name}</td>
+              <td>{u.email}</td>
               <td>
-                <select value={user.role} onChange={e => updateRole(user.id, e.target.value)}>
-                  {roles.map(r => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
+                <select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)}>
+                  {roles.length
+                    ? roles.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))
+                    : ["admin", "manager", "worker"].map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
                 </select>
               </td>
               <td>
-                <button onClick={() => deleteUser(user.id)}>Slett</button>
+                <button onClick={() => deleteUser(u.id)}>Slett</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <h2>Opprett ny rolle</h2>
-      <NewRoleForm fetchRoles={fetchRoles} />
+      <p style={{ marginTop: 12 }}>
+        <a href="/admin/dashboard" style={{ textDecoration: "underline" }}>
+          ← Tilbake til dashboard
+        </a>
+      </p>
     </div>
-  );
-}
-
-function NewRoleForm({ fetchRoles }) {
-  const [name, setName] = useState("");
-  const [permissions, setPermissions] = useState("");
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    await fetch("/api/roles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, permissions })
-    });
-    setName("");
-    setPermissions("");
-    fetchRoles();
-  }
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <input
-        placeholder="Rollenavn"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        required
-      />
-      <input
-        placeholder="Permissions (comma-separated)"
-        value={permissions}
-        onChange={e => setPermissions(e.target.value)}
-      />
-      <button type="submit">Opprett rolle</button>
-    </form>
   );
 }
