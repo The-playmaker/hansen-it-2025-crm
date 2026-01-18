@@ -9,7 +9,7 @@ export async function GET(req) {
   const state = url.searchParams.get("state");
 
   if (!code || !state) {
-    return NextResponse.redirect("/login");
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
   }
 
   try {
@@ -19,7 +19,7 @@ export async function GET(req) {
       client_secret: process.env.CASDOOR_CLIENT_SECRET,
       grant_type: "authorization_code",
       code,
-      redirect_uri: "https://crm.hansen-it.com/api/casdoor/callback"
+      redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/casdoor/callback`
     });
 
     const tokenRes = await fetch(
@@ -30,7 +30,7 @@ export async function GET(req) {
     const tokenData = await tokenRes.json();
     if (tokenData.error) {
       console.error("Casdoor token error", tokenData);
-      return NextResponse.redirect("/login");
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
     }
 
     // Hent brukerinfo
@@ -46,19 +46,4 @@ export async function GET(req) {
       access_token: tokenData.access_token
     });
 
-    // Sett cookie og redirect til dashboard
-    const response = NextResponse.redirect("/admin/dashboard");
-    response.cookies.set({
-      name: "casdoorUser",
-      value: JSON.stringify(userInfo),
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      path: "/"
-    });
-
-    return response;
-  } catch (err) {
-    console.error("Failed to login", err);
-    return NextResponse.redirect("/login");
-  }
-}
+    // Sett cookie og redirect til d
