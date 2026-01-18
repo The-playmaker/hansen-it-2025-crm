@@ -4,17 +4,23 @@ import { useEffect, useState } from "react";
 
 export default function UsersSettings() {
   const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
 
   async function fetchUsers() {
     const res = await fetch("/api/users");
     const data = await res.json();
     setUsers(data);
-    setLoading(false);
+  }
+
+  async function fetchRoles() {
+    const res = await fetch("/api/roles/all");
+    const data = await res.json();
+    setRoles(data.map(r => r.name));
   }
 
   useEffect(() => {
-    fetchUsers();
+    Promise.all([fetchUsers(), fetchRoles()]).then(() => setLoading(false));
   }, []);
 
   async function updateRole(id, role) {
@@ -53,10 +59,9 @@ export default function UsersSettings() {
               <td>{user.email}</td>
               <td>
                 <select value={user.role} onChange={e => updateRole(user.id, e.target.value)}>
-                  <option value="admin">Admin</option>
-                  <option value="manager">Manager</option>
-                  <option value="worker">Worker</option>
-                  {/* Legg til nye roller her */}
+                  {roles.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
                 </select>
               </td>
               <td>
@@ -66,6 +71,43 @@ export default function UsersSettings() {
           ))}
         </tbody>
       </table>
+
+      <h2>Opprett ny rolle</h2>
+      <NewRoleForm fetchRoles={fetchRoles} />
     </div>
+  );
+}
+
+function NewRoleForm({ fetchRoles }) {
+  const [name, setName] = useState("");
+  const [permissions, setPermissions] = useState("");
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    await fetch("/api/roles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, permissions })
+    });
+    setName("");
+    setPermissions("");
+    fetchRoles();
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        placeholder="Rollenavn"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        required
+      />
+      <input
+        placeholder="Permissions (comma-separated)"
+        value={permissions}
+        onChange={e => setPermissions(e.target.value)}
+      />
+      <button type="submit">Opprett rolle</button>
+    </form>
   );
 }

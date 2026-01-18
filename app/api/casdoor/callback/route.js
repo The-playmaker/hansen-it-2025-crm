@@ -13,7 +13,7 @@ export async function GET(req) {
   }
 
   try {
-    // Hent token
+    // Hent access token
     const params = new URLSearchParams({
       client_id: process.env.NEXT_PUBLIC_CASDOOR_CLIENT_ID,
       client_secret: process.env.CASDOOR_CLIENT_SECRET,
@@ -28,16 +28,22 @@ export async function GET(req) {
     );
 
     const tokenData = await tokenRes.json();
-    if (tokenData.error) {
+    if (!tokenData.access_token) {
       console.error("Casdoor token error", tokenData);
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
     }
 
-    // Hent brukerinfo fra Casdoor
+    // Hent brukerinfo
     const userRes = await fetch(
       `${process.env.NEXT_PUBLIC_CASDOOR_SERVER_URL}/api/get-user-info?accessToken=${tokenData.access_token}`
     );
+
     const userInfo = await userRes.json();
+
+    if (!userInfo || !userInfo.displayName || !userInfo.email) {
+      console.error("Invalid userInfo from Casdoor", userInfo);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+    }
 
     // Sjekk Supabase for rolle
     const supabase = getSupabaseServer();
@@ -52,7 +58,7 @@ export async function GET(req) {
       const { data } = await supabase
         .from("employees")
         .insert({
-          name: userInfo.displayName,
+          name: userInfo.displayName || userInfo.name,
           email: userInfo.email,
           role: "worker" // default rolle
         })
