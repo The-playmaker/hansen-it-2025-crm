@@ -7,6 +7,8 @@ export async function GET(req) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
+const isCasdoorAdmin = !!account?.isAdmin || account?.tag === "admin";
+const defaultRole = isCasdoorAdmin ? "admin" : "worker";
 
   if (!code || !state) {
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
