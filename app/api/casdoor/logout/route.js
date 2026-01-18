@@ -1,19 +1,22 @@
 import { NextResponse } from "next/server";
-import sdkConfig from "@/lib/casdoorConfig";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
-export async function GET(req) {
-  const response = NextResponse.redirect(`${sdkConfig.appUrl}/login`);
+export async function POST() {
+  const res = NextResponse.json({ ok: true });
 
-  response.cookies.set({
+  res.cookies.set({
     name: "casdoorUser",
     value: "",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: -1,
+    httpOnly: true,
+    expires: new Date(0),
   });
 
-  return response;
+  return res;
 }
+const casdoorLogoutUrl =
+  `${process.env.NEXT_PUBLIC_CASDOOR_SERVER_URL}/logout` +
+  `?redirect_uri=${encodeURIComponent(process.env.NEXT_PUBLIC_APP_URL + "/login")}`;
+
+return NextResponse.redirect(casdoorLogoutUrl);
