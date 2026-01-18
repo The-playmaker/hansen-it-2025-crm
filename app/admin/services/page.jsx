@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { supabase } from '@/lib/supabaseClient';
 import { Trash2, Plus, ArrowLeft } from 'lucide-react';
-import { AdminLayout } from '@/components/admin/AdminLayout';
+
 
 export default function AdminServices() {
   const router = useRouter();

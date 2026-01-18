@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { UserPlus, UserX, Trash2 } from 'lucide-react';
-import { AdminLayout } from '@/components/admin/AdminLayout';
+
 
 const ROLE_LABELS = {
   worker: 'Worker',

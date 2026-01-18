@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Flame, User, MapPin } from 'lucide-react';
-import { AdminLayout } from '@/components/admin/AdminLayout';
+
 
 const STATUS_COLUMNS = [
   { key: 'Ny',         title: 'New',        description: 'Nye henvendelser som ikke er påbegynt' },

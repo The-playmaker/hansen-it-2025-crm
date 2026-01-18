@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Calendar as CalendarIcon, Clock, User, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { AdminLayout } from '@/components/admin/AdminLayout';
+
 
 export default function AdminCalendar() {
   const [quotes, setQuotes] = useState([]);

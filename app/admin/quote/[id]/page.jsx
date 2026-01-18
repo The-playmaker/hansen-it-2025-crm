@@ -20,7 +20,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import { AdminLayout } from '@/components/admin/AdminLayout';
+
 
 export default function QuoteDetails() {
   const { id } = useParams();
