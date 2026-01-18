@@ -22,16 +22,14 @@ export async function GET(req) {
       redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/casdoor/callback`
     });
 
-    const tokenRes = await fetch(
-      `${process.env.NEXT_PUBLIC_CASDOOR_SERVER_URL}/api/token`,
-      { method: "POST", body: params }
-    );
+    const tokenRes = await fetch(`${process.env.NEXT_PUBLIC_CASDOOR_SERVER_URL}/api/token`, {
+  method: "POST",
+  body: params
+});
 
-    const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) {
-      console.error("Casdoor token error", tokenData);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
-    }
+const tokenData = await tokenRes.json();
+console.log("Casdoor token data:", tokenData);
+
 
     // Hent brukerinfo
     const userRes = await fetch(
