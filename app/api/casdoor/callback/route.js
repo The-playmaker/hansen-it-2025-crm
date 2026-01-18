@@ -53,14 +53,17 @@ export async function GET(req) {
 
     const userInfo = await userRes.json();
 
-    // userInfo kan ha litt ulike feltnavn
-    const email = userInfo?.email || userInfo?.mail;
-    const displayName = userInfo?.displayName || userInfo?.name || userInfo?.username;
+const account = userInfo?.data; // <-- Casdoor legger brukeren her
 
-    if (!email || !displayName) {
-      console.error("Invalid userInfo from Casdoor:", userInfo);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
-    }
+const email = account?.email || account?.mail;
+const displayName =
+  account?.displayName || account?.name || userInfo?.name || "Unknown";
+
+if (!email) {
+  console.error("Invalid userInfo from Casdoor:", userInfo);
+  return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+}
+
 
     // 3) Sync/lookup i Supabase employees
     const supabase = getSupabaseServer();
