@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { supabase } from "@/lib/supabaseClient";
 import { LogOut, Settings } from "lucide-react";
-import { AdminLayout } from "@/components/admin/AdminLayout";
 import DashboardHeader from "./DashboardHeader";
 
 export default function AdminDashboard() {
@@ -15,17 +14,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState(null);
 
-  const DB_STATUS_MAP = {
-    new: "Ny",
-    in_progress: "Pågår",
-    completed: "Fullført",
-  };
-
-  const REVERSE_DB_STATUS_MAP = {
-    Ny: "new",
-    Pågår: "in_progress",
-    Fullført: "completed",
-  };
+  const DB_STATUS_MAP = { new: "Ny", in_progress: "Pågår", completed: "Fullført" };
+  const REVERSE_DB_STATUS_MAP = { Ny: "new", Pågår: "in_progress", Fullført: "completed" };
 
   const statuses = [
     { value: "new", label: "New", color: "bg-red-500/20 border-red-500 text-red-400" },
@@ -38,11 +28,7 @@ export default function AdminDashboard() {
   const fetchQuotes = async () => {
     try {
       let query = supabase.from("requests").select("*").order("created_at", { ascending: false });
-
-      if (statusFilter) {
-        query = query.eq("status", DB_STATUS_MAP[statusFilter] || statusFilter);
-      }
-
+      if (statusFilter) query = query.eq("status", DB_STATUS_MAP[statusFilter] || statusFilter);
       const { data } = await query;
       setQuotes(data || []);
     } catch (error) {
@@ -54,23 +40,17 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchQuotes();
-
     const channel = supabase
       .channel("requests-changes-admin")
-      .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, () => {
-        fetchQuotes();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, () => fetchQuotes())
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStatusChange = async (quoteId, newStatus) => {
     const dbStatus = DB_STATUS_MAP[newStatus] || newStatus;
-
     try {
       await supabase.from("requests").update({ status: dbStatus }).eq("id", quoteId);
       fetchQuotes();
@@ -80,7 +60,6 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = async () => {
-    // Casdoor session cookie logout (anbefalt). Lager vi /api/logout etterpå.
     await fetch("/api/logout", { method: "POST" }).catch(() => {});
     router.push("/login");
   };
@@ -90,126 +69,121 @@ export default function AdminDashboard() {
   const completedCount = quotes.filter((q) => getStatusValue(q.status) === "completed").length;
 
   return (
-    <AdminLayout title="Admin Dashboard">
-      <div className="p-6 space-y-6">
-        <DashboardHeader />
+    <div className="p-6 space-y-6">
+      <DashboardHeader />
 
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-4xl font-bold text-white">Admin Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={() => router.push("/admin/services")}
-              className="flex items-center gap-2"
-            >
-              <Settings size={18} />
-              Services
-            </Button>
-            <Button variant="secondary" onClick={handleLogout} className="flex items-center gap-2">
-              <LogOut size={18} />
-              Logout
-            </Button>
-          </div>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-4xl font-bold text-white">Admin Dashboard</h1>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            onClick={() => router.push("/admin/services")}
+            className="flex items-center gap-2"
+          >
+            <Settings size={18} />
+            Services
+          </Button>
+          <Button variant="secondary" onClick={handleLogout} className="flex items-center gap-2">
+            <LogOut size={18} />
+            Logout
+          </Button>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <div className="space-y-2">
-              <p className="text-brand-400 text-sm font-medium">New Requests</p>
-              <p className="text-3xl font-bold text-accent-blue">{newCount}</p>
-            </div>
-          </Card>
-          <Card>
-            <div className="space-y-2">
-              <p className="text-brand-400 text-sm font-medium">In Progress</p>
-              <p className="text-3xl font-bold text-accent-orange">{inProgressCount}</p>
-            </div>
-          </Card>
-          <Card>
-            <div className="space-y-2">
-              <p className="text-brand-400 text-sm font-medium">Completed</p>
-              <p className="text-3xl font-bold text-accent-emerald">{completedCount}</p>
-            </div>
-          </Card>
-        </div>
-
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card>
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">Quote Requests</h2>
-
-              <select
-                value={statusFilter || ""}
-                onChange={(e) => setStatusFilter(e.target.value || null)}
-                className="bg-brand-900 border border-brand-700 rounded-lg px-4 py-2 text-white"
-              >
-                <option value="">All Requests</option>
-                <option value="new">New</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
-
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="w-8 h-8 rounded-full border-2 border-accent-blue border-t-transparent animate-spin" />
-              </div>
-            ) : quotes.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-brand-700">
-                      <th className="text-left py-3 px-4 font-semibold text-white">Name</th>
-                      <th className="text-left py-3 px-4 font-semibold text-white">Email</th>
-                      <th className="text-left py-3 px-4 font-semibold text-white">Status</th>
-                      <th className="text-left py-3 px-4 font-semibold text-white">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {quotes.map((quote) => (
-                      <tr
-                        key={quote.id}
-                        className="border-b border-brand-700 hover:bg-brand-900/50"
-                      >
-                        <td className="py-3 px-4 text-white">{quote.name || "No Name"}</td>
-                        <td className="py-3 px-4 text-brand-300">{quote.email || "-"}</td>
-                        <td className="py-3 px-4">
-                          <select
-                            value={getStatusValue(quote.status)}
-                            onChange={(e) => handleStatusChange(quote.id, e.target.value)}
-                            className={`rounded px-3 py-1 text-xs font-medium border ${
-                              statuses.find((s) => s.value === getStatusValue(quote.status))?.color ||
-                              "bg-brand-800"
-                            }`}
-                          >
-                            {statuses.map((s) => (
-                              <option key={s.value} value={s.value}>
-                                {s.label}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-3 px-4">
-                          <button
-                            onClick={() => router.push(`/admin/quote/${quote.id}`)}
-                            className="text-accent-blue hover:text-accent-cyan transition-colors text-sm font-medium"
-                          >
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-brand-400">No requests yet.</p>
-              </div>
-            )}
+          <div className="space-y-2">
+            <p className="text-brand-400 text-sm font-medium">New Requests</p>
+            <p className="text-3xl font-bold text-accent-blue">{newCount}</p>
+          </div>
+        </Card>
+        <Card>
+          <div className="space-y-2">
+            <p className="text-brand-400 text-sm font-medium">In Progress</p>
+            <p className="text-3xl font-bold text-accent-orange">{inProgressCount}</p>
+          </div>
+        </Card>
+        <Card>
+          <div className="space-y-2">
+            <p className="text-brand-400 text-sm font-medium">Completed</p>
+            <p className="text-3xl font-bold text-accent-emerald">{completedCount}</p>
           </div>
         </Card>
       </div>
-    </AdminLayout>
+
+      <Card>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-white">Quote Requests</h2>
+
+            <select
+              value={statusFilter || ""}
+              onChange={(e) => setStatusFilter(e.target.value || null)}
+              className="bg-brand-900 border border-brand-700 rounded-lg px-4 py-2 text-white"
+            >
+              <option value="">All Requests</option>
+              <option value="new">New</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="w-8 h-8 rounded-full border-2 border-accent-blue border-t-transparent animate-spin" />
+            </div>
+          ) : quotes.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-brand-700">
+                    <th className="text-left py-3 px-4 font-semibold text-white">Name</th>
+                    <th className="text-left py-3 px-4 font-semibold text-white">Email</th>
+                    <th className="text-left py-3 px-4 font-semibold text-white">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-white">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quotes.map((quote) => (
+                    <tr key={quote.id} className="border-b border-brand-700 hover:bg-brand-900/50">
+                      <td className="py-3 px-4 text-white">{quote.name || "No Name"}</td>
+                      <td className="py-3 px-4 text-brand-300">{quote.email || "-"}</td>
+                      <td className="py-3 px-4">
+                        <select
+                          value={getStatusValue(quote.status)}
+                          onChange={(e) => handleStatusChange(quote.id, e.target.value)}
+                          className={`rounded px-3 py-1 text-xs font-medium border ${
+                            statuses.find((s) => s.value === getStatusValue(quote.status))?.color ||
+                            "bg-brand-800"
+                          }`}
+                        >
+                          {statuses.map((s) => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => router.push(`/admin/quote/${quote.id}`)}
+                          className="text-accent-blue hover:text-accent-cyan transition-colors text-sm font-medium"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-brand-400">No requests yet.</p>
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
   );
 }

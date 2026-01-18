@@ -1,13 +1,15 @@
 "use client";
 
-import { useMe } from "@/app/admin/useMe";
+import { useMe } from "./useMe";
+import AdminSidebar from "@/components/admin/AdminSidebar";
 
-export default function SettingsLayout({ children }) {
+export default function AdminLayout({ children }) {
   const { me, loading } = useMe();
 
-  if (loading) return <div className="p-6 text-brand-300">Loading…</div>;
-  if (!me) return <div className="p-6 text-red-400">Not logged in</div>;
-  if (me.role !== "admin") return <div className="p-6 text-red-400">No access</div>;
-
-  return <>{children}</>;
+  return (
+    <div className="flex min-h-screen bg-brand-950 text-white">
+      <AdminSidebar me={me} loading={loading} />
+      <main className="flex-1 min-w-0 overflow-x-hidden">{children}</main>
+    </div>
+  );
 }
