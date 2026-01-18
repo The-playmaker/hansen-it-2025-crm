@@ -1,4 +1,5 @@
 "use client";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";

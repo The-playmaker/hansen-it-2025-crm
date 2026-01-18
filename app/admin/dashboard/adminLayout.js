@@ -1,12 +1,13 @@
 import { adminRoutes } from "@/app/admin/adminRoutes";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 
-const nav = useMemo(() => {
-  const perms = me?.permissions || [];
-  return adminRoutes
-    .filter((r) => {
-      if (!r.permsAny?.length) return true;
-      return r.permsAny.some((p) => perms.includes(p));
-    })
-    // optional: ikke vis under-items i sidebar hvis du vil
-    .filter((r) => !r.href.startsWith("/admin/settings/") || r.href === "/admin/settings");
-}, [me]);
+const nav = [...baseNav];
+if (me?.role === "admin") {
+  nav.push({ href: "/admin/settings", label: "Settings", icon: Settings });
+}
+
+
+<div className="p-2 text-xs text-yellow-300">
+  debug: {me ? `${me.email} (${me.role})` : "me=null"}
+</div>
+

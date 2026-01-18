@@ -3,14 +3,13 @@ import { useEffect, useState } from "react";
 
 export function useMe() {
   const [me, setMe] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/me", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setMe(d))
-      .finally(() => setLoading(false));
+      .then(setMe)
+      .catch(() => setMe(null));
   }, []);
 
-  return { me, loading };
+  return { me };
 }
