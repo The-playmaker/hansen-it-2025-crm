@@ -2,21 +2,26 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-export async function POST() {
-  const res = NextResponse.json({ ok: true });
+export async function GET() {
+  // 1) Bygg respons (redirect)
+  const casdoorLogoutUrl =
+    `${process.env.NEXT_PUBLIC_CASDOOR_SERVER_URL}/logout` +
+    `?redirect_uri=${encodeURIComponent(
+      process.env.NEXT_PUBLIC_APP_URL + "/login"
+    )}`;
 
-  res.cookies.set({
+  const response = NextResponse.redirect(casdoorLogoutUrl);
+
+  // 2) Slett app-cookie
+  response.cookies.set({
     name: "casdoorUser",
     value: "",
-    path: "/",
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
     expires: new Date(0),
   });
 
-  return res;
+  return response;
 }
-const casdoorLogoutUrl =
-  `${process.env.NEXT_PUBLIC_CASDOOR_SERVER_URL}/logout` +
-  `?redirect_uri=${encodeURIComponent(process.env.NEXT_PUBLIC_APP_URL + "/login")}`;
-
-return NextResponse.redirect(casdoorLogoutUrl);
