@@ -33,7 +33,7 @@ export async function POST(request) {
       );
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseServer
       .from("requests")
       .insert([{ name, email, company, message, priority }])
       .select()

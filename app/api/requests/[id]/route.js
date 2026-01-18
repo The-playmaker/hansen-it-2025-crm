@@ -22,7 +22,7 @@ export async function PATCH(request, { params }) {
   const id = params.id;
   const body = await request.json();
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseServer
     .from("requests")
     .update(body)
     .eq("id", id)
