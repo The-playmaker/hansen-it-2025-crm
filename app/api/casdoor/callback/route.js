@@ -44,6 +44,21 @@ export async function GET(req) {
     await supabase.from("sessions").upsert({
       user_id: userInfo.id,
       access_token: tokenData.access_token
+    }); // <- her lukkes objektet og upsert
+
+    // Sett cookie og redirect til dashboard
+    const response = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/admin/dashboard`);
+    response.cookies.set({
+      name: "casdoorUser",
+      value: JSON.stringify(userInfo),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/"
     });
 
-    // Sett cookie og redirect til d
+    return response;
+  } catch (err) {
+    console.error("Failed to login", err);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+  }
+} // <- lukk funksjonen her
