@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 /**
  * Hent alle forespørsler (GET /api/requests)
  */
 export async function GET() {
-  const { data, error } = await supabaseServer
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
     .from("requests")
     .select("*")
     .order("created_at", { ascending: false });
@@ -23,6 +24,7 @@ export async function GET() {
  */
 export async function POST(request) {
   try {
+    const supabase = createSupabaseServerClient();
     const body = await request.json();
     const { name, email, company, message, priority = "normal" } = body;
 
@@ -33,7 +35,7 @@ export async function POST(request) {
       );
     }
 
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabase
       .from("requests")
       .insert([{ name, email, company, message, priority }])
       .select()

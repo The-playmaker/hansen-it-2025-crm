@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export async function GET(request, { params }) {
+  const supabase = createSupabaseServerClient();
   const id = params.id;
 
-  const { data, error } = await supabaseServer
+  const { data, error } = await supabase
     .from("requests")
     .select("*")
     .eq("id", id)
@@ -19,10 +20,11 @@ export async function GET(request, { params }) {
 }
 
 export async function PATCH(request, { params }) {
+  const supabase = createSupabaseServerClient();
   const id = params.id;
   const body = await request.json();
 
-  const { data, error } = await supabaseServer
+  const { data, error } = await supabase
     .from("requests")
     .update(body)
     .eq("id", id)
