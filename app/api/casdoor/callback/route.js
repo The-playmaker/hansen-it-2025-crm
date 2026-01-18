@@ -13,7 +13,7 @@ export async function GET(req) {
   }
 
   try {
-    // Bytt code mot access token
+    // Hent token
     const params = new URLSearchParams({
       client_id: process.env.NEXT_PUBLIC_CASDOOR_CLIENT_ID,
       client_secret: process.env.CASDOOR_CLIENT_SECRET,
@@ -33,24 +33,43 @@ export async function GET(req) {
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
     }
 
-    // Hent brukerinfo
+    // Hent brukerinfo fra Casdoor
     const userRes = await fetch(
       `${process.env.NEXT_PUBLIC_CASDOOR_SERVER_URL}/api/get-user-info?accessToken=${tokenData.access_token}`
     );
     const userInfo = await userRes.json();
 
-    // Lagre session i Supabase
+    // Sjekk Supabase for rolle
     const supabase = getSupabaseServer();
-    await supabase.from("sessions").upsert({
-      user_id: userInfo.id,
-      access_token: tokenData.access_token
-    }); // <- her lukkes objektet og upsert
+    let { data: user } = await supabase
+      .from("employees")
+      .select("*")
+      .eq("email", userInfo.email)
+      .single();
 
-    // Sett cookie og redirect til dashboard
+    if (!user) {
+      // Opprett bruker hvis ikke eksisterer
+      const { data } = await supabase
+        .from("employees")
+        .insert({
+          name: userInfo.displayName,
+          email: userInfo.email,
+          role: "worker" // default rolle
+        })
+        .select()
+        .single();
+      user = data;
+    }
+
+    // Sett cookie og redirect
     const response = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/admin/dashboard`);
     response.cookies.set({
       name: "casdoorUser",
-      value: JSON.stringify(userInfo),
+      value: JSON.stringify({
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }),
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       path: "/"
@@ -61,4 +80,4 @@ export async function GET(req) {
     console.error("Failed to login", err);
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
   }
-} // <- lukk funksjonen her
+}
