@@ -1,39 +1,41 @@
-import { NextResponse } from 'next/server'
-import { getSupabaseServer } from '@/lib/supabaseServer'
+import { NextResponse } from "next/server";
+import { getSupabaseServer } from "@/lib/supabaseServer";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
-export async function GET(request, { params }) {
-  const supabase = getSupabaseServer()
-  const id = params.id
+export async function GET(req, { params }) {
+  const supabase = getSupabaseServer();
+  const id = params.id;
 
   const { data, error } = await supabase
-    .from('requests')
-    .select('*')
-    .eq('id', id)
-    .single()
+    .from("requests")
+    .select("*")
+    .eq("id", id)
+    .single();
 
   if (error) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    console.error("Supabase GET error:", error);
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(data)
+  return NextResponse.json(data);
 }
 
-export async function PATCH(request, { params }) {
-  const supabase = getSupabaseServer()
-  const id = params.id
-  const body = await request.json()
+export async function PATCH(req, { params }) {
+  const supabase = getSupabaseServer();
+  const id = params.id;
+  const body = await req.json();
 
   const { data, error } = await supabase
-    .from('requests')
+    .from("requests")
     .update(body)
-    .eq('id', id)
-    .select()
+    .eq("id", id)
+    .select();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    console.error("Supabase PATCH error:", error);
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json(data)
+  return NextResponse.json(data);
 }

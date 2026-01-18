@@ -3,7 +3,7 @@ import { getSupabaseServer } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export async function GET(req) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
@@ -13,10 +13,10 @@ export async function GET(req: Request) {
   }
 
   try {
-    // Bytt code mot access token via Casdoor REST API
+    // Bytt code mot access token
     const params = new URLSearchParams({
-      client_id: process.env.NEXT_PUBLIC_CASDOOR_CLIENT_ID!,
-      client_secret: process.env.CASDOOR_CLIENT_SECRET!,
+      client_id: process.env.NEXT_PUBLIC_CASDOOR_CLIENT_ID,
+      client_secret: process.env.CASDOOR_CLIENT_SECRET,
       grant_type: "authorization_code",
       code,
       redirect_uri: "https://crm.hansen-it.com/api/casdoor/callback"
@@ -24,14 +24,10 @@ export async function GET(req: Request) {
 
     const tokenRes = await fetch(
       `${process.env.NEXT_PUBLIC_CASDOOR_SERVER_URL}/api/token`,
-      {
-        method: "POST",
-        body: params
-      }
+      { method: "POST", body: params }
     );
 
     const tokenData = await tokenRes.json();
-
     if (tokenData.error) {
       console.error("Casdoor token error", tokenData);
       return NextResponse.redirect("/login");
@@ -43,14 +39,14 @@ export async function GET(req: Request) {
     );
     const userInfo = await userRes.json();
 
-    // Lagre i Supabase
+    // Lagre session i Supabase
     const supabase = getSupabaseServer();
     await supabase.from("sessions").upsert({
       user_id: userInfo.id,
       access_token: tokenData.access_token
     });
 
-    // Redirect til dashboard med cookie
+    // Sett cookie og redirect til dashboard
     const response = NextResponse.redirect("/admin/dashboard");
     response.cookies.set({
       name: "casdoorUser",
