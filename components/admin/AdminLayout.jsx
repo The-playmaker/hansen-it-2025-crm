@@ -31,12 +31,18 @@ export function AdminLayout({ children, title }) {
 
   // build nav after me is available
   const nav = useMemo(() => {
-    const items = [...baseNav];
-    if (me?.role === "admin") {
-      items.push({ href: "/admin/settings", label: "Settings", icon: Settings });
-    }
-    return items;
-  }, [me]);
+  const items = [...baseNav];
+
+  const perms = me?.permissions || [];
+  const canSeeSettings = perms.includes("manage_roles") || perms.includes("manage_users");
+
+  if (canSeeSettings) {
+    items.push({ href: "/admin/settings", label: "Settings", icon: Settings });
+  }
+
+  return items;
+}, [me]);
+
 
   useEffect(() => {
     const saved = localStorage.getItem("admin_sidebar_collapsed");
