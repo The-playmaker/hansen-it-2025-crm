@@ -1,24 +1,36 @@
 "use client";
-import { supabase } from "@/lib/supabaseClient";
+import { useEffect, useState } from "react";
+import { clientSdkConfig } from "@/lib/casdoorConfig";
 
 export default function LoginPage() {
-  const login = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "azure",
-      options: {
-        scopes: "openid email profile offline_access User.Read Mail.Send",
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/dashboard`,
-      },
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!clientSdkConfig.serverUrl || !clientSdkConfig.clientId) {
+      setError("Casdoor-konfigurasjonen mangler. Vennligst kontakt support.");
+      return;
+    }
+
+    import("casdoor-js-sdk").then((SdkModule) => {
+      const Sdk = SdkModule.default;
+      const sdk = new Sdk(clientSdkConfig);
+      window.location.href = sdk.getSigninUrl();
     });
-  };
+  }, []);
+
+  if (error) {
+    return (
+      <section className="container-default py-24">
+        <h1 className="text-2xl font-semibold text-red-500">Konfigurasjonsfeil</h1>
+        <p className="text-white/70 mt-2">{error}</p>
+      </section>
+    );
+  }
 
   return (
     <section className="container-default py-24">
-      <h1 className="text-2xl font-semibold">Logg inn</h1>
-      <p className="text-white/70 mt-2">Bruk Microsoft-kontoen din.</p>
-      <button onClick={login} className="mt-6 px-5 py-2 bg-white text-black rounded">
-        Logg inn med Microsoft
-      </button>
+      <h1 className="text-2xl font-semibold">Omdirigerer til innlogging...</h1>
+      <p className="text-white/70 mt-2">Vennligst vent mens vi sender deg til Casdoor.</p>
     </section>
   );
 }

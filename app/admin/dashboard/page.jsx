@@ -95,6 +95,7 @@ export default function AdminDashboard() {
   const newCount = quotes.filter(q => getStatusValue(q.status) === 'new').length;
   const inProgressCount = quotes.filter(q => getStatusValue(q.status) === 'in_progress').length;
   const completedCount = quotes.filter(q => getStatusValue(q.status) === 'completed').length;
+  const urgentInProgressCount = quotes.filter( (q) => q.status === 'in_progress' && q.urgent).length;
 
   return (
     <AdminLayout title="Admin Dashboard">
@@ -139,6 +140,10 @@ export default function AdminDashboard() {
               <p className="text-brand-400 text-sm font-medium">Completed</p>
               <p className="text-3xl font-bold text-accent-emerald">{completedCount}</p>
             </div>
+          </Card>
+          <Card>
+              <p className="text-brand-400 text-sm font-medium">Urgent In Progress</p>
+              <p className="text-3xl font-bold text-red-400">{urgentInProgressCount}</p>
           </Card>
         </div>
 

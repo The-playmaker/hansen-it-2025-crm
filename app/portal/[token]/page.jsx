@@ -113,7 +113,7 @@ export default function QuotePortal() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-6">
         <Card className="border-accent-blue/60 bg-brand-900/80">
           <h1 className="text-2xl font-bold text-white mb-2">
-            Your project with Fixrix
+            Your project with Hansen IT
           </h1>
           <p className="text-brand-300 text-sm">
             Here you can see the status and key details of your project.
@@ -219,7 +219,7 @@ export default function QuotePortal() {
         </Card>
 
         <div className="text-center text-[11px] text-brand-500 mt-6">
-          Fixrix – powered by your custom CRM
+          Hansen IT – powered by CRM
         </div>
       </div>
     </div>
