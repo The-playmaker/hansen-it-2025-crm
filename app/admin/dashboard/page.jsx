@@ -27,88 +27,76 @@ export default function AdminDashboard() {
     Fullført: "completed",
   };
 
-  useEffect(() => {
-    fetchQuotes();
+  const statuses = [
+    { value: "new", label: "New", color: "bg-red-500/20 border-red-500 text-red-400" },
+    { value: "in_progress", label: "In Progress", color: "bg-yellow-500/20 border-yellow-500 text-yellow-400" },
+    { value: "completed", label: "Completed", color: "bg-emerald-500/20 border-emerald-500 text-emerald-400" },
+  ];
 
-    const channel = supabase
-      .channel("requests-changes-admin")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "requests" },
-        () => fetchQuotes()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [statusFilter]);
+  const getStatusValue = (dbStatus) => REVERSE_DB_STATUS_MAP[dbStatus] || "new";
 
   const fetchQuotes = async () => {
     try {
-      setLoading(true);
-
-      let query = supabase
-        .from("requests")
-        .select("*")
-        .order("created_at", { ascending: false });
+      let query = supabase.from("requests").select("*").order("created_at", { ascending: false });
 
       if (statusFilter) {
-        query = query.eq("status", DB_STATUS_MAP[statusFilter]);
+        query = query.eq("status", DB_STATUS_MAP[statusFilter] || statusFilter);
       }
 
       const { data } = await query;
       setQuotes(data || []);
-    } catch (err) {
-      console.error("Error fetching quotes:", err);
+    } catch (error) {
+      console.error("Error fetching quotes:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStatusChange = async (id, newStatus) => {
-    try {
-      await supabase
-        .from("requests")
-        .update({ status: DB_STATUS_MAP[newStatus] })
-        .eq("id", id);
+  useEffect(() => {
+    fetchQuotes();
 
+    const channel = supabase
+      .channel("requests-changes-admin")
+      .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, () => {
+        fetchQuotes();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleStatusChange = async (quoteId, newStatus) => {
+    const dbStatus = DB_STATUS_MAP[newStatus] || newStatus;
+
+    try {
+      await supabase.from("requests").update({ status: dbStatus }).eq("id", quoteId);
       fetchQuotes();
-    } catch (err) {
-      console.error("Error updating status:", err);
+    } catch (error) {
+      console.error("Error updating quote:", error);
     }
   };
 
   const handleLogout = async () => {
-    await fetch("/api/logout", { method: "POST" });
+    // Casdoor session cookie logout (anbefalt). Lager vi /api/logout etterpå.
+    await fetch("/api/logout", { method: "POST" }).catch(() => {});
     router.push("/login");
   };
 
-  const getStatusValue = (dbStatus) =>
-    REVERSE_DB_STATUS_MAP[dbStatus] || "new";
-
-  const counts = {
-    new: quotes.filter((q) => getStatusValue(q.status) === "new").length,
-    in_progress: quotes.filter(
-      (q) => getStatusValue(q.status) === "in_progress"
-    ).length,
-    completed: quotes.filter(
-      (q) => getStatusValue(q.status) === "completed"
-    ).length,
-  };
+  const newCount = quotes.filter((q) => getStatusValue(q.status) === "new").length;
+  const inProgressCount = quotes.filter((q) => getStatusValue(q.status) === "in_progress").length;
+  const completedCount = quotes.filter((q) => getStatusValue(q.status) === "completed").length;
 
   return (
     <AdminLayout title="Admin Dashboard">
       <div className="p-6 space-y-6">
-
-        {/* 🔹 HEADER MED BRUKERNAVN + SETTINGS */}
         <DashboardHeader />
 
-        {/* 🔹 TOP BAR */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-8">
           <h1 className="text-4xl font-bold text-white">Admin Dashboard</h1>
-
-          <div className="flex gap-3">
+          <div className="flex items-center gap-4">
             <Button
               variant="outline"
               onClick={() => router.push("/admin/services")}
@@ -117,56 +105,45 @@ export default function AdminDashboard() {
               <Settings size={18} />
               Services
             </Button>
-
-            <Button
-              variant="secondary"
-              onClick={handleLogout}
-              className="flex items-center gap-2"
-            >
+            <Button variant="secondary" onClick={handleLogout} className="flex items-center gap-2">
               <LogOut size={18} />
               Logout
             </Button>
           </div>
         </div>
 
-        {/* 🔹 STATS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
-            <p className="text-brand-400 text-sm">New</p>
-            <p className="text-3xl font-bold text-accent-blue">
-              {counts.new}
-            </p>
+            <div className="space-y-2">
+              <p className="text-brand-400 text-sm font-medium">New Requests</p>
+              <p className="text-3xl font-bold text-accent-blue">{newCount}</p>
+            </div>
           </Card>
           <Card>
-            <p className="text-brand-400 text-sm">In Progress</p>
-            <p className="text-3xl font-bold text-accent-orange">
-              {counts.in_progress}
-            </p>
+            <div className="space-y-2">
+              <p className="text-brand-400 text-sm font-medium">In Progress</p>
+              <p className="text-3xl font-bold text-accent-orange">{inProgressCount}</p>
+            </div>
           </Card>
           <Card>
-            <p className="text-brand-400 text-sm">Completed</p>
-            <p className="text-3xl font-bold text-accent-emerald">
-              {counts.completed}
-            </p>
+            <div className="space-y-2">
+              <p className="text-brand-400 text-sm font-medium">Completed</p>
+              <p className="text-3xl font-bold text-accent-emerald">{completedCount}</p>
+            </div>
           </Card>
         </div>
 
-        {/* 🔹 REQUESTS */}
         <Card>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-white">
-                Quote Requests
-              </h2>
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">Quote Requests</h2>
 
               <select
-                className="bg-brand-900 border border-brand-700 rounded px-3 py-2 text-white"
                 value={statusFilter || ""}
-                onChange={(e) =>
-                  setStatusFilter(e.target.value || null)
-                }
+                onChange={(e) => setStatusFilter(e.target.value || null)}
+                className="bg-brand-900 border border-brand-700 rounded-lg px-4 py-2 text-white"
               >
-                <option value="">All</option>
+                <option value="">All Requests</option>
                 <option value="new">New</option>
                 <option value="in_progress">In Progress</option>
                 <option value="completed">Completed</option>
@@ -175,54 +152,60 @@ export default function AdminDashboard() {
 
             {loading ? (
               <div className="flex justify-center py-8">
-                <div className="w-8 h-8 border-2 border-accent-blue border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 rounded-full border-2 border-accent-blue border-t-transparent animate-spin" />
               </div>
-            ) : quotes.length ? (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-brand-700">
-                    <th className="text-left py-3">Name</th>
-                    <th className="text-left py-3">Email</th>
-                    <th className="text-left py-3">Status</th>
-                    <th className="text-left py-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {quotes.map((q) => (
-                    <tr key={q.id} className="border-b border-brand-800">
-                      <td className="py-3">{q.name}</td>
-                      <td className="py-3 text-brand-300">{q.email}</td>
-                      <td className="py-3">
-                        <select
-                          value={getStatusValue(q.status)}
-                          onChange={(e) =>
-                            handleStatusChange(q.id, e.target.value)
-                          }
-                          className="bg-brand-900 border border-brand-700 rounded px-2 py-1"
-                        >
-                          <option value="new">New</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="completed">Completed</option>
-                        </select>
-                      </td>
-                      <td className="py-3">
-                        <button
-                          onClick={() =>
-                            router.push(`/admin/quote/${q.id}`)
-                          }
-                          className="text-accent-blue hover:underline"
-                        >
-                          View
-                        </button>
-                      </td>
+            ) : quotes.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-brand-700">
+                      <th className="text-left py-3 px-4 font-semibold text-white">Name</th>
+                      <th className="text-left py-3 px-4 font-semibold text-white">Email</th>
+                      <th className="text-left py-3 px-4 font-semibold text-white">Status</th>
+                      <th className="text-left py-3 px-4 font-semibold text-white">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {quotes.map((quote) => (
+                      <tr
+                        key={quote.id}
+                        className="border-b border-brand-700 hover:bg-brand-900/50"
+                      >
+                        <td className="py-3 px-4 text-white">{quote.name || "No Name"}</td>
+                        <td className="py-3 px-4 text-brand-300">{quote.email || "-"}</td>
+                        <td className="py-3 px-4">
+                          <select
+                            value={getStatusValue(quote.status)}
+                            onChange={(e) => handleStatusChange(quote.id, e.target.value)}
+                            className={`rounded px-3 py-1 text-xs font-medium border ${
+                              statuses.find((s) => s.value === getStatusValue(quote.status))?.color ||
+                              "bg-brand-800"
+                            }`}
+                          >
+                            {statuses.map((s) => (
+                              <option key={s.value} value={s.value}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={() => router.push(`/admin/quote/${quote.id}`)}
+                            className="text-accent-blue hover:text-accent-cyan transition-colors text-sm font-medium"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
-              <p className="text-brand-400 text-center py-8">
-                No requests yet.
-              </p>
+              <div className="text-center py-8">
+                <p className="text-brand-400">No requests yet.</p>
+              </div>
             )}
           </div>
         </Card>
