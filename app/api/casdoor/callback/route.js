@@ -8,34 +8,40 @@ export async function GET(req) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
 
+  // 1️⃣ Sjekk at vi har code og state
   if (!code || !state) {
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
   }
 
   try {
-    // Hent access token
+    const supabase = getSupabaseServer();
+
+    // 2️⃣ Hent access token fra Casdoor
     const params = new URLSearchParams({
       client_id: process.env.NEXT_PUBLIC_CASDOOR_CLIENT_ID,
       client_secret: process.env.CASDOOR_CLIENT_SECRET,
       grant_type: "authorization_code",
       code,
-      redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/casdoor/callback`
+      redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/casdoor/callback`,
     });
 
-    const tokenRes = await fetch(`${process.env.NEXT_PUBLIC_CASDOOR_SERVER_URL}/api/token`, {
-  method: "POST",
-  body: params
-});
+    const tokenRes = await fetch(
+      `${process.env.NEXT_PUBLIC_CASDOOR_SERVER_URL}/api/token`,
+      { method: "POST", body: params }
+    );
 
-const tokenData = await tokenRes.json();
-console.log("Casdoor token data:", tokenData);
+    const tokenData = await tokenRes.json();
 
+    // 3️⃣ Sjekk at token eksisterer
+    if (!tokenData.access_token) {
+      console.error("Invalid tokenData:", tokenData);
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+    }
 
-    // Hent brukerinfo
+    // 4️⃣ Hent brukerinfo fra Casdoor
     const userRes = await fetch(
       `${process.env.NEXT_PUBLIC_CASDOOR_SERVER_URL}/api/get-user-info?accessToken=${tokenData.access_token}`
     );
-
     const userInfo = await userRes.json();
 
     if (!userInfo || !userInfo.displayName || !userInfo.email) {
@@ -43,8 +49,7 @@ console.log("Casdoor token data:", tokenData);
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
     }
 
-    // Sjekk Supabase for rolle
-    const supabase = getSupabaseServer();
+    // 5️⃣ Synk med Supabase employees
     let { data: user } = await supabase
       .from("employees")
       .select("*")
@@ -52,31 +57,33 @@ console.log("Casdoor token data:", tokenData);
       .single();
 
     if (!user) {
-      // Opprett bruker hvis ikke eksisterer
       const { data } = await supabase
         .from("employees")
         .insert({
           name: userInfo.displayName || userInfo.name,
           email: userInfo.email,
-          role: "worker" // default rolle
+          role: "worker", // default rolle
         })
         .select()
         .single();
       user = data;
     }
 
-    // Sett cookie og redirect
-    const response = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/admin/dashboard`);
+    // 6️⃣ Sett cookie og redirect til dashboard
+    const response = NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_APP_URL}/admin/dashboard`
+    );
+
     response.cookies.set({
       name: "casdoorUser",
       value: JSON.stringify({
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
       }),
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      path: "/"
+      path: "/",
     });
 
     return response;
