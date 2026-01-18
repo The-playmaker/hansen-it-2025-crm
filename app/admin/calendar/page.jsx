@@ -1,4 +1,15 @@
-'use client';
+"use client";
+export const dynamic = "force-dynamic";
+
+export default function CalendarPage() {
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold text-white">Calendar</h1>
+      <p className="text-brand-300 mt-2">Calendar page is loading correctly.</p>
+    </div>
+  );
+}
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Card } from '@/components/ui/Card';

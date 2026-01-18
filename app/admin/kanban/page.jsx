@@ -1,4 +1,15 @@
-'use client';
+"use client";
+export const dynamic = "force-dynamic";
+
+export default function KanbanPage() {
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold text-white">Kanban</h1>
+      <p className="text-brand-300 mt-2">Kanban page is loading correctly.</p>
+    </div>
+  );
+}
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';

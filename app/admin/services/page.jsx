@@ -1,4 +1,15 @@
-'use client';
+"use client";
+export const dynamic = "force-dynamic";
+
+export default function ServicesPage() {
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold text-white">Services</h1>
+      <p className="text-brand-300 mt-2">Services page is loading correctly.</p>
+    </div>
+  );
+}
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
