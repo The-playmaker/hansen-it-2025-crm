@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@hello-pangea/dnd": "^16.5.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.90.1",
     "casdoor-js-sdk": "^0.16.0",
     "jspdf": "^3.0.4",
     "lucide-react": "^0.548.0",
