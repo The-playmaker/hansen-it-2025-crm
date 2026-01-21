@@ -3,6 +3,6 @@ export const revalidate = 0;
 
 import AdminShell from "@/components/admin/AdminShell";
 
-export default function AdminLayoutRoot({ children }) {
+export default function AdminRootLayout({ children }) {
   return <AdminShell>{children}</AdminShell>;
 }
