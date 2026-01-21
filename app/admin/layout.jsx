@@ -14,13 +14,18 @@ import {
   Globe,
 } from "lucide-react";
 import { useMe } from "./useMe";
+import { Link as LinkIcon } from "lucide-react";
+
 
 const baseNav = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutGrid },
+  { href: "/admin/portal-links", label: "Portal ", icon: LinkIcon },
+  { href: "/admin/quotes", label: "Quotes", icon: FileText },
   { href: "/admin/kanban", label: "Kanban", icon: KanbanSquare },
   { href: "/admin/calendar", label: "Calendar", icon: Calendar },
   { href: "/admin/employees", label: "Team / Employees", icon: Users },
-  { href: "/admin/services", label: "Services", icon: Settings },
+  { href: "/admin/services", label: "Services", icon: Service },
+  
 ];
 
 export default function AdminLayout({ children }) {
