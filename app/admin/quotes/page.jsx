@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminLayout } from "../../../components/admin/AdminLayout";
 import { Card } from "@/components/ui/Card";
 
 export default function AdminQuotesPage() {
