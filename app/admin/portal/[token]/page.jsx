@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
@@ -31,7 +30,6 @@ export default function QuotePortal() {
 
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
-
   const [actionBusy, setActionBusy] = useState(false);
 
   const totalHours = useMemo(
@@ -45,60 +43,22 @@ export default function QuotePortal() {
     const load = async () => {
       try {
         setLoading(true);
+        setInvalid(false);
 
-        const { data: tokenRow, error: tokenError } = await supabase
-          .from("quote_portal_tokens")
-          .select("*")
-          .eq("token", tokenStr)
-          .maybeSingle();
+        const res = await fetch(`/api/portal/${encodeURIComponent(tokenStr)}`, {
+          cache: "no-store",
+        });
 
-        if (tokenError || !tokenRow) {
+        const json = await res.json();
+        if (!res.ok) {
+          console.error("Portal load error:", json);
           setInvalid(true);
           return;
         }
 
-        if (tokenRow.expires_at && new Date(tokenRow.expires_at) < new Date()) {
-          setInvalid(true);
-          return;
-        }
-
-        const { data: quote, error: quoteError } = await supabase
-          .from("requests")
-          .select("*")
-          .eq("id", tokenRow.quote_id)
-          .maybeSingle();
-
-        if (quoteError || !quote) {
-          setInvalid(true);
-          return;
-        }
-
-        let employee = null;
-        if (quote.employee_id) {
-          const { data: emp } = await supabase
-            .from("employees")
-            .select("*")
-            .eq("id", quote.employee_id)
-            .maybeSingle();
-          employee = emp ?? null;
-        }
-
-        const { data: timeData } = await supabase
-          .from("quote_time_entries")
-          .select("*")
-          .eq("quote_id", quote.id)
-          .order("created_at", { ascending: false });
-
-        setTimeEntries(timeData || []);
-
-        const { data: attachData } = await supabase
-          .from("quote_attachments")
-          .select("*")
-          .eq("quote_id", quote.id)
-          .order("created_at", { ascending: false });
-
-        setAttachments(attachData || []);
-        setData({ quote, employee, token: tokenRow });
+        setTimeEntries(json.timeEntries || []);
+        setAttachments(json.attachments || []);
+        setData({ quote: json.quote, employee: json.employee, token: json.token });
       } catch (e) {
         console.error(e);
         setInvalid(true);
@@ -125,10 +85,25 @@ export default function QuotePortal() {
 
   const statusChip = (status) => {
     const base = "inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs border";
-    if (status === "Ny") return <span className={`${base} border-blue-500/40 bg-blue-500/10 text-blue-200`}>New</span>;
-    if (status === "Pågår") return <span className={`${base} border-yellow-500/40 bg-yellow-500/10 text-yellow-200`}>In progress</span>;
-    if (status === "Fullført") return <span className={`${base} border-emerald-500/40 bg-emerald-500/10 text-emerald-200`}>Completed</span>;
-    return <span className={`${base} border-brand-700 bg-brand-900/40 text-brand-200`}>{status || "Unknown"}</span>;
+    if (status === "Ny")
+      return <span className={`${base} border-blue-500/40 bg-blue-500/10 text-blue-200`}>New</span>;
+    if (status === "Pågår")
+      return (
+        <span className={`${base} border-yellow-500/40 bg-yellow-500/10 text-yellow-200`}>
+          In progress
+        </span>
+      );
+    if (status === "Fullført")
+      return (
+        <span className={`${base} border-emerald-500/40 bg-emerald-500/10 text-emerald-200`}>
+          Completed
+        </span>
+      );
+    return (
+      <span className={`${base} border-brand-700 bg-brand-900/40 text-brand-200`}>
+        {status || "Unknown"}
+      </span>
+    );
   };
 
   const downloadAttachment = async (file_path) => {
@@ -149,20 +124,21 @@ export default function QuotePortal() {
     }
   };
 
+  // (Foreløpig) messages/actions: lagres som notes via API (ikke client supabase)
   const postPortalMessage = async () => {
     if (!data?.quote?.id || !message.trim()) return;
 
     try {
       setSending(true);
 
-      // Enkel løsning: lagre som note i quote_notes (author_id null = customer)
-      const { error } = await supabase.from("quote_notes").insert({
-        quote_id: data.quote.id,
-        author_id: null,
-        note: `[PORTAL] ${message.trim()}`,
+      const res = await fetch("/api/portal/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: tokenStr, message: message.trim() }),
       });
 
-      if (error) throw error;
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Failed");
 
       setMessage("");
       alert("Message sent!");
@@ -180,21 +156,14 @@ export default function QuotePortal() {
     try {
       setActionBusy(true);
 
-      // Best effort: skriv til requests.portal_status hvis felt finnes.
-      // Hvis ikke, lag en note i stedet.
-      const { error } = await supabase
-        .from("requests")
-        .update({ portal_status: type }) // hvis kolonne ikke finnes → feiler → fallback
-        .eq("id", data.quote.id);
+      const res = await fetch("/api/portal/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: tokenStr, type }),
+      });
 
-      if (error) {
-        // fallback note
-        await supabase.from("quote_notes").insert({
-          quote_id: data.quote.id,
-          author_id: null,
-          note: `[PORTAL ACTION] ${type}`,
-        });
-      }
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Failed");
 
       alert(type === "approved" ? "Thanks! We received your approval." : "Thanks! We received your request.");
     } catch (e) {
@@ -231,23 +200,23 @@ export default function QuotePortal() {
 
   const { quote, employee } = data;
 
-  // “Offer pdf” - finner første pdf med "offer" i navn, ellers første pdf
   const offerPdf =
-    attachments.find((a) => (a.file_name || "").toLowerCase().includes("offer") && (a.file_name || "").toLowerCase().endsWith(".pdf")) ||
+    attachments.find(
+      (a) =>
+        (a.file_name || "").toLowerCase().includes("offer") &&
+        (a.file_name || "").toLowerCase().endsWith(".pdf")
+    ) ||
     attachments.find((a) => (a.file_name || "").toLowerCase().endsWith(".pdf")) ||
     null;
 
   return (
     <div className="min-h-screen bg-brand-950">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-14 space-y-6">
-        {/* Hero */}
         <Card className="border-accent-blue/50 bg-brand-900/70">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <h1 className="text-2xl font-bold text-white mb-1">Your project with Hansen IT</h1>
-              <p className="text-brand-300 text-sm">
-                Track status, view the offer, and communicate with us here.
-              </p>
+              <p className="text-brand-300 text-sm">Track status, view the offer, and communicate with us here.</p>
               <div className="mt-3 flex items-center gap-2 flex-wrap">
                 {statusChip(quote.status)}
                 <span className="text-[11px] text-brand-500 font-mono">Project ID: {quote.id}</span>
@@ -255,11 +224,7 @@ export default function QuotePortal() {
             </div>
 
             <div className="flex gap-2">
-              <Button
-                onClick={() => portalAction("approved")}
-                disabled={actionBusy}
-                className="gap-2"
-              >
+              <Button onClick={() => portalAction("approved")} disabled={actionBusy} className="gap-2">
                 <CheckCircle2 size={16} /> Approve
               </Button>
               <Button
@@ -274,9 +239,7 @@ export default function QuotePortal() {
           </div>
         </Card>
 
-        {/* Two columns */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left */}
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <div className="space-y-3">
@@ -324,7 +287,11 @@ export default function QuotePortal() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-brand-300">
                   <div>
                     <p className="font-medium text-white text-xs uppercase">Inspection</p>
-                    <p>{quote.inspection_date ? new Date(quote.inspection_date).toLocaleString() : "Not scheduled yet"}</p>
+                    <p>
+                      {quote.inspection_date
+                        ? new Date(quote.inspection_date).toLocaleString()
+                        : "Not scheduled yet"}
+                    </p>
                   </div>
                   <div>
                     <p className="font-medium text-white text-xs uppercase">Start</p>
@@ -362,17 +329,12 @@ export default function QuotePortal() {
               <p className="text-sm text-brand-300 whitespace-pre-wrap">{quote.message}</p>
             </Card>
 
-            {/* Message */}
             <Card>
               <h2 className="text-lg font-semibold text-white mb-2">Send a message</h2>
               <p className="text-sm text-brand-300 mb-3">
                 Send additional details or questions here. We will see it internally.
               </p>
-              <Textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Write your message…"
-              />
+              <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Write your message…" />
               <div className="mt-3">
                 <Button onClick={postPortalMessage} disabled={sending || !message.trim()}>
                   {sending ? "Sending…" : "Send"}
@@ -381,9 +343,7 @@ export default function QuotePortal() {
             </Card>
           </div>
 
-          {/* Right */}
           <div className="space-y-6">
-            {/* Offer PDF */}
             <Card>
               <div className="flex items-center justify-between gap-3">
                 <div className="text-white font-semibold flex items-center gap-2">
@@ -394,18 +354,12 @@ export default function QuotePortal() {
               {offerPdf ? (
                 <div className="mt-3 space-y-2">
                   <div className="text-sm text-white">{offerPdf.file_name}</div>
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => downloadAttachment(offerPdf.file_path)}
-                  >
+                  <Button variant="outline" className="gap-2" onClick={() => downloadAttachment(offerPdf.file_path)}>
                     <Download size={16} /> Download
                   </Button>
                 </div>
               ) : (
-                <div className="mt-3 text-sm text-brand-400">
-                  No offer document available yet.
-                </div>
+                <div className="mt-3 text-sm text-brand-400">No offer document available yet.</div>
               )}
 
               {attachments.length > 1 ? (
@@ -436,14 +390,10 @@ export default function QuotePortal() {
               <p className="text-sm text-brand-300">
                 If you want to change details or add information, use the message box or contact us and refer to:
               </p>
-              <p className="text-sm text-accent-blue font-mono mt-2">
-                Project ID: #{quote.id}
-              </p>
+              <p className="text-sm text-accent-blue font-mono mt-2">Project ID: #{quote.id}</p>
             </Card>
 
-            <div className="text-center text-[11px] text-brand-500">
-              Hansen IT – powered by CRM
-            </div>
+            <div className="text-center text-[11px] text-brand-500">Hansen IT – powered by CRM</div>
           </div>
         </div>
       </div>
