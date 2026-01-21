@@ -1,56 +1,66 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const c = cookies().get("casdoorUser");
-  if (!c?.value) return NextResponse.json({ error: "Not logged in" }, { status: 401 });
-
-  let sessionUser;
+export async function GET(req) {
   try {
-    sessionUser = JSON.parse(c.value);
-  } catch {
-    return NextResponse.json({ error: "Bad session" }, { status: 401 });
-  }
+    const cookie = req.cookies.get("casdoorUser")?.value;
+    if (!cookie) return NextResponse.json(null, { status: 200 });
 
-  const supabase = getSupabaseServer();
+    const parsed = JSON.parse(cookie);
+    const email = parsed?.email;
+    if (!email) return NextResponse.json(null, { status: 200 });
 
-  // get employee from your employees table
-  const { data: employee } = await supabase
-    .from("employees")
-    .select("name,email,role")
-    .eq("email", sessionUser.email)
-    .maybeSingle();
+    const supabase = getSupabaseServer();
 
-  const roleName = employee?.role || sessionUser.role || "worker";
+    // employee
+    const { data: emp, error: empErr } = await supabase
+      .from("employees")
+      .select("id,name,email,role")
+      .eq("email", email)
+      .single();
 
-  // fetch role id
-  const { data: roleRow } = await supabase
-    .from("roles")
-    .select("id,name")
-    .eq("name", roleName)
-    .maybeSingle();
+    if (empErr || !emp) return NextResponse.json(null, { status: 200 });
 
-  let permissions = [];
-  if (roleRow?.id) {
-    // join -> permissions keys
-    const { data: rp } = await supabase
-      .from("role_permissions")
-      .select("permission_id, permissions:key ( key )")
-      .eq("role_id", roleRow.id);
+    // roles for employee
+    const { data: er, error: erErr } = await supabase
+      .from("employee_roles")
+      .select("role_id, roles:role_id (id,name)")
+      .eq("employee_id", emp.id);
 
-    // Supabase can return nested; safe parse:
-    permissions = (rp || [])
-      .map((x) => x?.permissions?.key)
+    const roles = (erErr ? [] : (er || []))
+      .map((x) => x.roles?.name)
       .filter(Boolean);
-  }
 
-  return NextResponse.json({
-    name: employee?.name || sessionUser.name,
-    email: employee?.email || sessionUser.email,
-    role: roleName,
-    permissions,
-  });
+    // permissions via roles
+    let permissions = [];
+    if ((er || []).length) {
+      const roleIds = er.map((x) => x.role_id).filter(Boolean);
+
+      const { data: rp, error: rpErr } = await supabase
+        .from("role_permissions")
+        .select("permission_id, permissions:permission_id (key)")
+        .in("role_id", roleIds);
+
+      permissions = (rpErr ? [] : (rp || []))
+        .map((x) => x.permissions?.key)
+        .filter(Boolean);
+    }
+
+    // fallback: hvis du ikke har migrert alt ennå
+    const effectiveRole = emp.role || (roles.includes("admin") ? "admin" : roles[0] || "worker");
+
+    return NextResponse.json({
+      id: emp.id,
+      name: emp.name,
+      email: emp.email,
+      role: effectiveRole, // bakoverkompatibel
+      roles: roles.length ? roles : [effectiveRole],
+      permissions,
+    });
+  } catch (e) {
+    console.error("api/me error:", e);
+    return NextResponse.json(null, { status: 200 });
+  }
 }

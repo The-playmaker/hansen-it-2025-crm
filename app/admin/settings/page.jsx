@@ -1,35 +1,55 @@
 "use client";
+export const dynamic = "force-dynamic";
 
-import { useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
+import { useMe } from "@/app/admin/useMe";
 
-const tabs = [
-  { key: "users", label: "Brukere", href: "/admin/settings/users" },
-  { key: "roles", label: "Roller & tilgang", href: "/admin/settings/roles" },
-  { key: "general", label: "Generelt", href: "/admin/settings/general" },
-  { key: "integrations", label: "Integrasjoner", href: "/admin/settings/integrations" },
-];
+export default function SettingsIndex() {
+  const { me, loading } = useMe();
 
-export default function SettingsHome() {
+  if (loading) return <div className="p-6 text-brand-300">Loading…</div>;
+  if (!me) return <div className="p-6 text-brand-300">Not logged in</div>;
+
+  // only admins (for now)
+  if (!me.permissions?.includes("admin.settings.view") && me.role !== "admin") {
+    return <div className="p-6 text-brand-300">No access</div>;
+  }
+
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white">Settings</h1>
-        <p className="text-brand-300">Administrasjon, tilgang og systeminnstillinger.</p>
-      </div>
+      <h1 className="text-3xl font-bold text-white">Settings</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {tabs.map((t) => (
-          <Link key={t.key} href={t.href}>
-            <Card className="cursor-pointer hover:bg-brand-900/40 transition">
-              <div className="space-y-1">
-                <div className="text-white font-semibold">{t.label}</div>
-                <div className="text-brand-400 text-sm">Åpne {t.label.toLowerCase()}</div>
-              </div>
-            </Card>
-          </Link>
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <div className="space-y-2">
+            <div className="text-white font-semibold">Users</div>
+            <div className="text-brand-300 text-sm">Assign roles to employees</div>
+            <Link className="text-accent-blue underline text-sm" href="/admin/settings/users">
+              Open
+            </Link>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="space-y-2">
+            <div className="text-white font-semibold">Roles</div>
+            <div className="text-brand-300 text-sm">Create/edit roles + toggle permissions</div>
+            <Link className="text-accent-blue underline text-sm" href="/admin/settings/roles">
+              Open
+            </Link>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="space-y-2">
+            <div className="text-white font-semibold">Permissions</div>
+            <div className="text-brand-300 text-sm">Create/edit permission keys</div>
+            <Link className="text-accent-blue underline text-sm" href="/admin/settings/permissions">
+              Open
+            </Link>
+          </div>
+        </Card>
       </div>
     </div>
   );
