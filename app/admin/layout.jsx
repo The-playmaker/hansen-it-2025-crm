@@ -18,7 +18,7 @@ import {
   Link as LinkIcon // ✅ hvis du la til Portal links
 } from "lucide-react";
 import { useMe } from "./useMe";
-import { Link as LinkIcon } from "lucide-react";
+
 
 
 const baseNav = [
