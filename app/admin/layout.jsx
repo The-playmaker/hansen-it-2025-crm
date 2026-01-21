@@ -1,5 +1,8 @@
-import { AdminLayout } from "@/components/admin/AdminShell";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-export default function AdminRootLayout({ children }) {
-  return <AdminLayout>{children}</AdminLayout>;
+import AdminShell from "@/components/admin/AdminShell";
+
+export default function AdminLayoutRoot({ children }) {
+  return <AdminShell>{children}</AdminShell>;
 }
