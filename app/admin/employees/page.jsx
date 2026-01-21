@@ -5,10 +5,11 @@ export default function EmployeesPage() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold text-white">Team / Employees</h1>
-      <p className="text-brand-300 mt-2">Employees page is loading correctly.</p>
+      <p className="text-brand-300 mt-2">OK – page renders.</p>
     </div>
   );
 }
+
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
