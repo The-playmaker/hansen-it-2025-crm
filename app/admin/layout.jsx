@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -9,9 +10,12 @@ import {
   Calendar,
   Users,
   Settings,
+  Service,
   LogOut,
   ChevronLeft,
   Globe,
+  FileText,     // ✅ legg til denne
+  Link as LinkIcon // ✅ hvis du la til Portal links
 } from "lucide-react";
 import { useMe } from "./useMe";
 import { Link as LinkIcon } from "lucide-react";
