@@ -1,16 +1,26 @@
 "use client";
-export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
 import { RefreshCcw } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 function isoDate(d) {
-  // yyyy-mm-dd
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function toDayStr(value) {
+  // value kan være null, date, timestamptz string
+  if (!value) return "";
+  try {
+    return isoDate(new Date(value));
+  } catch {
+    return "";
+  }
 }
 
 export default function CalendarPage() {
@@ -27,9 +37,10 @@ export default function CalendarPage() {
   const refresh = async () => {
     setLoading(true);
     try {
+      // ✅ Bruk felter vi vet finnes: start_date/due_date/inspection_date
       const { data, error } = await supabase
         .from("requests")
-        .select("id,name,email,status,created_at,scheduled_date")
+        .select("id,name,email,status,created_at,start_date")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -43,31 +54,31 @@ export default function CalendarPage() {
   };
 
   const scheduledForSelected = useMemo(() => {
-    return requests.filter((r) => (r.scheduled_date || "") === selectedDate);
+    return requests.filter((r) => toDayStr(r.start_date) === selectedDate);
   }, [requests, selectedDate]);
 
   const unscheduled = useMemo(() => {
-    return requests.filter((r) => !r.scheduled_date);
+    return requests.filter((r) => !r.start_date);
   }, [requests]);
 
   const setScheduledDate = async (id, dateStr) => {
     try {
+      // Lagre som timestamptz: date + tid (00:00:00Z)
+      const iso = `${dateStr}T00:00:00.000Z`;
+
       const { error } = await supabase
         .from("requests")
-        .update({ scheduled_date: dateStr })
+        .update({ start_date: iso })
         .eq("id", id);
 
       if (error) throw error;
 
       setRequests((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, scheduled_date: dateStr } : r))
+        prev.map((r) => (r.id === id ? { ...r, start_date: iso } : r))
       );
     } catch (e) {
       console.error("setScheduledDate error:", e);
-      alert(
-        e?.message ||
-          "Kunne ikke sette dato. Sjekk at requests.scheduled_date finnes i databasen."
-      );
+      alert(e?.message || "Kunne ikke sette dato.");
     }
   };
 
@@ -75,13 +86,13 @@ export default function CalendarPage() {
     try {
       const { error } = await supabase
         .from("requests")
-        .update({ scheduled_date: null })
+        .update({ start_date: null })
         .eq("id", id);
 
       if (error) throw error;
 
       setRequests((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, scheduled_date: null } : r))
+        prev.map((r) => (r.id === id ? { ...r, start_date: null } : r))
       );
     } catch (e) {
       console.error("clearScheduledDate error:", e);
@@ -95,7 +106,7 @@ export default function CalendarPage() {
         <div>
           <h1 className="text-3xl font-bold text-white">Calendar / Planner</h1>
           <p className="text-brand-300 text-sm mt-1">
-            Planlegg requests på dato (scheduled_date).
+            Planlegg requests på dato (bruker <span className="text-white">start_date</span>).
           </p>
         </div>
 
@@ -152,9 +163,7 @@ export default function CalendarPage() {
 
           <Card>
             <h2 className="text-xl font-bold text-white mb-2">Unscheduled</h2>
-            <p className="text-brand-300 text-sm mb-4">
-              Sett dato = {selectedDate}
-            </p>
+            <p className="text-brand-300 text-sm mb-4">Sett dato = {selectedDate}</p>
 
             <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
               {unscheduled.length === 0 ? (
@@ -183,7 +192,7 @@ export default function CalendarPage() {
             </div>
 
             <div className="text-xs text-brand-400 mt-4">
-              Krever `requests.scheduled_date` (date eller text yyyy-mm-dd).
+              Dette bruker <span className="text-white">requests.start_date</span> i databasen.
             </div>
           </Card>
         </div>
