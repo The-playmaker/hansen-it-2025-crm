@@ -27,7 +27,7 @@ const baseNav = [
   { href: "/admin/services", label: "Services", icon: Settings },
 ];
 
-export default function AdminShell({ children }) {
+export function AdminShell({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const { me } = useMe();
