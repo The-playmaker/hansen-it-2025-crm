@@ -289,20 +289,22 @@ export default function QuoteDetailsPage() {
   };
 
   const downloadAttachment = async (file_path) => {
-    try {
-      const res = await fetch("/api/portal/attachments/sign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: "__internal_admin__", file_path }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Failed to sign URL");
-      window.open(json.url, "_blank", "noopener,noreferrer");
-    } catch (e) {
-      console.error(e);
-      alert("Could not download.");
-    }
-  };
+  try {
+    const res = await fetch(`/api/admin/quotes/${quoteId}/sign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_path }),
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || "Failed to sign URL");
+
+    window.open(json.url, "_blank", "noopener,noreferrer");
+  } catch (e) {
+    console.error(e);
+    alert("Could not download.");
+  }
+};
 
   // ---- portal link ----
   const handleCreatePortalLink = async () => {
