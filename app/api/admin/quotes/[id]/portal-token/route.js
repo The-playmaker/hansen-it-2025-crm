@@ -5,15 +5,20 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req, ctx) {
   const id = ctx.params.id;
-  const body = await req.json().catch(() => ({}));
+
+  const token =
+    (globalThis.crypto?.randomUUID && globalThis.crypto.randomUUID()) ||
+    Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+  const expires = new Date();
+  expires.setMonth(expires.getMonth() + 3);
 
   const { data, error } = await supabaseAdmin
-    .from("quote_time_entries")
+    .from("quote_portal_tokens")
     .insert({
       quote_id: id,
-      employee_id: body.employee_id ?? null,
-      hours: body.hours,
-      description: body.description ?? null,
+      token,
+      expires_at: expires.toISOString(),
     })
     .select("*")
     .single();

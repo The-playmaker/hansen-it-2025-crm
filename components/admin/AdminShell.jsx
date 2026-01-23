@@ -27,7 +27,7 @@ const baseNav = [
   { href: "/admin/services", label: "Services", icon: Settings },
 ];
 
-export default function AdminShell({ children }) {
+export function AdminShell({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const { me } = useMe();
@@ -87,7 +87,8 @@ export default function AdminShell({ children }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium
+                transition-colors ${
                   active
                     ? "bg-accent-blue/10 text-accent-blue"
                     : "text-brand-400 hover:bg-brand-800 hover:text-white"

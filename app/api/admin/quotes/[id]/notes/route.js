@@ -1,31 +1,35 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { requireMe } from "@/lib/requireMe";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-export async function POST(req, { params }) {
-  const me = requireMe();
-  if (!me) return NextResponse.json({ error: "Not logged in" }, { status: 401 });
+export const dynamic = "force-dynamic";
 
-  const { note } = await req.json();
-  if (!note?.trim()) return NextResponse.json({ error: "Missing note" }, { status: 400 });
+export async function GET(req, ctx) {
+  const id = ctx.params.id;
 
-  const supabase = getSupabaseAdmin();
-
-  // map email -> employee.id (bigint)
-  const { data: emp } = await supabase
-    .from("employees")
-    .select("id")
-    .ilike("email", me.email)
-    .maybeSingle();
-
-  const author_id = emp?.id ?? null;
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("quote_notes")
-    .insert({ quote_id: params.id, author_id, note: note.trim() })
+    .select("*")
+    .eq("quote_id", id)
+    .order("created_at", { ascending: false });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ data: data || [] });
+}
+
+export async function POST(req, ctx) {
+  const id = ctx.params.id;
+  const body = await req.json().catch(() => ({}));
+
+  const { data, error } = await supabaseAdmin
+    .from("quote_notes")
+    .insert({
+      quote_id: id,
+      author_id: body.author_id ?? null,
+      note: body.note ?? "",
+    })
     .select("*")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data });
 }

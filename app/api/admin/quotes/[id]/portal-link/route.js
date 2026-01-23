@@ -3,52 +3,31 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-function getMeFromCookie(req) {
-  const raw = req.cookies.get("casdoorUser")?.value;
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-export async function POST(req, { params }) {
-  const me = getMeFromCookie(req);
-  if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  // valgfritt: kun admin/worker som får lage portal link
-  if (!["admin", "worker", "manager"].includes(me.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const quoteId = params.id;
-
-  const token =
-    (globalThis.crypto?.randomUUID && globalThis.crypto.randomUUID()) ||
-    Math.random().toString(36).slice(2) + Date.now().toString(36);
-
-  const expires = new Date();
-  expires.setMonth(expires.getMonth() + 3);
-
-  const { data, error } = await supabaseAdmin
+export async function GET() {
+  const { data: tokens, error } = await supabaseAdmin
     .from("quote_portal_tokens")
-    .insert({
-      quote_id: quoteId,
-      token,
-      expires_at: expires.toISOString(),
-    })
-    .select("*")
-    .single();
+    .select("token,quote_id,expires_at,created_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const ids = Array.from(new Set((tokens || []).map((t) => t.quote_id).filter(Boolean)));
+  let quotesById = {};
+
+  if (ids.length) {
+    const { data: quotes } = await supabaseAdmin
+      .from("requests")
+      .select("id,name,email,status")
+      .in("id", ids);
+
+    (quotes || []).forEach((q) => (quotesById[q.id] = q));
   }
 
-  const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  return NextResponse.json({
-    token: data.token,
-    url: `${base}/portal/${data.token}`,
-    expires_at: data.expires_at,
-  });
+  const rows = (tokens || []).map((t) => ({
+    ...t,
+    quote: quotesById[t.quote_id] || null,
+  }));
+
+  return NextResponse.json({ data: rows });
 }

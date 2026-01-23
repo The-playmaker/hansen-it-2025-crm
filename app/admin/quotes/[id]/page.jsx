@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
@@ -17,10 +16,11 @@ import {
   Calendar as CalendarIcon,
   FileText,
   Link as LinkIcon,
+  Download,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 
-export default function QuoteDetails() {
+export default function QuoteDetailsPage() {
   const { id } = useParams();
   const quoteId = String(id || "");
   const router = useRouter();
@@ -39,30 +39,21 @@ export default function QuoteDetails() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Notat
   const [newNote, setNewNote] = useState("");
-
-  // Time-entry
   const [hours, setHours] = useState("");
   const [timeDescription, setTimeDescription] = useState("");
 
-  // Datoer
   const [inspectionDate, setInspectionDate] = useState("");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
 
-  // Vedlegg
   const [file, setFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
 
-  // Portal-link
   const [portalUrl, setPortalUrl] = useState(null);
-  const [creatingPortal, setCreatingPortal] = useState(false);
+  const [busyPortal, setBusyPortal] = useState(false);
+  const [busyPdf, setBusyPdf] = useState(false);
+  const [busyUpload, setBusyUpload] = useState(false);
 
-  // PDF
-  const [generatingPdf, setGeneratingPdf] = useState(false);
-
-  // --- helpers ---
   const assignedEmployee = useMemo(
     () => employees.find((e) => e.id === quote?.employee_id) || null,
     [employees, quote]
@@ -73,9 +64,7 @@ export default function QuoteDetails() {
     [timeEntries]
   );
 
-  const canManageNotes = true; // du kan senere bytte til permission-check via me.permissions
-
-  // --- auth/me (Casdoor cookie) ---
+  // ---- load me ----
   useEffect(() => {
     fetch("/api/me", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -83,159 +72,129 @@ export default function QuoteDetails() {
       .catch(() => setMe(null));
   }, []);
 
-  // --- load quote + related ---
+  // ---- loaders ----
+  const loadEmployees = async () => {
+    const res = await fetch("/api/admin/employees", { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || "Failed employees");
+    setEmployees(json.data || []);
+  };
+
+  const loadNotes = async () => {
+    const res = await fetch(`/api/admin/quotes/${quoteId}/notes`, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || "Failed notes");
+    setNotes(json.data || []);
+  };
+
+  const loadQuote = async () => {
+    const res = await fetch(`/api/admin/quotes/${quoteId}`, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || "Failed quote");
+    setQuote(json.data);
+
+    const q = json.data;
+    if (q?.inspection_date) setInspectionDate(String(q.inspection_date).slice(0, 10));
+    if (q?.start_date) setStartDate(String(q.start_date).slice(0, 10));
+    if (q?.due_date) setDueDate(String(q.due_date).slice(0, 10));
+  };
+
+  const loadTime = async () => {
+    const res = await fetch(`/api/admin/quotes/${quoteId}?include=time`, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || "Failed time");
+    setTimeEntries(json.time || []);
+  };
+
+  const loadAttachments = async () => {
+    const res = await fetch(`/api/admin/quotes/${quoteId}?include=attachments`, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || "Failed attachments");
+    setAttachments(json.attachments || []);
+  };
+
   useEffect(() => {
     if (!quoteId) return;
 
-    const load = async () => {
+    const loadAll = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
-
-        const { data: quoteData, error: quoteError } = await supabase
-          .from("requests")
-          .select("*")
-          .eq("id", quoteId)
-          .maybeSingle();
-
-        if (quoteError || !quoteData) {
-          router.push("/admin/dashboard");
-          return;
-        }
-
-        setQuote(quoteData);
-
-        if (quoteData.inspection_date) setInspectionDate(String(quoteData.inspection_date).slice(0, 10));
-        if (quoteData.start_date) setStartDate(String(quoteData.start_date).slice(0, 10));
-        if (quoteData.due_date) setDueDate(String(quoteData.due_date).slice(0, 10));
-
-        const { data: empData } = await supabase
-          .from("employees")
-          .select("*")
-          .eq("active", true)
-          .order("name", { ascending: true });
-
-        setEmployees(empData || []);
-
-        const { data: notesData } = await supabase
-          .from("quote_notes")
-          .select("*")
-          .eq("quote_id", quoteId)
-          .order("created_at", { ascending: false });
-
-        setNotes(notesData || []);
-
-        const { data: timeData } = await supabase
-          .from("quote_time_entries")
-          .select("*")
-          .eq("quote_id", quoteId)
-          .order("created_at", { ascending: false });
-
-        setTimeEntries(timeData || []);
-
-        const { data: attachData } = await supabase
-          .from("quote_attachments")
-          .select("*")
-          .eq("quote_id", quoteId)
-          .order("created_at", { ascending: false });
-
-        setAttachments(attachData || []);
-      } catch (err) {
-        console.error("Error loading quote details:", err);
+        await Promise.all([loadEmployees(), loadQuote()]);
+        await Promise.all([loadNotes(), loadTime(), loadAttachments()]);
+      } catch (e) {
+        console.error(e);
+        router.push("/admin/quotes");
       } finally {
         setLoading(false);
       }
     };
 
-    load();
-  }, [quoteId, router]);
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteId]);
 
-  // --- actions ---
-  const handleAssignChange = async (employeeId) => {
-    if (!quoteId) return;
+  // ---- actions (quote update) ----
+  const patchQuote = async (payload) => {
     setSaving(true);
     try {
-      const value = employeeId ? Number(employeeId) : null;
-
-      const { error } = await supabase
-        .from("requests")
-        .update({ employee_id: value })
-        .eq("id", quoteId);
-
-      if (error) throw error;
-      setQuote((prev) => (prev ? { ...prev, employee_id: value } : prev));
-    } catch (err) {
-      console.error("Error assigning employee:", err);
+      const res = await fetch(`/api/admin/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Failed");
+      setQuote(json.data);
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Could not save");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleStatusChange = async (status) => {
-    if (!quoteId) return;
-    setSaving(true);
-    try {
-      const { error } = await supabase.from("requests").update({ status }).eq("id", quoteId);
-      if (error) throw error;
-      setQuote((prev) => (prev ? { ...prev, status } : prev));
-    } catch (err) {
-      console.error("Error updating status:", err);
-    } finally {
-      setSaving(false);
-    }
+  const handleAssignChange = (employeeId) => {
+    const val = employeeId ? Number(employeeId) : null;
+    patchQuote({ employee_id: val });
   };
 
-  const handleDatesSave = async () => {
-    if (!quoteId) return;
-    setSaving(true);
-    try {
-      const payload = {
-        inspection_date: inspectionDate ? new Date(inspectionDate).toISOString() : null,
-        start_date: startDate ? new Date(startDate).toISOString() : null,
-        due_date: dueDate ? new Date(dueDate).toISOString() : null,
-      };
+  const handleStatusChange = (status) => patchQuote({ status });
 
-      const { error } = await supabase.from("requests").update(payload).eq("id", quoteId);
-      if (error) throw error;
+  const handleDatesSave = () =>
+    patchQuote({
+      inspection_date: inspectionDate ? new Date(inspectionDate).toISOString() : null,
+      start_date: startDate ? new Date(startDate).toISOString() : null,
+      due_date: dueDate ? new Date(dueDate).toISOString() : null,
+    });
 
-      setQuote((prev) => (prev ? { ...prev, ...payload } : prev));
-    } catch (err) {
-      console.error("Error saving dates:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
+  // ---- notes ----
   const handleAddNote = async (e) => {
     e.preventDefault();
-    if (!quoteId || !me || !newNote.trim()) return;
+    if (!newNote.trim()) return;
 
     try {
-      // author_id forventer trolig employee_id (bigint). Hvis du bruker casdoorUser id (uuid),
-      // bør du mappe me.email -> employee.id. Vi gjør det enkelt:
-      const authorId = employees.find((x) => x.email === me.email)?.id || null;
+      const authorId = employees.find((x) => x.email === me?.email)?.id ?? null;
 
-      const { data, error } = await supabase
-        .from("quote_notes")
-        .insert({
-          quote_id: quoteId,
-          author_id: authorId,
-          note: newNote.trim(),
-        })
-        .select("*")
-        .single();
+      const res = await fetch(`/api/admin/quotes/${quoteId}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: newNote.trim(), author_id: authorId }),
+      });
 
-      if (error) throw error;
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Failed");
 
-      setNotes((prev) => [data, ...prev]);
+      setNotes((prev) => [json.data, ...prev]);
       setNewNote("");
     } catch (err) {
-      console.error("Error adding note:", err);
+      console.error(err);
+      alert(err.message || "Could not add note");
     }
   };
 
-  const startEditNote = (note) => {
-    setEditingNoteId(note.id);
-    setEditingText(note.note || "");
+  const startEditNote = (n) => {
+    setEditingNoteId(n.id);
+    setEditingText(n.note || "");
   };
 
   const cancelEditNote = () => {
@@ -244,166 +203,133 @@ export default function QuoteDetails() {
   };
 
   const saveEditNote = async () => {
-    if (!editingNoteId || !me) return;
-    const note = notes.find((n) => n.id === editingNoteId);
-    if (!note) return;
-
+    if (!editingNoteId) return;
     const trimmed = editingText.trim();
-    if (!trimmed || trimmed === note.note) {
-      cancelEditNote();
-      return;
-    }
+    if (!trimmed) return;
 
     try {
-      const editorId = employees.find((x) => x.email === me.email)?.id || null;
+      const editorId = employees.find((x) => x.email === me?.email)?.id ?? null;
 
-      // log change
-      await supabase.from("quote_note_edits").insert({
-        note_id: note.id,
-        editor_id: editorId,
-        previous_value: note.note || "",
-        new_value: trimmed,
+      const res = await fetch(`/api/admin/quotes/${quoteId}/notes/${editingNoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: trimmed, editor_id: editorId }),
       });
 
-      // update note
-      const { data: updatedRow, error: updateError } = await supabase
-        .from("quote_notes")
-        .update({
-          note: trimmed,
-          updated_at: new Date().toISOString(),
-          updated_by: editorId,
-        })
-        .eq("id", note.id)
-        .select("*")
-        .single();
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Failed");
 
-      if (updateError) throw updateError;
-
-      setNotes((prev) => prev.map((n) => (n.id === note.id ? updatedRow : n)));
+      setNotes((prev) => prev.map((n) => (n.id === editingNoteId ? json.data : n)));
       cancelEditNote();
-    } catch (err) {
-      console.error("Error editing note:", err);
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Could not edit note");
     }
   };
 
+  // ---- time ----
   const handleAddTime = async (e) => {
-  e.preventDefault();
-  if (!quoteId || !hours.trim()) return;
+    e.preventDefault();
+    if (!hours.trim()) return;
 
-  const h = Number(hours);
-  if (Number.isNaN(h) || h <= 0) return;
+    const h = Number(hours);
+    if (Number.isNaN(h) || h <= 0) return;
 
-  try {
-    const res = await fetch(`/api/admin/quotes/${quoteId}/time`, {
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/time`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hours: h,
+          description: timeDescription || null,
+          employee_id: quote?.employee_id ?? null,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Failed");
+
+      setTimeEntries((prev) => [json.data, ...prev]);
+      setHours("");
+      setTimeDescription("");
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Could not add time entry");
+    }
+  };
+
+  // ---- attachments upload via API ----
+  const uploadViaApi = async (fileObj, fileNameOverride) => {
+    const form = new FormData();
+    form.append("file", fileObj, fileNameOverride || fileObj.name);
+
+    const res = await fetch(`/api/admin/quotes/${quoteId}/attachments`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        hours: h,
-        description: timeDescription,
-        employee_id: quote?.employee_id ?? null,
-      }),
+      body: form,
     });
 
     const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || "Failed");
+    if (!res.ok) throw new Error(json?.error || "Upload failed");
 
-    setTimeEntries((prev) => [json.data, ...prev]);
-    setHours("");
-    setTimeDescription("");
-  } catch (err) {
-    console.error("Error adding time entry:", err);
-    alert(err.message || "Could not add time entry");
-  }
-};
-
-
-  const handleFileChange = (e) => {
-    const f = e.target.files?.[0];
-    setFile(f || null);
-  };
-
-  const getPublicUrl = (path) => {
-    const { data } = supabase.storage.from("quote-attachments").getPublicUrl(path);
-    return data?.publicUrl || null;
+    setAttachments((prev) => [json.data, ...prev]);
   };
 
   const handleUpload = async () => {
-    if (!file || !quoteId || !me) return;
-
+    if (!file) return;
     try {
-      setUploading(true);
-
-      const path = `${quoteId}/${Date.now()}_${file.name}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("quote-attachments")
-        .upload(path, file);
-
-      if (uploadError) throw uploadError;
-
-      const uploadedBy = employees.find((x) => x.email === me.email)?.id || null;
-
-      const { data, error: metaError } = await supabase
-        .from("quote_attachments")
-        .insert({
-          quote_id: quoteId,
-          file_name: file.name,
-          file_path: path,
-          uploaded_by: uploadedBy,
-        })
-        .select("*")
-        .single();
-
-      if (metaError) throw metaError;
-
-      setAttachments((prev) => [data, ...prev]);
+      setBusyUpload(true);
+      await uploadViaApi(file);
       setFile(null);
-    } catch (err) {
-      console.error("Error uploading attachment:", err);
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Upload failed");
     } finally {
-      setUploading(false);
+      setBusyUpload(false);
     }
   };
 
-  const handleCreatePortalLink = async () => {
-    if (!quoteId) return;
-
+  const downloadAttachment = async (file_path) => {
     try {
-      setCreatingPortal(true);
+      const res = await fetch("/api/portal/attachments/sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: "__internal_admin__", file_path }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Failed to sign URL");
+      window.open(json.url, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      console.error(e);
+      alert("Could not download.");
+    }
+  };
 
-      const token =
-        (window.crypto?.randomUUID && window.crypto.randomUUID()) ||
-        Math.random().toString(36).slice(2) + Date.now().toString(36);
-
-      const expires = new Date();
-      expires.setMonth(expires.getMonth() + 3);
-
-      const { data, error } = await supabase
-        .from("quote_portal_tokens")
-        .insert({
-          quote_id: quoteId,
-          token,
-          expires_at: expires.toISOString(),
-        })
-        .select("*")
-        .single();
-
-      if (error) throw error;
+  // ---- portal link ----
+  const handleCreatePortalLink = async () => {
+    try {
+      setBusyPortal(true);
+      const res = await fetch(`/api/admin/quotes/${quoteId}/portal-token`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Failed");
 
       const base = window.location.origin;
-      setPortalUrl(`${base}/portal/${data.token}`);
-    } catch (err) {
-      console.error("Error creating portal link:", err);
+      setPortalUrl(`${base}/portal/${json.data.token}`);
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Could not create link");
     } finally {
-      setCreatingPortal(false);
+      setBusyPortal(false);
     }
   };
 
+  // ---- PDF (generate + upload) ----
   const handleGenerateOfferPdf = async () => {
-    if (!quote || !quoteId || !me) return;
+    if (!quote) return;
 
     try {
-      setGeneratingPdf(true);
+      setBusyPdf(true);
 
       const doc = new jsPDF();
       doc.setFontSize(16);
@@ -412,72 +338,42 @@ export default function QuoteDetails() {
       doc.setFontSize(11);
       let y = 30;
 
-      const addLine = (text) => {
-        doc.text(String(text), 20, y);
+      const addLine = (t) => {
+        doc.text(String(t), 20, y);
         y += 6;
       };
 
       addLine(`Project ID: ${quote.id}`);
       addLine(`Customer: ${quote.name || ""}`);
-      if (quote.address) addLine(`Address: ${quote.address}`);
       if (quote.email) addLine(`Email: ${quote.email}`);
       if (quote.phone) addLine(`Phone: ${quote.phone}`);
+      if (quote.address) addLine(`Address: ${quote.address}`);
 
       y += 4;
       addLine(`Status: ${quote.status || "Ny"}`);
-      addLine(`Urgent: ${quote.priority === "hast" ? "Yes" : "No"}`);
-
-      if (quote.inspection_date) addLine(`Inspection: ${new Date(quote.inspection_date).toLocaleString()}`);
-      if (quote.start_date) addLine(`Start: ${new Date(quote.start_date).toLocaleDateString()}`);
-      if (quote.due_date) addLine(`Due: ${new Date(quote.due_date).toLocaleDateString()}`);
+      addLine(`Logged hours: ${totalHours.toFixed(2)}h`);
 
       y += 4;
       addLine("---");
       addLine("Customer message:");
-
-      const message = quote.message || "";
-      const split = doc.splitTextToSize(message, 170);
+      const msg = quote.message || "";
+      const split = doc.splitTextToSize(msg, 170);
       doc.text(split, 20, y);
-      y += split.length * 6;
 
-      y += 8;
-      addLine(`Total logged hours: ${totalHours.toFixed(2)}h`);
-
-      // upload pdf
-      const pdfBlob = doc.output("blob");
+      const blob = doc.output("blob");
       const fileName = `offer_quote_${quote.id}.pdf`;
-      const path = `${quote.id}/${Date.now()}_${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("quote-attachments")
-        .upload(path, pdfBlob);
-
-      if (uploadError) throw uploadError;
-
-      const uploadedBy = employees.find((x) => x.email === me.email)?.id || null;
-
-      const { data, error: metaError } = await supabase
-        .from("quote_attachments")
-        .insert({
-          quote_id: quoteId,
-          file_name: fileName,
-          file_path: path,
-          uploaded_by: uploadedBy,
-        })
-        .select("*")
-        .single();
-
-      if (metaError) throw metaError;
-
-      setAttachments((prev) => [data, ...prev]);
-    } catch (err) {
-      console.error("Error generating PDF:", err);
+      // Upload via API
+      const pdfFile = new File([blob], fileName, { type: "application/pdf" });
+      await uploadViaApi(pdfFile, fileName);
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Could not generate/upload PDF");
     } finally {
-      setGeneratingPdf(false);
+      setBusyPdf(false);
     }
   };
 
-  // --- render ---
   if (loading || !quote) {
     return (
       <div className="min-h-screen bg-brand-950 flex items-center justify-center">
@@ -489,7 +385,7 @@ export default function QuoteDetails() {
   return (
     <div className="p-6 space-y-6">
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={() => router.push("/admin/quotes")} className="gap-2">
             <ArrowLeft size={16} /> Back
@@ -505,20 +401,24 @@ export default function QuoteDetails() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleGenerateOfferPdf} className="gap-2" disabled={generatingPdf}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={handleGenerateOfferPdf}
+            className="gap-2"
+            disabled={busyPdf}
+          >
             <FileText size={16} />
-            {generatingPdf ? "Generating…" : "Generate PDF"}
+            {busyPdf ? "Working…" : "Generate PDF"}
           </Button>
 
-          <Button onClick={handleCreatePortalLink} className="gap-2" disabled={creatingPortal}>
+          <Button onClick={handleCreatePortalLink} className="gap-2" disabled={busyPortal}>
             <LinkIcon size={16} />
-            {creatingPortal ? "Creating…" : "Create portal link"}
+            {busyPortal ? "Creating…" : "Create portal link"}
           </Button>
         </div>
       </div>
 
-      {/* Portal link */}
       {portalUrl ? (
         <Card>
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -526,10 +426,7 @@ export default function QuoteDetails() {
               <div className="text-white font-semibold">Customer portal link</div>
               <div className="text-brand-300 text-sm break-all">{portalUrl}</div>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => navigator.clipboard.writeText(portalUrl)}
-            >
+            <Button variant="outline" onClick={() => navigator.clipboard.writeText(portalUrl)}>
               Copy
             </Button>
           </div>
@@ -537,7 +434,7 @@ export default function QuoteDetails() {
       ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: core */}
+        {/* Left */}
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -632,7 +529,7 @@ export default function QuoteDetails() {
                 onChange={(e) => setNewNote(e.target.value)}
                 placeholder="Write internal note…"
               />
-              <Button type="submit" className="gap-2" disabled={!canManageNotes}>
+              <Button type="submit" className="gap-2">
                 <Plus size={16} /> Add note
               </Button>
             </form>
@@ -647,8 +544,8 @@ export default function QuoteDetails() {
                       <div className="space-y-2">
                         <Textarea value={editingText} onChange={(e) => setEditingText(e.target.value)} />
                         <div className="flex gap-2">
-                          <Button onClick={saveEditNote}>Save</Button>
-                          <Button variant="outline" onClick={cancelEditNote}>Cancel</Button>
+                          <Button type="button" onClick={saveEditNote}>Save</Button>
+                          <Button type="button" variant="outline" onClick={cancelEditNote}>Cancel</Button>
                         </div>
                       </div>
                     ) : (
@@ -658,7 +555,7 @@ export default function QuoteDetails() {
                           <div className="text-xs text-brand-500">
                             {n.created_at ? new Date(n.created_at).toLocaleString() : ""}
                           </div>
-                          <Button variant="outline" onClick={() => startEditNote(n)}>
+                          <Button type="button" variant="outline" onClick={() => startEditNote(n)}>
                             Edit
                           </Button>
                         </div>
@@ -671,7 +568,7 @@ export default function QuoteDetails() {
           </Card>
         </div>
 
-        {/* Right: time + attachments */}
+        {/* Right */}
         <div className="space-y-6">
           <Card>
             <div className="flex items-center justify-between">
@@ -682,16 +579,8 @@ export default function QuoteDetails() {
             </div>
 
             <form onSubmit={handleAddTime} className="mt-4 space-y-3">
-              <Input
-                value={hours}
-                onChange={(e) => setHours(e.target.value)}
-                placeholder="Hours (e.g. 1.5)"
-              />
-              <Input
-                value={timeDescription}
-                onChange={(e) => setTimeDescription(e.target.value)}
-                placeholder="Description (optional)"
-              />
+              <Input value={hours} onChange={(e) => setHours(e.target.value)} placeholder="Hours (e.g. 1.5)" />
+              <Input value={timeDescription} onChange={(e) => setTimeDescription(e.target.value)} placeholder="Description (optional)" />
               <Button type="submit" className="gap-2">
                 <Plus size={16} /> Add time
               </Button>
@@ -723,9 +612,9 @@ export default function QuoteDetails() {
             </div>
 
             <div className="mt-4 space-y-3">
-              <input type="file" onChange={handleFileChange} />
-              <Button onClick={handleUpload} disabled={uploading || !file} className="gap-2">
-                <Plus size={16} /> {uploading ? "Uploading…" : "Upload"}
+              <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              <Button onClick={handleUpload} disabled={busyUpload || !file} className="gap-2">
+                <Plus size={16} /> {busyUpload ? "Uploading…" : "Upload"}
               </Button>
             </div>
 
@@ -733,24 +622,23 @@ export default function QuoteDetails() {
               {attachments.length === 0 ? (
                 <div className="text-brand-400 text-sm">No attachments.</div>
               ) : (
-                attachments.map((a) => {
-                  const url = getPublicUrl(a.file_path);
-                  return (
-                    <div key={a.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
-                      <div className="text-white text-sm font-medium flex items-center gap-2">
-                        <Paperclip size={14} /> {a.file_name}
-                      </div>
-                      <div className="text-brand-500 text-[11px] mt-1">
-                        {a.created_at ? new Date(a.created_at).toLocaleString() : ""}
-                      </div>
-                      {url ? (
-                        <a className="text-accent-blue text-sm underline mt-2 inline-block" href={url} target="_blank" rel="noreferrer">
-                          Open
-                        </a>
-                      ) : null}
+                attachments.map((a) => (
+                  <div key={a.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
+                    <div className="text-white text-sm font-medium flex items-center gap-2">
+                      <Paperclip size={14} /> {a.file_name}
                     </div>
-                  );
-                })
+                    <div className="text-brand-500 text-[11px] mt-1">
+                      {a.created_at ? new Date(a.created_at).toLocaleString() : ""}
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="mt-2 gap-2"
+                      onClick={() => downloadAttachment(a.file_path)}
+                    >
+                      <Download size={16} /> Open
+                    </Button>
+                  </div>
+                ))
               )}
             </div>
           </Card>

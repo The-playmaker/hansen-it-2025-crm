@@ -3,126 +3,107 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { FileText, RefreshCcw } from "lucide-react";
+import { Input } from "@/components/ui/Input";
+import { RefreshCcw, Search, ExternalLink } from "lucide-react";
 
 export default function QuotesPage() {
   const router = useRouter();
-  const [quotes, setQuotes] = useState([]);
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("");
+  const [q, setQ] = useState("");
 
-  const fetchQuotes = async () => {
+  const load = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from("requests")
-        .select("id,name,email,status,created_at")
-        .order("created_at", { ascending: false });
-
-      if (statusFilter) {
-        query = query.eq("status", statusFilter);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      setQuotes(data || []);
+      const res = await fetch(`/api/admin/quotes?search=${encodeURIComponent(q)}`, {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Failed");
+      setRows(json.data || []);
     } catch (e) {
-      console.error("quotes fetch error:", e);
-      setQuotes([]);
+      console.error(e);
+      setRows([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchQuotes();
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
+  }, []);
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold text-white">Quotes</h1>
           <p className="text-brand-300 text-sm mt-1">
-            Alle innkommende forespørsler / tilbud
+            Oversikt over alle requests/tilbud (requests-tabellen).
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-brand-900 border border-brand-700 rounded-lg px-3 py-2 text-white text-sm"
-          >
-            <option value="">Alle statuser</option>
-            <option value="Ny">Ny</option>
-            <option value="Pågår">Pågår</option>
-            <option value="Fullført">Fullført</option>
-          </select>
-
-          <Button variant="outline" onClick={fetchQuotes} className="gap-2">
+        <div className="flex gap-2 items-center flex-wrap">
+          <div className="relative">
+            <Search className="w-4 h-4 text-brand-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Søk navn / email / id…"
+              className="pl-9 w-[280px]"
+            />
+          </div>
+          <Button variant="outline" onClick={load} className="gap-2">
             <RefreshCcw size={16} /> Refresh
           </Button>
         </div>
       </div>
 
-      {/* Content */}
-      {loading ? (
-        <div className="py-10 text-center text-brand-300">Loading…</div>
-      ) : quotes.length === 0 ? (
-        <div className="text-brand-400 text-sm">Ingen quotes funnet.</div>
-      ) : (
-        <div className="grid grid-cols-1 gap-3">
-          {quotes.map((q) => (
-            <Card
-              key={q.id}
-              className="flex items-center justify-between gap-4 hover:bg-brand-900/40 transition cursor-pointer"
-              onClick={() => router.push(`/admin/quotes/${q.id}`)}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <FileText className="w-5 h-5 text-accent-blue shrink-0" />
-
-                <div className="min-w-0">
-                  <div className="text-white font-medium truncate">
-                    {q.name || "No name"}
-                  </div>
-                  <div className="text-xs text-brand-400 truncate">
-                    {q.email || "-"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 shrink-0">
-                <span
-                  className={`text-xs px-2 py-1 rounded-full border ${
-                    q.status === "Ny"
-                      ? "border-blue-500/40 bg-blue-500/10 text-blue-200"
-                      : q.status === "Pågår"
-                      ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-200"
-                      : q.status === "Fullført"
-                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-                      : "border-brand-700 bg-brand-800 text-brand-300"
-                  }`}
-                >
-                  {q.status || "Ny"}
-                </span>
-
-                <div className="text-xs text-brand-500">
-                  {q.created_at
-                    ? new Date(q.created_at).toLocaleDateString()
-                    : "-"}
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+      <Card>
+        {loading ? (
+          <div className="py-10 text-center text-brand-300">Loading…</div>
+        ) : rows.length === 0 ? (
+          <div className="py-10 text-center text-brand-400">No quotes found.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-brand-800">
+                  <th className="text-left py-3 px-4 text-white font-semibold">Name</th>
+                  <th className="text-left py-3 px-4 text-white font-semibold">Email</th>
+                  <th className="text-left py-3 px-4 text-white font-semibold">Status</th>
+                  <th className="text-left py-3 px-4 text-white font-semibold">Created</th>
+                  <th className="text-left py-3 px-4 text-white font-semibold">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-b border-brand-900 hover:bg-brand-900/40">
+                    <td className="py-3 px-4 text-white">{r.name || "No name"}</td>
+                    <td className="py-3 px-4 text-brand-300">{r.email || "-"}</td>
+                    <td className="py-3 px-4 text-brand-300">{r.status || "Ny"}</td>
+                    <td className="py-3 px-4 text-brand-500 text-xs">
+                      {r.created_at ? new Date(r.created_at).toLocaleString() : "-"}
+                    </td>
+                    <td className="py-3 px-4">
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => router.push(`/admin/quote/${r.id}`)}
+                      >
+                        <ExternalLink size={16} /> Open
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
