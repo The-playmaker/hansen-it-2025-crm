@@ -1,20 +1,36 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { requireMe } from "@/lib/requireMe";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(req, { params }) {
-  const me = requireMe();
-  if (!me) return NextResponse.json({ error: "Not logged in" }, { status: 401 });
+  try {
+    const { id } = params; // quote id
+    const body = await req.json().catch(() => ({}));
 
-  const { employee_id } = await req.json(); // bigint or null
-  const value = employee_id ? Number(employee_id) : null;
+    // employee_id kan være number eller null
+    const employee_id =
+      body.employee_id === null || body.employee_id === "" || typeof body.employee_id === "undefined"
+        ? null
+        : Number(body.employee_id);
 
-  const supabase = getSupabaseAdmin();
-  const { error } = await supabase
-    .from("requests")
-    .update({ employee_id: value })
-    .eq("id", params.id);
+    if (employee_id !== null && Number.isNaN(employee_id)) {
+      return NextResponse.json({ error: "employee_id must be a number or null" }, { status: 400 });
+    }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ ok: true });
+    const { data, error } = await supabaseAdmin
+      .from("requests")
+      .update({ employee_id })
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ data });
+  } catch (e) {
+    return NextResponse.json({ error: e?.message || "Unknown error" }, { status: 500 });
+  }
 }
