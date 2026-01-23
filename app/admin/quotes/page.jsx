@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { AdminShell } from "@/components/admin/AdminShell.jsx";
+import { AdminShell } from "@/components/admin/AdminShell";
 
 export default function QuotesPage() {
   const [rows, setRows] = useState([]);
