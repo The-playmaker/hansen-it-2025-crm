@@ -1,8 +1,17 @@
-'use client';
-import { useEffect } from 'react';
-import { supabase } from '../../lib/supabaseClient';
+import { NextResponse } from "next/server";
 
-export default function LogoutPage() {
-  useEffect(() => { supabase.auth.signOut().then(() => window.location.href = '/login'); }, []);
-  return <section className="container-default py-20">Logger ut…</section>;
+export const dynamic = "force-dynamic";
+
+export async function POST() {
+  const res = NextResponse.json({ ok: true });
+  res.cookies.set({
+    name: "casdoorUser",
+    value: "",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  return res;
 }
