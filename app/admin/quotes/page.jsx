@@ -146,7 +146,7 @@ export default function QuotesPage() {
                   </td>
                   <td className="py-3 px-4">
                     <button
-                      onClick={() => router.push(`/admin/quote/${r.id}`)}
+                      onClick={() => router.push(`/admin/quotes/${r.id}`)}
                       className="text-accent-blue hover:text-accent-cyan font-medium"
                     >
                       Open
