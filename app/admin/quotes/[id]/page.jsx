@@ -287,33 +287,35 @@ export default function QuoteDetails() {
   };
 
   const handleAddTime = async (e) => {
-    e.preventDefault();
-    if (!quoteId || !hours.trim()) return;
+  e.preventDefault();
+  if (!quoteId || !hours.trim()) return;
 
-    const h = Number(hours);
-    if (isNaN(h) || h <= 0) return;
+  const h = Number(hours);
+  if (Number.isNaN(h) || h <= 0) return;
 
-    try {
-      const { data, error } = await supabase
-        .from("quote_time_entries")
-        .insert({
-          quote_id: quoteId,
-          employee_id: quote?.employee_id || null,
-          hours: h,
-          description: timeDescription.trim() || null,
-        })
-        .select("*")
-        .single();
+  try {
+    const res = await fetch(`/api/admin/quotes/${quoteId}/time`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        hours: h,
+        description: timeDescription,
+        employee_id: quote?.employee_id ?? null,
+      }),
+    });
 
-      if (error) throw error;
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || "Failed");
 
-      setTimeEntries((prev) => [data, ...prev]);
-      setHours("");
-      setTimeDescription("");
-    } catch (err) {
-      console.error("Error adding time entry:", err);
-    }
-  };
+    setTimeEntries((prev) => [json.data, ...prev]);
+    setHours("");
+    setTimeDescription("");
+  } catch (err) {
+    console.error("Error adding time entry:", err);
+    alert(err.message || "Could not add time entry");
+  }
+};
+
 
   const handleFileChange = (e) => {
     const f = e.target.files?.[0];
