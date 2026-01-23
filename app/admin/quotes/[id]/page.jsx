@@ -76,8 +76,8 @@ export default function QuoteDetailsPage() {
   const loadEmployees = async () => {
     const res = await fetch("/api/admin/employees", { cache: "no-store" });
     const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || "Failed employees");
     setEmployees(json.data || []);
+
   };
 
   const loadNotes = async () => {
@@ -307,25 +307,22 @@ export default function QuoteDetailsPage() {
 };
 
   // ---- portal link ----
-  const handleCreatePortalLink = async () => {
-    try {
-      setBusyPortal(true);
-      const res = await fetch(`/api/admin/quotes/${quoteId}/portal-token`, {
-        method: "POST",
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Failed");
+const handleCreatePortalLink = async () => {
+  if (!quoteId) return;
+  setCreatingPortal(true);
+  try {
+    const res = await fetch(`/api/admin/quotes/${quoteId}/portal-link`, { method: "POST" });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || "Failed");
 
-      const base = window.location.origin;
-      setPortalUrl(`${base}/portal/${json.data.token}`);
-    } catch (e) {
-      console.error(e);
-      alert(e.message || "Could not create link");
-    } finally {
-      setBusyPortal(false);
-    }
-  };
-
+    setPortalUrl(`${window.location.origin}/portal/${json.data.token}`);
+  } catch (e) {
+    console.error(e);
+    alert(e.message);
+  } finally {
+    setCreatingPortal(false);
+  }
+};
   // ---- PDF (generate + upload) ----
   const handleGenerateOfferPdf = async () => {
     if (!quote) return;

@@ -3,31 +3,25 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const { data: tokens, error } = await supabaseAdmin
+export async function POST(_req, { params }) {
+  const quoteId = params.id;
+
+  const token =
+    (globalThis.crypto?.randomUUID && globalThis.crypto.randomUUID()) ||
+    Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+  const expires = new Date();
+  expires.setMonth(expires.getMonth() + 3);
+
+  const { data, error } = await supabaseAdmin
     .from("quote_portal_tokens")
-    .select("token,quote_id,expires_at,created_at")
-    .order("created_at", { ascending: false })
-    .limit(200);
+    .insert({ quote_id: quoteId, token, expires_at: expires.toISOString() })
+    .select("*")
+    .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  const ids = Array.from(new Set((tokens || []).map((t) => t.quote_id).filter(Boolean)));
-  let quotesById = {};
-
-  if (ids.length) {
-    const { data: quotes } = await supabaseAdmin
-      .from("requests")
-      .select("id,name,email,status")
-      .in("id", ids);
-
-    (quotes || []).forEach((q) => (quotesById[q.id] = q));
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  const rows = (tokens || []).map((t) => ({
-    ...t,
-    quote: quotesById[t.quote_id] || null,
-  }));
-
-  return NextResponse.json({ data: rows });
+  return NextResponse.json({ data });
 }
