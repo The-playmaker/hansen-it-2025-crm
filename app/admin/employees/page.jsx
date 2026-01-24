@@ -2,7 +2,6 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -47,37 +46,21 @@ export default function EmployeesPage() {
 
   const refreshAll = async () => {
     setLoading(true);
-    await Promise.all([fetchEmployees(), fetchRequests()]);
+    await fetchEmployees();
     setLoading(false);
   };
 
   const fetchEmployees = async () => {
     try {
-      const { data, error } = await supabase
-        .from("employees")
-        .select("id,name,email,role")
-        .order("name", { ascending: true });
-
-      if (error) throw error;
-      setEmployees(data || []);
+      const response = await fetch("/api/admin/employees");
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to fetch employees");
+      }
+      setEmployees(result.data || []);
     } catch (e) {
       console.error("fetchEmployees error:", e);
       setEmployees([]);
-    }
-  };
-
-  const fetchRequests = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("requests")
-        .select("id,name,email,status,created_at,employee_id")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setRequests(data || []);
-    } catch (e) {
-      console.error("fetchRequests error:", e);
-      setRequests([]);
     }
   };
 
@@ -115,22 +98,25 @@ export default function EmployeesPage() {
   const saveEmployee = async (e) => {
     e.preventDefault();
 
-    // access control UI-side (server-side bør også håndheve, men dette hjelper)
     if (me?.role !== "admin") {
       alert("Kun admin kan endre ansatte/roller.");
       return;
     }
 
     try {
-      if (editingId) {
-        const { error } = await supabase
-          .from("employees")
-          .update({ ...form })
-          .eq("id", editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("employees").insert([{ ...form }]);
-        if (error) throw error;
+      const url = editingId ? `/api/admin/employees/${editingId}` : "/api/admin/employees";
+      const method = editingId ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to save employee");
       }
 
       await fetchEmployees();
@@ -149,8 +135,16 @@ export default function EmployeesPage() {
     if (!confirm("Slette ansatt?")) return;
 
     try {
-      const { error } = await supabase.from("employees").delete().eq("id", id);
-      if (error) throw error;
+      const response = await fetch(`/api/admin/employees/${id}`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to delete employee");
+      }
+
       await fetchEmployees();
     } catch (err) {
       console.error("deleteEmployee error:", err);
@@ -164,8 +158,18 @@ export default function EmployeesPage() {
       return;
     }
     try {
-      const { error } = await supabase.from("employees").update({ role }).eq("id", empId);
-      if (error) throw error;
+      const response = await fetch(`/api/admin/employees/${empId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to change role");
+      }
+
       setEmployees((prev) => prev.map((e) => (e.id === empId ? { ...e, role } : e)));
     } catch (err) {
       console.error("changeRoleInline error:", err);
