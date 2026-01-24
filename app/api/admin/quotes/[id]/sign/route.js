@@ -1,20 +1,22 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { requireMe } from "@/lib/requireMe";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-export async function POST(req) {
-  const me = requireMe();
-  if (!me) return NextResponse.json({ error: "Not logged in" }, { status: 401 });
+export const dynamic = "force-dynamic";
 
+export async function POST(req, { params }) {
   const { file_path } = await req.json();
-  if (!file_path) return NextResponse.json({ error: "Missing file_path" }, { status: 400 });
 
-  const supabase = getSupabaseAdmin();
+  if (!file_path) {
+    return NextResponse.json({ error: "No file path provided" }, { status: 400 });
+  }
 
-  const { data, error } = await supabase.storage
+  const { data, error } = await supabaseAdmin.storage
     .from("quote-attachments")
-    .createSignedUrl(file_path, 60); // 60s
+    .createSignedUrl(file_path, 60);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
   return NextResponse.json({ url: data.signedUrl });
 }

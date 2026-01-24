@@ -5,10 +5,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req, { params }) {
   const { data, error } = await supabaseAdmin
-    .from("requests")
+    .from("quote_messages")
     .select("*")
-    .eq("id", params.id)
-    .single();
+    .eq("quote_id", params.id)
+    .order("created_at", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -17,12 +17,11 @@ export async function GET(req, { params }) {
   return NextResponse.json({ data });
 }
 
-export async function PATCH(req, { params }) {
+export async function POST(req, { params }) {
   const body = await req.json();
   const { data, error } = await supabaseAdmin
-    .from("requests")
-    .update(body)
-    .eq("id", params.id)
+    .from("quote_messages")
+    .insert([{ ...body, quote_id: params.id }])
     .select()
     .single();
 

@@ -25,6 +25,7 @@ export default function QuotePortal() {
   const [data, setData] = useState(null);
   const [attachments, setAttachments] = useState([]);
   const [timeEntries, setTimeEntries] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [invalid, setInvalid] = useState(false);
 
@@ -59,6 +60,15 @@ export default function QuotePortal() {
         setTimeEntries(json.timeEntries || []);
         setAttachments(json.attachments || []);
         setData({ quote: json.quote, employee: json.employee, token: json.token });
+
+        const messagesRes = await fetch(`/api/portal/${encodeURIComponent(tokenStr)}/messages`, {
+          cache: "no-store",
+        });
+
+        const messagesJson = await messagesRes.json();
+        if (messagesRes.ok) {
+          setMessages(messagesJson.data || []);
+        }
       } catch (e) {
         console.error(e);
         setInvalid(true);
@@ -131,17 +141,17 @@ export default function QuotePortal() {
     try {
       setSending(true);
 
-      const res = await fetch("/api/portal/message", {
+      const res = await fetch(`/api/portal/${encodeURIComponent(tokenStr)}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: tokenStr, message: message.trim() }),
+        body: JSON.stringify({ message: message.trim() }),
       });
 
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || "Failed");
 
+      setMessages((prev) => [json.data, ...prev]);
       setMessage("");
-      alert("Message sent!");
     } catch (e) {
       console.error(e);
       alert("Could not send message.");
@@ -330,15 +340,26 @@ export default function QuotePortal() {
             </Card>
 
             <Card>
-              <h2 className="text-lg font-semibold text-white mb-2">Send a message</h2>
-              <p className="text-sm text-brand-300 mb-3">
-                Send additional details or questions here. We will see it internally.
-              </p>
-              <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Write your message…" />
-              <div className="mt-3">
-                <Button onClick={postPortalMessage} disabled={sending || !message.trim()}>
-                  {sending ? "Sending…" : "Send"}
-                </Button>
+              <h2 className="text-lg font-semibold text-white mb-2">Messages</h2>
+              <div className="space-y-3">
+                {messages.map((m) => (
+                  <div key={m.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
+                    <div className="text-brand-200 text-sm whitespace-pre-wrap">{m.message}</div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <div className="text-xs text-brand-500">
+                        {m.created_at ? new Date(m.created_at).toLocaleString() : ""}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4">
+                <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Write your message…" />
+                <div className="mt-3">
+                  <Button onClick={postPortalMessage} disabled={sending || !message.trim()}>
+                    {sending ? "Sending…" : "Send"}
+                  </Button>
+                </div>
               </div>
             </Card>
           </div>

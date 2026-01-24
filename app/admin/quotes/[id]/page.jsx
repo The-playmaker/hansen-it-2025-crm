@@ -41,6 +41,7 @@ export default function QuoteDetailsPage() {
 
   const [newNote, setNewNote] = useState("");
   const [hours, setHours] = useState("");
+  const [rate, setRate] = useState("");
   const [timeDescription, setTimeDescription] = useState("");
 
   const [inspectionDate, setInspectionDate] = useState("");
@@ -54,13 +55,16 @@ export default function QuoteDetailsPage() {
   const [busyPdf, setBusyPdf] = useState(false);
   const [busyUpload, setBusyUpload] = useState(false);
 
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+
   const assignedEmployee = useMemo(
     () => employees.find((e) => e.id === quote?.employee_id) || null,
     [employees, quote]
   );
 
-  const totalHours = useMemo(
-    () => timeEntries.reduce((sum, t) => sum + Number(t.hours || 0), 0),
+  const totalCost = useMemo(
+    () => timeEntries.reduce((sum, t) => sum + Number(t.hours || 0) * Number(t.rate || 0), 0),
     [timeEntries]
   );
 
@@ -100,17 +104,24 @@ export default function QuoteDetailsPage() {
   };
 
   const loadTime = async () => {
-    const res = await fetch(`/api/admin/quotes/${quoteId}?include=time`, { cache: "no-store" });
+    const res = await fetch(`/api/admin/quotes/${quoteId}/time`, { cache: "no-store" });
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error || "Failed time");
-    setTimeEntries(json.time || []);
+    setTimeEntries(json.data || []);
   };
 
   const loadAttachments = async () => {
-    const res = await fetch(`/api/admin/quotes/${quoteId}?include=attachments`, { cache: "no-store" });
+    const res = await fetch(`/api/admin/quotes/${quoteId}/attachments`, { cache: "no-store" });
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error || "Failed attachments");
-    setAttachments(json.attachments || []);
+    setAttachments(json.data || []);
+  };
+
+  const loadMessages = async () => {
+    const res = await fetch(`/api/admin/quotes/${quoteId}/messages`, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || "Failed messages");
+    setMessages(json.data || []);
   };
 
   useEffect(() => {
@@ -120,7 +131,7 @@ export default function QuoteDetailsPage() {
       setLoading(true);
       try {
         await Promise.all([loadEmployees(), loadQuote()]);
-        await Promise.all([loadNotes(), loadTime(), loadAttachments()]);
+        await Promise.all([loadNotes(), loadTime(), loadAttachments(), loadMessages()]);
       } catch (e) {
         console.error(e);
         router.push("/admin/quotes");
@@ -235,12 +246,16 @@ export default function QuoteDetailsPage() {
     const h = Number(hours);
     if (Number.isNaN(h) || h <= 0) return;
 
+    const r = Number(rate);
+    if (Number.isNaN(r) || r < 0) return;
+
     try {
       const res = await fetch(`/api/admin/quotes/${quoteId}/time`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           hours: h,
+          rate: r,
           description: timeDescription || null,
           employee_id: quote?.employee_id ?? null,
         }),
@@ -251,6 +266,7 @@ export default function QuoteDetailsPage() {
 
       setTimeEntries((prev) => [json.data, ...prev]);
       setHours("");
+      setRate("");
       setTimeDescription("");
     } catch (e) {
       console.error(e);
@@ -309,7 +325,7 @@ export default function QuoteDetailsPage() {
   // ---- portal link ----
 const handleCreatePortalLink = async () => {
   if (!quoteId) return;
-  setCreatingPortal(true);
+  setBusyPortal(true);
   try {
     const res = await fetch(`/api/admin/quotes/${quoteId}/portal-link`, { method: "POST" });
     const json = await res.json();
@@ -320,10 +336,34 @@ const handleCreatePortalLink = async () => {
     console.error(e);
     alert(e.message);
   } finally {
-    setCreatingPortal(false);
+    setBusyPortal(false);
   }
 };
   // ---- PDF (generate + upload) ----
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+
+    try {
+      const authorId = employees.find((x) => x.email === me?.email)?.id ?? null;
+
+      const res = await fetch(`/api/admin/quotes/${quoteId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: newMessage.trim(), author_id: authorId }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Failed");
+
+      setMessages((prev) => [json.data, ...prev]);
+      setNewMessage("");
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Could not send message");
+    }
+  };
+
   const handleGenerateOfferPdf = async () => {
     if (!quote) return;
 
@@ -574,11 +614,12 @@ const handleCreatePortalLink = async () => {
               <div className="text-white font-semibold flex items-center gap-2">
                 <Clock size={16} /> Time
               </div>
-              <div className="text-sm text-white">{totalHours.toFixed(2)}h</div>
+              <div className="text-sm text-white">{totalCost.toFixed(2)} kr</div>
             </div>
 
             <form onSubmit={handleAddTime} className="mt-4 space-y-3">
               <Input value={hours} onChange={(e) => setHours(e.target.value)} placeholder="Hours (e.g. 1.5)" />
+              <Input value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Rate (e.g. 100)" />
               <Input value={timeDescription} onChange={(e) => setTimeDescription(e.target.value)} placeholder="Description (optional)" />
               <Button type="submit" className="gap-2">
                 <Plus size={16} /> Add time
@@ -591,7 +632,9 @@ const handleCreatePortalLink = async () => {
               ) : (
                 timeEntries.map((t) => (
                   <div key={t.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
-                    <div className="text-white text-sm font-medium">{Number(t.hours).toFixed(2)}h</div>
+                    <div className="text-white text-sm font-medium">
+                      {Number(t.hours).toFixed(2)}h @ {Number(t.rate).toFixed(2)} kr/h
+                    </div>
                     <div className="text-brand-300 text-xs">{t.description || "-"}</div>
                     <div className="text-brand-500 text-[11px] mt-1">
                       {t.created_at ? new Date(t.created_at).toLocaleString() : ""}
@@ -646,6 +689,37 @@ const handleCreatePortalLink = async () => {
             <div className="text-white font-semibold">Assigned employee</div>
             <div className="text-brand-300 text-sm mt-1">
               {assignedEmployee ? assignedEmployee.name : "Unassigned"}
+            </div>
+          </Card>
+
+          <Card>
+            <div className="text-white font-semibold">Messages</div>
+            <form onSubmit={handleSendMessage} className="mt-4 space-y-3">
+              <Textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Write a message to the customer…"
+              />
+              <Button type="submit" className="gap-2">
+                <Plus size={16} /> Send message
+              </Button>
+            </form>
+
+            <div className="mt-5 space-y-3">
+              {messages.length === 0 ? (
+                <div className="text-brand-400 text-sm">No messages yet.</div>
+              ) : (
+                messages.map((m) => (
+                  <div key={m.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
+                    <div className="text-brand-200 text-sm whitespace-pre-wrap">{m.message}</div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <div className="text-xs text-brand-500">
+                        {m.created_at ? new Date(m.created_at).toLocaleString() : ""}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
         </div>

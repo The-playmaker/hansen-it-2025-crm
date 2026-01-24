@@ -13,7 +13,6 @@ export default function EmployeesPage() {
   const [me, setMe] = useState(null);
 
   const [employees, setEmployees] = useState([]);
-  const [requests, setRequests] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");

@@ -3,33 +3,31 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req, ctx) {
-  const id = ctx.params.id;
-
+export async function GET(req, { params }) {
   const { data, error } = await supabaseAdmin
     .from("quote_notes")
     .select("*")
-    .eq("quote_id", id)
+    .eq("quote_id", params.id)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data: data || [] });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ data });
 }
 
-export async function POST(req, ctx) {
-  const id = ctx.params.id;
-  const body = await req.json().catch(() => ({}));
-
+export async function POST(req, { params }) {
+  const body = await req.json();
   const { data, error } = await supabaseAdmin
     .from("quote_notes")
-    .insert({
-      quote_id: id,
-      author_id: body.author_id ?? null,
-      note: body.note ?? "",
-    })
-    .select("*")
+    .insert([{ ...body, quote_id: params.id }])
+    .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
   return NextResponse.json({ data });
 }
