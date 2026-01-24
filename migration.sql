@@ -103,6 +103,7 @@ ALTER TABLE quote_note_edits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quote_time_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quote_attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quote_portal_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_messages ENABLE ROW LEVEL SECURITY;
 
 -- Policies
 CREATE POLICY "Enable all access for authenticated users" ON employees FOR ALL USING (auth.role() = 'authenticated');
@@ -112,6 +113,7 @@ CREATE POLICY "Enable all access for authenticated users" ON quote_note_edits FO
 CREATE POLICY "Enable all access for authenticated users" ON quote_time_entries FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Enable all access for authenticated users" ON quote_attachments FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Enable all access for authenticated users" ON quote_portal_tokens FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable all access for authenticated users" ON quote_messages FOR ALL USING (auth.role() = 'authenticated');
 
 CREATE POLICY "Allow public read on portal tokens" ON quote_portal_tokens FOR SELECT USING (true);
 

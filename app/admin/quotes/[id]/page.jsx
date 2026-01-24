@@ -390,6 +390,7 @@ const handleCreatePortalLink = async () => {
 
       y += 4;
       addLine(`Status: ${quote.status || "Ny"}`);
+      const totalHours = timeEntries.reduce((sum, t) => sum + Number(t.hours || 0), 0);
       addLine(`Logged hours: ${totalHours.toFixed(2)}h`);
 
       y += 4;
