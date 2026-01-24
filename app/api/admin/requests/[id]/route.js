@@ -5,10 +5,11 @@ export const dynamic = "force-dynamic";
 
 export async function PUT(req, { params }) {
   const body = await req.json();
-  const { data, error } from await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("requests")
     .update(body)
-    .eq("id", params.id);
+    .eq("id", params.id)
+    .select();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
