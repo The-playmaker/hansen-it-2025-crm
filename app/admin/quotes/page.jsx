@@ -92,7 +92,7 @@ export default function QuotesPage() {
                       <Button
                         variant="outline"
                         className="gap-2"
-                        onClick={() => router.push(`/admin/quote/${r.id}`)}
+                        onClick={() => router.push(`/admin/quotes/${r.id}`)}
                       >
                         <ExternalLink size={16} /> Open
                       </Button>
