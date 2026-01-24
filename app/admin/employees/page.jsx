@@ -13,6 +13,7 @@ export default function EmployeesPage() {
   const [me, setMe] = useState(null);
 
   const [employees, setEmployees] = useState([]);
+  const [requests, setRequests] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -40,7 +41,7 @@ export default function EmployeesPage() {
 
   const refreshAll = async () => {
     setLoading(true);
-    await fetchEmployees();
+    await Promise.all([fetchEmployees(), fetchRequests()]);
     setLoading(false);
   };
 
@@ -58,14 +59,29 @@ export default function EmployeesPage() {
     }
   };
 
-  const filteredEmployees = (() => {
+  const fetchRequests = async () => {
+    try {
+      const response = await fetch("/api/admin/requests");
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to fetch requests");
+      }
+      setRequests(result.data || []);
+    } catch (e) {
+      console.error("fetchRequests error:", e);
+      setRequests([]);
+    }
+  };
+
+  const filteredEmployees = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return employees;
     return employees.filter((e) => {
       const hay = `${e.name || ""} ${e.email || ""} ${e.role || ""}`.toLowerCase();
       return hay.includes(q);
     });
-  })();
+  }, [employees, query]);
+
 
   const resetForm = () => {
     setForm({ name: "", email: "", role: "worker" });
@@ -171,6 +187,44 @@ export default function EmployeesPage() {
     }
   };
 
+  const assignRequest = async () => {
+    if (me?.role !== "admin" && me?.role !== "manager") {
+      alert("Kun admin/manager kan assign requests.");
+      return;
+    }
+    if (!assignEmpId || !assignRequestId) {
+      alert("Velg ansatt og request.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/requests/${assignRequestId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employee_id: assignEmpId,
+          status: assignStatus || "Ny",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to assign request");
+      }
+
+      setAssignEmpId("");
+      setAssignRequestId("");
+      setAssignStatus("Ny");
+      await fetchRequests();
+    } catch (err) {
+      console.error("assignRequest error:", err);
+      alert(err?.message || "Kunne ikke assign.");
+    }
+  };
+
+  const empNameById = (id) => employees.find((e) => e.id === id)?.name || id;
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -256,7 +310,7 @@ export default function EmployeesPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Employees table */}
         <Card>
           <div className="flex items-center justify-between mb-4">
@@ -318,6 +372,107 @@ export default function EmployeesPage() {
               </table>
             </div>
           )}
+        </Card>
+
+        {/* Assignment panel */}
+        <Card>
+          <h2 className="text-xl font-bold text-white mb-2">Assign request</h2>
+          <p className="text-brand-300 text-sm mb-4">
+            Sett request → employee + status.
+          </p>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label className="text-sm text-brand-200">Employee</label>
+              <select
+                value={assignEmpId}
+                onChange={(e) => setAssignEmpId(e.target.value)}
+                className="bg-brand-900 border border-brand-700 rounded-lg px-4 py-2 text-white w-full"
+              >
+                <option value="">Choose…</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name} ({e.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-brand-200">Request (unassigned)</label>
+              <select
+                value={assignRequestId}
+                onChange={(e) => setAssignRequestId(e.target.value)}
+                className="bg-brand-900 border border-brand-700 rounded-lg px-4 py-2 text-white w-full"
+              >
+                <option value="">Choose…</option>
+                {unassignedRequests.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {(r.name || "No name") + " · " + (r.email || "-")}{" "}
+                    {r.status ? `· ${r.status}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-brand-200">Set status</label>
+              <select
+                value={assignStatus}
+                onChange={(e) => setAssignStatus(e.target.value)}
+                className="bg-brand-900 border border-brand-700 rounded-lg px-4 py-2 text-white w-full"
+              >
+                <option value="Ny">Ny</option>
+                <option value="Pågår">Pågår</option>
+                <option value="Fullført">Fullført</option>
+              </select>
+            </div>
+
+            <Button onClick={assignRequest} className="gap-2">
+              <Plus size={16} />
+              Assign
+            </Button>
+
+            <div className="text-xs text-brand-400">
+              Krever `requests.employee_id` i databasen.
+            </div>
+          </div>
+        </Card>
+
+        {/* Requests overview */}
+        <Card>
+          <h2 className="text-xl font-bold text-white mb-2">Requests overview</h2>
+          <p className="text-brand-300 text-sm mb-4">
+            Rask oversikt hvem som eier hva.
+          </p>
+
+          <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+            {requests.slice(0, 80).map((r) => (
+              <div
+                key={r.id}
+                className="rounded-lg border border-brand-800 bg-brand-900/40 p-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-white font-medium">{r.name || "No name"}</div>
+                    <div className="text-xs text-brand-300">{r.email || "-"}</div>
+                    <div className="text-xs text-brand-400 mt-1">
+                      Status: <span className="text-white">{r.status || "Ny"}</span>
+                      {" · "}
+                      Assigned:{" "}
+                      <span className="text-white">
+                        {r.employee_id ? empNameById(r.employee_id) : "—"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-brand-500 mt-2">
+                  {r.created_at ? new Date(r.created_at).toLocaleString() : ""}
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
       </div>
     </div>
