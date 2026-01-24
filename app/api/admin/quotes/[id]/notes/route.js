@@ -3,8 +3,9 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req, ctx) {
-  const id = ctx.params.id;
+export async function GET(req, { params }) {
+  const id = params?.id;
+  if (!id) return NextResponse.json({ error: "Missing quote id" }, { status: 400 });
 
   const { data, error } = await supabaseAdmin
     .from("quote_notes")
@@ -16,17 +17,21 @@ export async function GET(req, ctx) {
   return NextResponse.json({ data: data || [] });
 }
 
-export async function POST(req, ctx) {
-  const id = ctx.params.id;
+export async function POST(req, { params }) {
+  const id = params?.id;
+  if (!id) return NextResponse.json({ error: "Missing quote id" }, { status: 400 });
+
   const body = await req.json().catch(() => ({}));
+  const note = String(body.note || "").trim();
+
+  if (!note) return NextResponse.json({ error: "Missing note" }, { status: 400 });
+
+  // author_id skal være uuid (Casdoor user id)
+  const author_id = body.author_id ? String(body.author_id) : null;
 
   const { data, error } = await supabaseAdmin
     .from("quote_notes")
-    .insert({
-      quote_id: id,
-      author_id: body.author_id ?? null,
-      note: body.note ?? "",
-    })
+    .insert({ quote_id: id, author_id, note })
     .select("*")
     .single();
 

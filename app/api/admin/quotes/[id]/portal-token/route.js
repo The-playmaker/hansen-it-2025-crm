@@ -3,8 +3,9 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req, ctx) {
-  const id = ctx.params.id;
+export async function POST(req, { params }) {
+  const id = params?.id;
+  if (!id) return NextResponse.json({ error: "Missing quote id" }, { status: 400 });
 
   const token =
     (globalThis.crypto?.randomUUID && globalThis.crypto.randomUUID()) ||
@@ -15,11 +16,7 @@ export async function POST(req, ctx) {
 
   const { data, error } = await supabaseAdmin
     .from("quote_portal_tokens")
-    .insert({
-      quote_id: id,
-      token,
-      expires_at: expires.toISOString(),
-    })
+    .insert({ quote_id: id, token, expires_at: expires.toISOString() })
     .select("*")
     .single();
 
