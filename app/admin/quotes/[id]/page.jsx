@@ -173,7 +173,8 @@ export default function QuoteDetailsPage() {
     if (!newNote.trim()) return;
 
     try {
-      const authorId = employees.find((x) => x.email === me?.email)?.id ?? null;
+      const authorId = me?.id ?? null; // ✅ uuid
+
 
       const res = await fetch(`/api/admin/quotes/${quoteId}/notes`, {
         method: "POST",
