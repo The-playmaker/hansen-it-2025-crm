@@ -3,8 +3,21 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req, { params }) {
-  const id = params.id;
+export async function GET(_req, ctx) {
+  const id = ctx.params.id;
+
+  const { data, error } = await supabaseAdmin
+    .from("quote_time_entries")
+    .select("*")
+    .eq("quote_id", id)
+    .order("created_at", { ascending: false });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ data: data || [] });
+}
+
+export async function POST(req, ctx) {
+  const id = ctx.params.id;
   const body = await req.json().catch(() => ({}));
 
   const hours = Number(body.hours);

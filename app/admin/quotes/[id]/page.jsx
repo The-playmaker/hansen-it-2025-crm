@@ -99,19 +99,20 @@ export default function QuoteDetailsPage() {
     if (q?.due_date) setDueDate(String(q.due_date).slice(0, 10));
   };
 
-  const loadTime = async () => {
-    const res = await fetch(`/api/admin/quotes/${quoteId}?include=time`, { cache: "no-store" });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || "Failed time");
-    setTimeEntries(json.time || []);
-  };
+ const loadTime = async () => {
+  const res = await fetch(`/api/admin/quotes/${quoteId}/time`, { cache: "no-store" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || "Failed time");
+  setTimeEntries(json.data || []);
+};
 
-  const loadAttachments = async () => {
-    const res = await fetch(`/api/admin/quotes/${quoteId}?include=attachments`, { cache: "no-store" });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || "Failed attachments");
-    setAttachments(json.attachments || []);
-  };
+
+const loadAttachments = async () => {
+  const res = await fetch(`/api/admin/quotes/${quoteId}/attachments`, { cache: "no-store" });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error || "Failed attachments");
+  setAttachments(json.data || []);
+};
 
   useEffect(() => {
     if (!quoteId) return;
@@ -120,7 +121,7 @@ export default function QuoteDetailsPage() {
       setLoading(true);
       try {
         await Promise.all([loadEmployees(), loadQuote()]);
-        await Promise.all([loadNotes(), loadTime(), loadAttachments()]);
+       await Promise.allSettled([loadNotes(), loadTime(), loadAttachments()]);
       } catch (e) {
         console.error(e);
         router.push("/admin/quotes");
@@ -173,7 +174,8 @@ export default function QuoteDetailsPage() {
     if (!newNote.trim()) return;
 
     try {
-      const authorId = me?.id ?? null; // ✅ uuid
+      const authorId = null; // tryggest inntil du har ekte uuid fra casdoor
+
 
 
       const res = await fetch(`/api/admin/quotes/${quoteId}/notes`, {
@@ -209,7 +211,7 @@ export default function QuoteDetailsPage() {
     if (!trimmed) return;
 
     try {
-      const editorId = employees.find((x) => x.email === me?.email)?.id ?? null;
+      const editorId = null;
 
       const res = await fetch(`/api/admin/quotes/${quoteId}/notes/${editingNoteId}`, {
         method: "PATCH",

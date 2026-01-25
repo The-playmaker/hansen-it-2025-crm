@@ -3,24 +3,32 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-const isUuid = (v) =>
-  typeof v === "string" &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+function isUuid(v) {
+  return (
+    typeof v === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)
+  );
+}
 
-export async function POST(req, { params }) {
-  const id = params?.id;
+export async function PATCH(req, ctx) {
+  const { id, noteId } = ctx.params;
   const body = await req.json().catch(() => ({}));
 
   const note = String(body.note || "").trim();
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   if (!note) return NextResponse.json({ error: "Missing note" }, { status: 400 });
 
-  // ✅ aldri bruk tall her
-  const author_id = isUuid(body.author_id) ? body.author_id : null;
+  // DB hos deg ser ut til å forvente UUID her → hvis du sender "2" så kræsjer det.
+  const updated_by = isUuid(body.editor_id) ? body.editor_id : null;
 
   const { data, error } = await supabaseAdmin
     .from("quote_notes")
-    .insert({ quote_id: id, author_id, note })
+    .update({
+      note,
+      updated_at: new Date().toISOString(),
+      updated_by,
+    })
+    .eq("id", noteId)
+    .eq("quote_id", id)
     .select("*")
     .single();
 
