@@ -310,7 +310,7 @@ export default function QuoteDetailsPage() {
   // ---- portal link ----
 const handleCreatePortalLink = async () => {
   if (!quoteId) return;
-  setCreatingPortal(true);
+  setBusyPortal(true);
   try {
     const res = await fetch(`/api/admin/quotes/${quoteId}/portal-link`, { method: "POST" });
     const json = await res.json();
@@ -319,11 +319,12 @@ const handleCreatePortalLink = async () => {
     setPortalUrl(`${window.location.origin}/portal/${json.data.token}`);
   } catch (e) {
     console.error(e);
-    alert(e.message);
+    alert(e.message || "Could not create portal link");
   } finally {
-    setCreatingPortal(false);
+    setBusyPortal(false);
   }
 };
+
   // ---- PDF (generate + upload) ----
   const handleGenerateOfferPdf = async () => {
     if (!quote) return;
