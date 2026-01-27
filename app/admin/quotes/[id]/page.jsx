@@ -19,6 +19,7 @@ import {
   Download,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function QuoteDetailsPage() {
   const { id } = useParams();
@@ -57,6 +58,7 @@ export default function QuoteDetailsPage() {
 
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const [hasNewMessage, setHasNewMessage] = useState(false);
 
   const assignedEmployee = useMemo(
     () => employees.find((e) => e.id === quote?.employee_id) || null,
@@ -141,6 +143,17 @@ export default function QuoteDetailsPage() {
     };
 
     loadAll();
+
+    const channel = supabase
+      .channel(`quotes-messages-${quoteId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "quote_messages", filter: `quote_id=eq.${quoteId}` }, (payload) => {
+        setMessages((prev) => [payload.new, ...prev]);
+        setHasNewMessage(true);
+        new Audio("/notification.mp3").play();
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteId]);
 
@@ -184,7 +197,7 @@ export default function QuoteDetailsPage() {
     if (!newNote.trim()) return;
 
     try {
-      const authorId = employees.find((x) => x.email === me?.email)?.id ?? null;
+      const authorId = employees.find((x) => x.email === me?.email)?.auth_user_id ?? null;
 
       const res = await fetch(`/api/admin/quotes/${quoteId}/notes`, {
         method: "POST",
@@ -219,12 +232,12 @@ export default function QuoteDetailsPage() {
     if (!trimmed) return;
 
     try {
-      const editorId = employees.find((x) => x.email === me?.email)?.id ?? null;
+      const editorId = employees.find((x) => x.email === me?.email)?.auth_user_id ?? null;
 
       const res = await fetch(`/api/admin/quotes/${quoteId}/notes/${editingNoteId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note: trimmed, editor_id: editorId }),
+        body: JSON.stringify({ note: trimmed, updated_by: editorId }),
       });
 
       const json = await res.json();
@@ -345,7 +358,7 @@ const handleCreatePortalLink = async () => {
     if (!newMessage.trim()) return;
 
     try {
-      const authorId = employees.find((x) => x.email === me?.email)?.id ?? null;
+      const authorId = employees.find((x) => x.email === me?.email)?.auth_user_id ?? null;
 
       const res = await fetch(`/api/admin/quotes/${quoteId}/messages`, {
         method: "POST",
@@ -607,6 +620,40 @@ const handleCreatePortalLink = async () => {
               )}
             </div>
           </Card>
+
+          <Card>
+            <div className="flex items-center justify-between">
+              <div className="text-white font-semibold">Messages</div>
+              {hasNewMessage && <div className="text-xs text-white bg-red-500 px-2 py-1 rounded-full">New Message</div>}
+            </div>
+            <form onSubmit={handleSendMessage} className="mt-4 space-y-3">
+              <Textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Write a message to the customer…"
+              />
+              <Button type="submit" className="gap-2">
+                <Plus size={16} /> Send message
+              </Button>
+            </form>
+
+            <div className="mt-5 space-y-3">
+              {messages.length === 0 ? (
+                <div className="text-brand-400 text-sm">No messages yet.</div>
+              ) : (
+                messages.map((m) => (
+                  <div key={m.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
+                    <div className="text-brand-200 text-sm whitespace-pre-wrap">{m.message}</div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <div className="text-xs text-brand-500">
+                        {m.created_at ? new Date(m.created_at).toLocaleString() : ""}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
         </div>
 
         {/* Right */}
@@ -691,37 +738,6 @@ const handleCreatePortalLink = async () => {
             <div className="text-white font-semibold">Assigned employee</div>
             <div className="text-brand-300 text-sm mt-1">
               {assignedEmployee ? assignedEmployee.name : "Unassigned"}
-            </div>
-          </Card>
-
-          <Card>
-            <div className="text-white font-semibold">Messages</div>
-            <form onSubmit={handleSendMessage} className="mt-4 space-y-3">
-              <Textarea
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Write a message to the customer…"
-              />
-              <Button type="submit" className="gap-2">
-                <Plus size={16} /> Send message
-              </Button>
-            </form>
-
-            <div className="mt-5 space-y-3">
-              {messages.length === 0 ? (
-                <div className="text-brand-400 text-sm">No messages yet.</div>
-              ) : (
-                messages.map((m) => (
-                  <div key={m.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
-                    <div className="text-brand-200 text-sm whitespace-pre-wrap">{m.message}</div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <div className="text-xs text-brand-500">
-                        {m.created_at ? new Date(m.created_at).toLocaleString() : ""}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
             </div>
           </Card>
         </div>
