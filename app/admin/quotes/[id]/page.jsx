@@ -482,6 +482,7 @@ const handleCreatePortalLink = async () => {
                 <div className="text-white font-semibold flex items-center gap-2">
                   <User size={16} /> Customer
                 </div>
+                <div className="text-brand-300 text-sm">{quote.customer_name || quote.name}</div>
                 <div className="text-brand-300 text-sm">{quote.address || "-"}</div>
               </div>
 
