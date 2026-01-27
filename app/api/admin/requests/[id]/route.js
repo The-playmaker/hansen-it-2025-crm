@@ -3,28 +3,13 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req, { params }) {
-  const { data, error } = await supabaseAdmin
-    .from("requests")
-    .select("*")
-    .eq("id", params.id)
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ data });
-}
-
-export async function PATCH(req, { params }) {
+export async function PUT(req, { params }) {
   const body = await req.json();
   const { data, error } = await supabaseAdmin
     .from("requests")
     .update(body)
     .eq("id", params.id)
-    .select()
-    .single();
+    .select();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,31 +1,28 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getSessionServer } from "@/lib/getSessionServer";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req, { params }) {
-  const id = params?.id;
-  const body = await req.json().catch(() => ({}));
-  const file_path = String(body.file_path || "");
+  const session = await getSessionServer();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-  if (!id) return NextResponse.json({ error: "Missing quote id" }, { status: 400 });
-  if (!file_path) return NextResponse.json({ error: "Missing file_path" }, { status: 400 });
+  const { file_path } = await req.json();
 
-  // sikkerhet: sørg for at filen faktisk tilhører quote
-  const { data: meta, error: metaErr } = await supabaseAdmin
-    .from("quote_attachments")
-    .select("id,quote_id,file_path")
-    .eq("quote_id", id)
-    .eq("file_path", file_path)
-    .maybeSingle();
-
-  if (metaErr) return NextResponse.json({ error: metaErr.message }, { status: 500 });
-  if (!meta) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!file_path) {
+    return NextResponse.json({ error: "No file path provided" }, { status: 400 });
+  }
 
   const { data, error } = await supabaseAdmin.storage
     .from("quote-attachments")
-    .createSignedUrl(file_path, 60 * 10); // 10 min
+    .createSignedUrl(file_path, 60);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ url: data?.signedUrl });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ url: data.signedUrl });
 }

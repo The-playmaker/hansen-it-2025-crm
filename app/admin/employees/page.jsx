@@ -46,7 +46,7 @@ export default function EmployeesPage() {
 
   const refreshAll = async () => {
     setLoading(true);
-    await fetchEmployees();
+    await Promise.all([fetchEmployees(), fetchRequests()]);
     setLoading(false);
   };
 
@@ -64,6 +64,20 @@ export default function EmployeesPage() {
     }
   };
 
+  const fetchRequests = async () => {
+    try {
+      const response = await fetch("/api/admin/requests");
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to fetch requests");
+      }
+      setRequests(result.data || []);
+    } catch (e) {
+      console.error("fetchRequests error:", e);
+      setRequests([]);
+    }
+  };
+
   const filteredEmployees = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return employees;
@@ -72,6 +86,7 @@ export default function EmployeesPage() {
       return hay.includes(q);
     });
   }, [employees, query]);
+
 
   const resetForm = () => {
     setForm({ name: "", email: "", role: "worker" });
@@ -192,15 +207,20 @@ export default function EmployeesPage() {
     }
 
     try {
-      const { error } = await supabase
-        .from("requests")
-        .update({
+      const response = await fetch(`/api/admin/requests/${assignRequestId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           employee_id: assignEmpId,
           status: assignStatus || "Ny",
-        })
-        .eq("id", assignRequestId);
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to assign request");
+      }
 
       setAssignEmpId("");
       setAssignRequestId("");
@@ -220,7 +240,7 @@ export default function EmployeesPage() {
         <div>
           <h1 className="text-3xl font-bold text-white">Team / Employees</h1>
           <p className="text-brand-300 text-sm mt-1">
-            CRUD + rolle-endring + assignment av requests.
+            CRUD + rolle-endring.
           </p>
           <p className="text-brand-400 text-xs mt-1">
             Innlogget: {me?.email || "…"} · Rolle: {me?.role || "…"}

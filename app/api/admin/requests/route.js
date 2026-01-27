@@ -3,14 +3,11 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-export async function PATCH(req, { params }) {
-  const body = await req.json();
+export async function GET(req) {
   const { data, error } = await supabaseAdmin
-    .from("quote_notes")
-    .update(body)
-    .eq("id", params.noteId)
-    .select()
-    .single();
+    .from("requests")
+    .select("id,name,email,status,created_at,employee_id")
+    .order("created_at", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
