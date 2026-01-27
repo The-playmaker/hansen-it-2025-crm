@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -26,6 +26,11 @@ export default function EmployeesPage() {
     email: "",
     role: "worker",
   });
+
+  // assignment panel
+  const [assignEmpId, setAssignEmpId] = useState("");
+  const [assignRequestId, setAssignRequestId] = useState("");
+  const [assignStatus, setAssignStatus] = useState("Ny");
 
   useEffect(() => {
     fetch("/api/me", { cache: "no-store" })
@@ -186,6 +191,10 @@ export default function EmployeesPage() {
       alert(err?.message || "Kunne ikke endre rolle.");
     }
   };
+
+  const unassignedRequests = useMemo(() => {
+    return requests.filter((r) => !r.employee_id);
+  }, [requests]);
 
   const assignRequest = async () => {
     if (me?.role !== "admin" && me?.role !== "manager") {
