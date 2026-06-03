@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 
+
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(req) {
   const url = new URL(req.url);
@@ -9,7 +11,9 @@ export async function GET(req) {
   const state = url.searchParams.get("state");
 
   if (!code || !state) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+    const res = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+    res.headers.set("Cache-Control", "no-store, no-cache");
+    return res;
   }
 
   try {
@@ -36,7 +40,9 @@ export async function GET(req) {
 
     if (!tokenData?.access_token) {
       console.error("Invalid tokenData:", tokenData);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+      const res = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+res.headers.set("Cache-Control", "no-store, no-cache");
+return res;
     }
 
     // 2) Get user info from Casdoor
@@ -55,7 +61,9 @@ export async function GET(req) {
     // if casdoor returns error format
     if (!account) {
       console.error("Invalid userInfo from Casdoor:", userInfo);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+      const res = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+      res.headers.set("Cache-Control", "no-store, no-cache");
+      return res;
     }
 
     const email = account.email || account.mail;
@@ -64,7 +72,9 @@ export async function GET(req) {
 
     if (!email) {
       console.error("Casdoor account missing email:", userInfo);
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+      const res = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+      res.headers.set("Cache-Control", "no-store, no-cache");
+      return res;
     }
 
     // 3) Sync/lookup user in Supabase employees
@@ -88,12 +98,9 @@ export async function GET(req) {
         .select()
         .single();
 
-      if (createErr) {
-        console.error("Supabase create employee error:", createErr);
-        return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
-      }
-
-      user = created;
+      const res = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+      res.headers.set("Cache-Control", "no-store, no-cache");
+      return res;
     }
 
     // 4) Set cookie + redirect
@@ -119,6 +126,8 @@ export async function GET(req) {
     return response;
   } catch (err) {
     console.error("Failed to login:", err);
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+    const res = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+    res.headers.set("Cache-Control", "no-store, no-cache");
+    return res;
   }
 }
