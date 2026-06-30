@@ -1,30 +1,17 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutGrid,
-  KanbanSquare,
-  Calendar,
-  Users,
-  Settings,
-  LogOut,
-  ChevronLeft,
-  Globe,
-  FileText,
-  Link as LinkIcon,
-} from "lucide-react";
+import { LayoutGrid, KanbanSquare, Users, Settings, LogOut, ChevronLeft, FileText, Lightbulb, Sparkles } from "lucide-react";
 import { useMe } from "@/app/admin/useMe";
 
 const baseNav = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutGrid },
-  { href: "/admin/quotes", label: "Quotes", icon: FileText },
-  { href: "/admin/portal-links", label: "Portal links", icon: LinkIcon },
-  { href: "/admin/kanban", label: "Kanban", icon: KanbanSquare },
-  { href: "/admin/calendar", label: "Calendar", icon: Calendar },
-  { href: "/admin/employees", label: "Team / Employees", icon: Users },
-  { href: "/admin/services", label: "Services", icon: Settings },
+  { href: "/admin/customers", label: "Kunder", icon: Users },
+  { href: "/admin/kanban", label: "Oppgaver", icon: KanbanSquare },
+  { href: "/admin/quotes", label: "Tilbud", icon: FileText },
+  { href: "/admin/ideas", label: "Idebank", icon: Lightbulb }
 ];
 
 export function AdminShell({ children }) {
@@ -35,7 +22,7 @@ export function AdminShell({ children }) {
 
   const nav = [...baseNav];
   if (me?.role === "admin") {
-    nav.push({ href: "/admin/settings", label: "Settings", icon: Settings });
+    nav.push({ href: "/admin/settings", label: "Innstillinger", icon: Settings });
   }
 
   useEffect(() => {
@@ -53,97 +40,58 @@ export function AdminShell({ children }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-brand-950 text-white">
-      <aside
-        className={`sticky top-0 h-screen border-r border-brand-800 bg-brand-900/50 backdrop-blur
-        transition-all duration-200 ${collapsed ? "w-16" : "w-64"} hidden md:flex flex-col z-50`}
-      >
-        <div className="h-16 px-4 flex items-center justify-between border-b border-brand-800">
-          <span
-            className={`font-bold text-lg text-accent-blue truncate ${
-              collapsed ? "opacity-0 w-0 overflow-hidden" : "w-auto"
-            }`}
-          >
-            Admin
-          </span>
-
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-brand-400 hover:text-white transition"
-            title={collapsed ? "Expand" : "Collapse"}
-          >
-            <ChevronLeft
-              className={`h-5 w-5 transition-transform ${collapsed ? "rotate-180" : ""}`}
-            />
+    <div className="flex min-h-screen bg-slate-950 text-white">
+      <aside className={`sticky top-0 z-50 hidden h-screen flex-col border-r border-white/10 bg-slate-950/90 backdrop-blur-xl transition-all duration-200 md:flex ${collapsed ? "w-16" : "w-72"}`}>
+        <div className="flex h-20 items-center justify-between border-b border-white/10 px-4">
+          <Link href="/admin/dashboard" className={`flex items-center gap-3 overflow-hidden ${collapsed ? "w-8" : "w-auto"}`}>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cyan-400 text-slate-950">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div className={`${collapsed ? "hidden" : "block"}`}>
+              <p className="text-sm font-bold leading-tight text-white">Project Phoenix</p>
+              <p className="text-xs text-slate-400">Hansen IT CRM</p>
+            </div>
+          </Link>
+          <button onClick={() => setCollapsed(!collapsed)} className="rounded-xl p-2 text-slate-400 hover:bg-white/10 hover:text-white" title={collapsed ? "Utvid" : "Minimer"}>
+            <ChevronLeft className={`h-5 w-5 transition-transform ${collapsed ? "rotate-180" : ""}`} />
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {nav.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
-
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium
-                transition-colors ${
-                  active
-                    ? "bg-accent-blue/10 text-accent-blue"
-                    : "text-brand-400 hover:bg-brand-800 hover:text-white"
-                }`}
-              >
-                <Icon
-                  className={`h-5 w-5 shrink-0 ${
-                    active ? "text-accent-blue" : "text-brand-500 group-hover:text-white"
-                  }`}
-                />
-                <span
-                  className={`transition-opacity duration-200 ${
-                    collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto"
-                  }`}
-                >
-                  {item.label}
-                </span>
+              <Link key={item.href} href={item.href} className={`group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition ${active ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:bg-white/10 hover:text-white"}`} title={item.label}>
+                <Icon className="h-5 w-5 shrink-0" />
+                <span className={`${collapsed ? "hidden" : "block"}`}>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-brand-800 space-y-1">
-          <Link
-            href="/"
-            target="_blank"
-            className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-brand-400 hover:bg-brand-800 hover:text-white transition-colors"
-          >
-            <Globe className="h-5 w-5 shrink-0 text-brand-500 group-hover:text-white" />
-            <span
-              className={`transition-opacity duration-200 ${
-                collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto"
-              }`}
-            >
-              View Site
-            </span>
-          </Link>
-
-          <button
-            onClick={handleLogout}
-            className="w-full group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-brand-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
-          >
-            <LogOut className="h-5 w-5 shrink-0 text-brand-500 group-hover:text-red-400" />
-            <span
-              className={`transition-opacity duration-200 ${
-                collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto"
-              }`}
-            >
-              Logout
-            </span>
+        <div className="border-t border-white/10 p-3">
+          <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-slate-400 hover:bg-rose-500/10 hover:text-rose-200" title="Logg ut">
+            <LogOut className="h-5 w-5 shrink-0" />
+            <span className={`${collapsed ? "hidden" : "block"}`}>Logg ut</span>
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 overflow-x-hidden">{children}</main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="sticky top-0 z-40 flex items-center gap-2 overflow-x-auto border-b border-white/10 bg-slate-950/90 px-3 py-3 backdrop-blur md:hidden">
+          {baseNav.map((item) => {
+            const Icon = item.icon;
+            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <Link key={item.href} href={item.href} className={`flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-sm font-semibold ${active ? "bg-cyan-400 text-slate-950" : "bg-white/5 text-slate-300"}`}>
+                <Icon className="h-4 w-4" />{item.label}
+              </Link>
+            );
+          })}
+        </div>
+        <main className="min-w-0 flex-1 overflow-x-hidden bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_34%),linear-gradient(180deg,#020617,#0f172a)]">{children}</main>
+      </div>
     </div>
   );
 }

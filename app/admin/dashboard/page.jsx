@@ -1,189 +1,110 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { supabase } from "@/lib/supabaseClient";
-import { LogOut, Settings } from "lucide-react";
-import DashboardHeader from "./DashboardHeader";
+import Link from "next/link";
+import { ArrowRight, CheckCircle2, Download, FileText, Lightbulb, Users } from "lucide-react";
+import { usePhoenixData } from "@/components/phoenix/usePhoenixData";
+import { EmptyState, formatCurrency, formatDate, MetricCard, PhoenixPageHeader, PhoenixPanel, SecondaryButton, StatusBadge } from "@/components/phoenix/PhoenixUi";
+
+function priorityRank(priority) {
+  return { lav: 1, normal: 2, høy: 3 }[priority] || 0;
+}
 
 export default function AdminDashboard() {
-  const router = useRouter();
-  const [quotes, setQuotes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState(null);
-
-  const DB_STATUS_MAP = { new: "Ny", in_progress: "Pågår", completed: "Fullført" };
-  const REVERSE_DB_STATUS_MAP = { Ny: "new", Pågår: "in_progress", Fullført: "completed" };
-
-  const statuses = [
-    { value: "new", label: "New", color: "bg-red-500/20 border-red-500 text-red-400" },
-    { value: "in_progress", label: "In Progress", color: "bg-yellow-500/20 border-yellow-500 text-yellow-400" },
-    { value: "completed", label: "Completed", color: "bg-emerald-500/20 border-emerald-500 text-emerald-400" },
-  ];
-
-  const getStatusValue = (dbStatus) => REVERSE_DB_STATUS_MAP[dbStatus] || "new";
-
-  const fetchQuotes = async () => {
-    try {
-      let query = supabase.from("requests").select("*").order("created_at", { ascending: false });
-      if (statusFilter) query = query.eq("status", DB_STATUS_MAP[statusFilter] || statusFilter);
-      const { data } = await query;
-      setQuotes(data || []);
-    } catch (error) {
-      console.error("Error fetching quotes:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchQuotes();
-    const channel = supabase
-      .channel("requests-changes-admin")
-      .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, () => fetchQuotes())
-      .subscribe();
-
-    return () => supabase.removeChannel(channel);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleStatusChange = async (quoteId, newStatus) => {
-    const dbStatus = DB_STATUS_MAP[newStatus] || newStatus;
-    try {
-      await supabase.from("requests").update({ status: dbStatus }).eq("id", quoteId);
-      fetchQuotes();
-    } catch (error) {
-      console.error("Error updating quote:", error);
-    }
-  };
-
-  const handleLogout = async () => {
-    await fetch("/api/logout", { method: "POST" }).catch(() => {});
-    router.push("/login");
-  };
-
-  const newCount = quotes.filter((q) => getStatusValue(q.status) === "new").length;
-  const inProgressCount = quotes.filter((q) => getStatusValue(q.status) === "in_progress").length;
-  const completedCount = quotes.filter((q) => getStatusValue(q.status) === "completed").length;
+  const { data, customersById, parkTaskAsIdea, exportBackup } = usePhoenixData();
+  const activeTasks = data.tasks.filter((task) => task.status !== "ferdig");
+  const todaysThree = [...activeTasks].sort((a, b) => priorityRank(b.priority) - priorityRank(a.priority) || String(a.dueDate).localeCompare(String(b.dueDate))).slice(0, 3);
+  const customersToFollowUp = data.customers.filter((customer) => customer.status !== "inaktiv" && customer.followUpDate).slice(0, 5);
+  const openQuotes = data.quotes.filter((quote) => ["kladd", "sendt"].includes(quote.status));
+  const parkedIdeas = data.ideas.filter((idea) => idea.status === "parkert").length;
 
   return (
-    <div className="p-6 space-y-6">
-      <DashboardHeader />
+    <div className="space-y-6 p-4 md:p-8">
+      <PhoenixPageHeader
+        title="Dagens oversikt"
+        description="Phoenix v1 fokuserer på dagens tre viktigste oppgaver, kunder som må følges opp, åpne tilbud og ideer som kan parkeres uten å bli prosjekter."
+        action={<Link href="/admin/kanban" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-cyan-300">Åpne oppgaver <ArrowRight size={16} /></Link>}
+      />
 
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-4xl font-bold text-white">Admin Dashboard</h1>
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            onClick={() => router.push("/admin/services")}
-            className="flex items-center gap-2"
-          >
-            <Settings size={18} />
-            Services
-          </Button>
-          <Button variant="secondary" onClick={handleLogout} className="flex items-center gap-2">
-            <LogOut size={18} />
-            Logout
-          </Button>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Dagens 3" value={todaysThree.length} detail="Maks tre aktive hovedoppgaver" tone="cyan" />
+        <MetricCard label="Kunder å følge opp" value={customersToFollowUp.length} detail="Lead og aktive kunder" tone="emerald" />
+        <MetricCard label="Åpne tilbud" value={openQuotes.length} detail="Kladd eller sendt" tone="amber" />
+        <MetricCard label="Parkerte ideer" value={`${parkedIdeas}/${data.ideas.length}`} detail="Ideer uten prosjektstatus" tone="rose" />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <div className="space-y-2">
-            <p className="text-brand-400 text-sm font-medium">New Requests</p>
-            <p className="text-3xl font-bold text-accent-blue">{newCount}</p>
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <PhoenixPanel title="Dagens 3 prioriteringsmodul" description="Maks tre aktive toppoppgaver. Parker det som ikke skal v?re aktivt arbeid akkurat n?.">
+          <div className="space-y-3">
+            {todaysThree.length ? todaysThree.map((task) => (
+              <div key={task.id} className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-white">{task.title}</h3>
+                    <p className="mt-1 text-sm text-slate-400">{customersById.get(task.customerId)?.companyName || "Ingen kunde"} - {formatDate(task.dueDate)}</p>
+                  </div>
+                  <StatusBadge>{task.priority}</StatusBadge>
+                </div>
+                <p className="mt-3 text-sm text-slate-300">{task.description}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <SecondaryButton onClick={() => parkTaskAsIdea(task.id)}>Parker som id?</SecondaryButton>
+                  <Link href="/admin/kanban" className="inline-flex min-h-10 items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Rediger i kanban</Link>
+                </div>
+              </div>
+            )) : <EmptyState text="Ingen aktive oppgaver i Dagens 3." />}
           </div>
-        </Card>
-        <Card>
-          <div className="space-y-2">
-            <p className="text-brand-400 text-sm font-medium">In Progress</p>
-            <p className="text-3xl font-bold text-accent-orange">{inProgressCount}</p>
+        </PhoenixPanel>
+
+        <PhoenixPanel title="Kunder som må følges opp" description="Companies og contacts fra inspirasjons-CRM-et samlet som kundeoversikt.">
+          <div className="space-y-3">
+            {customersToFollowUp.map((customer) => (
+              <Link key={customer.id} href="/admin/customers" className="block rounded-2xl border border-white/10 bg-slate-950/45 p-4 hover:bg-white/10">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-white">{customer.companyName}</p>
+                    <p className="mt-1 text-sm text-slate-400">{customer.contactPerson} - {formatDate(customer.followUpDate)}</p>
+                  </div>
+                  <StatusBadge>{customer.status}</StatusBadge>
+                </div>
+              </Link>
+            ))}
           </div>
-        </Card>
-        <Card>
-          <div className="space-y-2">
-            <p className="text-brand-400 text-sm font-medium">Completed</p>
-            <p className="text-3xl font-bold text-accent-emerald">{completedCount}</p>
-          </div>
-        </Card>
+        </PhoenixPanel>
       </div>
 
-      <Card>
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-white">Quote Requests</h2>
-
-            <select
-              value={statusFilter || ""}
-              onChange={(e) => setStatusFilter(e.target.value || null)}
-              className="bg-brand-900 border border-brand-700 rounded-lg px-4 py-2 text-white"
-            >
-              <option value="">All Requests</option>
-              <option value="new">New</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-            </select>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <PhoenixPanel title="Åpne tilbud" description="Quotes-flyt i enkel v1-form.">
+          <div className="space-y-3">
+            {openQuotes.map((quote) => (
+              <div key={quote.id} className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-white">{quote.title}</p>
+                    <p className="mt-1 text-sm text-slate-400">{customersById.get(quote.customerId)?.companyName || "Ingen kunde"} - {formatCurrency(quote.priceExVat)}</p>
+                  </div>
+                  <StatusBadge>{quote.status}</StatusBadge>
+                </div>
+              </div>
+            ))}
           </div>
+        </PhoenixPanel>
 
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="w-8 h-8 rounded-full border-2 border-accent-blue border-t-transparent animate-spin" />
-            </div>
-          ) : quotes.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-brand-700">
-                    <th className="text-left py-3 px-4 font-semibold text-white">Name</th>
-                    <th className="text-left py-3 px-4 font-semibold text-white">Email</th>
-                    <th className="text-left py-3 px-4 font-semibold text-white">Status</th>
-                    <th className="text-left py-3 px-4 font-semibold text-white">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {quotes.map((quote) => (
-                    <tr key={quote.id} className="border-b border-brand-700 hover:bg-brand-900/50">
-                      <td className="py-3 px-4 text-white">{quote.name || "No Name"}</td>
-                      <td className="py-3 px-4 text-brand-300">{quote.email || "-"}</td>
-                      <td className="py-3 px-4">
-                        <select
-                          value={getStatusValue(quote.status)}
-                          onChange={(e) => handleStatusChange(quote.id, e.target.value)}
-                          className={`rounded px-3 py-1 text-xs font-medium border ${
-                            statuses.find((s) => s.value === getStatusValue(quote.status))?.color ||
-                            "bg-brand-800"
-                          }`}
-                        >
-                          {statuses.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-3 px-4">
-                        <button
-                          onClick={() => router.push(`/admin/quote/${quote.id}`)}
-                          className="text-accent-blue hover:text-accent-cyan transition-colors text-sm font-medium"
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-brand-400">No requests yet.</p>
-            </div>
-          )}
-        </div>
-      </Card>
+        <PhoenixPanel title="CRM-flyt" description="Inspirert av dashboard, companies, contacts, quotes og scrumboard.">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              [Users, "Kunder", "Firma og kontaktpersoner"],
+              [CheckCircle2, "Oppgaver", "Kanban for daglig drift"],
+              [FileText, "Tilbud", "Kladd, sendt og godkjent"],
+              [Lightbulb, "Idebank", "Parker ideer raskt"]
+            ].map(([Icon, title, text]) => (
+              <div key={title} className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <Icon className="h-5 w-5 text-cyan-300" />
+                <p className="mt-3 font-semibold text-white">{title}</p>
+                <p className="mt-1 text-sm text-slate-400">{text}</p>
+              </div>
+            ))}
+          </div>
+        </PhoenixPanel>
+      </div>
     </div>
   );
 }

@@ -1,47 +1,30 @@
+﻿import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 
-export async function POST(req, res) {
+export async function POST(req) {
   try {
     const body = await req.json();
-    const { name, email, role, password } = body;
+    const { name, email, role = "worker" } = body;
 
-    const supabase = getSupabaseServer();
-
-    // Sjekk om bruker finnes
-    const { data: existing } = await supabase
-      .from("employees")
-      .select("*")
-      .eq("email", email)
-      .single();
-
-    if (existing) {
-      return res.status(400).json({ error: "User already exists" });
+    if (!name || !email) {
+      return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
     }
 
-    // Opprett i Supabase
-    const { data: user } = await supabase
-      .from("employees")
-      .insert({ name, email, role })
-      .select()
-      .single();
+    const supabase = getSupabaseServer();
+    const { data: existing } = await supabase.from("employees").select("*").eq("email", email).maybeSingle();
 
-    // Opprett i Casdoor
-    const params = new URLSearchParams({
-      owner: process.env.CASDOOR_ORG_NAME,
-      name: email,
-      email,
-      password: password || "Temp123!",
-      displayName: name,
-      role,
-      avatar: ""
-    });
+    if (existing) {
+      return NextResponse.json({ error: "User already exists" }, { status: 400 });
+    }
 
-    const casdoorRes = await fetch(
-      `${process.env.NEXT_PUBLIC_CASDOOR_SERVER_URL}/api/add-user`,
-      { method: "POST", body: params }
-    );
+    const { data, error } = await supabase.from("employees").insert({ name, email, role }).select().single();
 
-    const casdoorData = await casdoorRes.json();
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-    if (casdoorData.error) {
-      // Rull tilbake Supabase hvis Casdoor feil
+    return NextResponse.json({ data }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json({ error: error?.message || "Could not create user" }, { status: 500 });
+  }
+}

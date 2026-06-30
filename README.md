@@ -34,3 +34,29 @@ npm install
 npm run dev
 ```
 Åpne /login → Microsoft → /dashboard eller /dashboard/kanban
+
+## Project Phoenix v1
+
+Phoenix v1 er lagt oppå eksisterende `hansen-it-2025-crm` uten migrering til Refine og uten Ant Design. Design og flyt er inspirert av `The-playmaker/crm-Hansen-IT`, men implementert med Next.js, React og Tailwind i dagens 2025 CRM-base.
+
+### Gjort i v1
+
+- Forbedret `/login` med Hansen IT / Project Phoenix-branding og eksisterende Casdoor SSO-flyt.
+- Ny Phoenix adminstruktur med sidepanel for Dashboard, Kunder, Oppgaver, Tilbud og Idebank.
+- Dashboard med Dagens 3, kunder til oppfølging, åpne tilbud og idebank-teller.
+- Kunder-side inspirert av Companies/Contacts: firma, primærkontakt, kontaktpersoner, status og notater.
+- Oppgaver/Kanban-side inspirert av Scrumboard: enkel status-board med `ny`, `pågår`, `venter kunde`, `ferdig`.
+- Tilbud-side inspirert av Quotes: kladd/sendt/godkjent/avslått, pris eks. mva og gyldighet.
+- Idebank med `parkert` som standardstatus, slik at ideer ikke automatisk blir aktive prosjekter.
+- Midlertidig lokal mock-data via `localStorage` når Supabase-tabeller for Phoenix ikke finnes.
+
+### Neste steg
+
+- Lage Supabase-tabeller/migrasjoner for `phoenix_customers`, `phoenix_contacts`, `phoenix_tasks`, `phoenix_quotes` og `phoenix_ideas`.
+- Bytte `components/phoenix/usePhoenixData.jsx` fra `localStorage` til Supabase CRUD.
+- Koble eksisterende `requests`/quotes-data inn i Phoenix tilbud hvis den tabellen skal være videre kilde.
+- Legge til rolle-/RLS-policyer før produksjonsbruk.
+
+### Ikke inkludert i v1
+
+Faktura, AI, lager, kundeportal og avansert rapportering er bevisst holdt utenfor Phoenix v1.
