@@ -60,3 +60,9 @@ Phoenix v1 er lagt oppå eksisterende `hansen-it-2025-crm` uten migrering til Re
 ### Ikke inkludert i v1
 
 Faktura, AI, lager, kundeportal og avansert rapportering er bevisst holdt utenfor Phoenix v1.
+
+## Auth etter Casdoor-fjerning
+
+Casdoor er fjernet fra Phoenix v1. `/login` bruker nå en enkel lokal Phoenix-session som setter `phoenixUser` cookie via `/api/auth/login`. Dette er ment for v1/mock-drift og lokal bruk mens CRM-et fortsatt bruker `localStorage` for Phoenix-data.
+
+Neste auth-steg bør være å velge og implementere produksjonsauth, for eksempel Supabase Auth med RLS-policyer for Phoenix-tabellene.
