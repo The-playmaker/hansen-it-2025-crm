@@ -133,3 +133,100 @@ curl -X POST https://crm.hansen-it.com/api/public/contact \
   -H "Content-Type: application/json" \
   -d '{"name":"Ola Nordmann","email":"ola@example.no","phone":"+47 900 00 000","company":"Eksempel AS","message":"Vi ønsker hjelp med IT-drift.","category":"Salg","source":"hansen-it-2025"}'
 ```
+
+## Phoenix CMS for Hansen IT-nettsiden
+
+CRM-et har en enkel CMS-side på `/admin/site-content` for forsideinnhold til Hansen IT-nettsiden:
+
+- hero title og subtitle
+- CTA-tekst
+- tjenester/seksjoner
+- om oss tekst
+- kontakttekst
+- SEO title og description
+
+Offentlig innhold kan hentes via:
+
+```http
+GET /api/public/site-content
+```
+
+Hvis Supabase ikke er konfigurert, eller tabellen ikke kan leses, returnerer endpointet trygg fallback/mock-data.
+
+### Forventet Supabase-schema
+
+Endpointet forsøker å lese siste rad fra `phoenix_site_content`. En enkel startmodell kan være:
+
+```sql
+create table if not exists public.phoenix_site_content (
+  id uuid primary key default gen_random_uuid(),
+  content jsonb not null,
+  updated_at timestamptz default now()
+);
+```
+
+`content` bør inneholde feltene `heroTitle`, `heroSubtitle`, `ctaText`, `services`, `aboutText`, `contactText`, `seoTitle` og `seoDescription`.
+
+### Slack-varsel for nye leads
+
+Hvis `SLACK_WEBHOOK_URL` finnes i CRM-miljøet, sender `/api/public/contact` et best-effort Slack-varsel etter at en gyldig lead er lagret i `phoenix_leads` eller fallback-tabellen `requests`.
+
+```bash
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+Slack-feil logges kontrollert med `console.error`, men skal ikke stoppe lead-mottaket eller krasje API-et. Meldingen viser navn, firma, e-post, telefon, kategori, kort melding og kilde.
+
+## Project Phoenix core Supabase-migration
+
+Ny migration ligger i:
+
+```bash
+supabase/migrations/20260701130000_project_phoenix_core.sql
+```
+
+### Nye tabeller
+
+Migrationen oppretter disse Phoenix core-tabellene hvis de ikke finnes:
+
+- `customers`
+- `customer_contacts`
+- `projects`
+- `tasks`
+- `locations`
+- `assets`
+- `activity_log`
+
+Den legger også trygge koblingskolonner på eksisterende `requests` hvis de mangler:
+
+- `requests.customer_id uuid references customers(id)`
+- `requests.converted_at timestamptz`
+- `requests.converted_to_customer boolean default false`
+
+### Eksisterende tabeller som gjenbrukes
+
+Migrationen gjenbruker eksisterende tabeller og endrer ikke Casdoor-tabeller:
+
+- `requests`
+- `services`
+- `employees`
+- `quote_*`
+
+`projects`, `tasks` og `activity_log` kan kobles mot `requests`. `projects` kan også kobles mot `services` og `employees`.
+
+### Kjøre SQL i Supabase
+
+Alternativ 1: Supabase Dashboard
+
+1. Åpne Supabase-prosjektet.
+2. Gå til SQL Editor.
+3. Lim inn innholdet fra `supabase/migrations/20260701130000_project_phoenix_core.sql`.
+4. Kjør scriptet.
+
+Alternativ 2: Supabase CLI
+
+```bash
+supabase db push
+```
+
+Denne migrationen lager ikke RLS policies ennå. Det bør gjøres i en egen sikkerhetsrunde før produksjonsbruk.

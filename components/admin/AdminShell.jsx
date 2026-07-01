@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, KanbanSquare, Users, Settings, LogOut, ChevronLeft, FileText, Lightbulb, Sparkles, Inbox } from "lucide-react";
+import { LayoutGrid, KanbanSquare, Users, Settings, LogOut, ChevronLeft, FileText, Lightbulb, Sparkles, Inbox, Globe2 } from "lucide-react";
 import { useMe } from "@/app/admin/useMe";
 
 const baseNav = [
@@ -12,7 +12,8 @@ const baseNav = [
   { href: "/admin/customers", label: "Kunder", icon: Users },
   { href: "/admin/kanban", label: "Oppgaver", icon: KanbanSquare },
   { href: "/admin/quotes", label: "Tilbud", icon: FileText },
-  { href: "/admin/ideas", label: "Idebank", icon: Lightbulb }
+  { href: "/admin/ideas", label: "Idebank", icon: Lightbulb },
+  { href: "/admin/site-content", label: "Nettside", icon: Globe2 }
 ];
 
 export function AdminShell({ children }) {

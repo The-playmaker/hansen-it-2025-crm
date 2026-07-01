@@ -7,6 +7,17 @@ function cloneInitialData() {
   return JSON.parse(JSON.stringify(phoenixMockData));
 }
 
+function mergeWithInitialData(savedData) {
+  return {
+    ...cloneInitialData(),
+    ...savedData,
+    siteContent: {
+      ...cloneInitialData().siteContent,
+      ...(savedData?.siteContent || {})
+    }
+  };
+}
+
 function createId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -19,7 +30,7 @@ export function usePhoenixData() {
     const saved = window.localStorage.getItem(PHOENIX_STORAGE_KEY);
     if (saved) {
       try {
-        setData(JSON.parse(saved));
+        setData(mergeWithInitialData(JSON.parse(saved)));
       } catch {
         setData(cloneInitialData());
       }
