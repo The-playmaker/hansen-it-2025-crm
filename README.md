@@ -66,3 +66,70 @@ Faktura, AI, lager, kundeportal og avansert rapportering er bevisst holdt utenfo
 Casdoor er fjernet fra Phoenix v1. `/login` bruker nå en enkel lokal Phoenix-session som setter `phoenixUser` cookie via `/api/auth/login`. Dette er ment for v1/mock-drift og lokal bruk mens CRM-et fortsatt bruker `localStorage` for Phoenix-data.
 
 Neste auth-steg bør være å velge og implementere produksjonsauth, for eksempel Supabase Auth med RLS-policyer for Phoenix-tabellene.
+
+## Hansen IT-nettside -> Phoenix lead-bro
+
+CRM-et eksponerer et offentlig endpoint for kontaktskjema fra nettsiden:
+
+```http
+POST /api/public/contact
+Content-Type: application/json
+```
+
+### Miljøvariabler i CRM
+
+Endpointet krever Supabase-konfig for å lagre leads:
+
+```bash
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+```
+
+Alternativt kan `NEXT_PUBLIC_SUPABASE_URL` og `NEXT_PUBLIC_SUPABASE_ANON_KEY` brukes i enklere dev-miljø, men service role anbefales for server-side lead-mottak.
+
+Hvis Supabase-miljøvariabler mangler returnerer endpointet kontrollert `503` med norsk feilmelding. Build/dev skal ikke krasje.
+
+### Forventet payload
+
+```json
+{
+  "name": "Ola Nordmann",
+  "email": "ola@example.no",
+  "phone": "+47 900 00 000",
+  "company": "Eksempel AS",
+  "message": "Vi ønsker hjelp med IT-drift.",
+  "category": "Salg",
+  "source": "hansen-it-2025"
+}
+```
+
+`name`, `email` og `message` er påkrevd.
+
+### Forventet Supabase-schema
+
+Primært forsøker endpointet å skrive til `phoenix_leads`:
+
+```sql
+create table if not exists public.phoenix_leads (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text not null,
+  phone text,
+  company text,
+  message text not null,
+  category text,
+  source text default 'hansen-it-2025',
+  status text default 'ny',
+  created_at timestamptz default now()
+);
+```
+
+Hvis `phoenix_leads` ikke finnes, brukes eksisterende `requests`-tabell som fallback med feltene `name`, `email`, `phone`, `company`, `description`, `message`, `priority` og `status`.
+
+### Eksempel curl
+
+```bash
+curl -X POST https://crm.hansen-it.com/api/public/contact \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Ola Nordmann","email":"ola@example.no","phone":"+47 900 00 000","company":"Eksempel AS","message":"Vi ønsker hjelp med IT-drift.","category":"Salg","source":"hansen-it-2025"}'
+```

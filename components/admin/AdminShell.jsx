@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, KanbanSquare, Users, Settings, LogOut, ChevronLeft, FileText, Lightbulb, Sparkles } from "lucide-react";
+import { LayoutGrid, KanbanSquare, Users, Settings, LogOut, ChevronLeft, FileText, Lightbulb, Sparkles, Inbox } from "lucide-react";
 import { useMe } from "@/app/admin/useMe";
 
 const baseNav = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutGrid },
+  { href: "/admin/leads", label: "Leads", icon: Inbox },
   { href: "/admin/customers", label: "Kunder", icon: Users },
   { href: "/admin/kanban", label: "Oppgaver", icon: KanbanSquare },
   { href: "/admin/quotes", label: "Tilbud", icon: FileText },
