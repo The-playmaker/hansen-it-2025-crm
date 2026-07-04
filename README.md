@@ -342,6 +342,65 @@ create table if not exists public.security_scan_reports (
 
 Hvis Supabase ikke er konfigurert, kan scan kjøres, men rapporten lagres ikke. Reports-siden viser da demo mode.
 
+### Phoenix Scan v2
+
+Phoenix Scan v2 er fortsatt en passiv, CRM-integrert sikkerhetssjekk. Public/admin scan bruker kun DNS-, HTTP-, TLS- og offentlige RDAP-oppslag:
+
+- domain scan med HTTPS, TLS, sikkerhetsheadere, DNSSEC og domeneutløp
+- email/security scan med MX, SPF, DKIM, DMARC, MTA-STS og email spoofing risk
+- passiv subdomain discovery via vanlige DNS-navn som `www`, `mail`, `portal`, `crm`, `api`, `status` og lignende
+- findings med `severity` (`critical`, `high`, `medium`, `low`, `ok`)
+- anbefalte tiltak med estimert arbeid
+- "Create CRM lead" fra funn, som oppretter en intern `requests`-rad med `source='phoenix_scan'`
+- "Create task" fra funn, som oppretter rad i `tasks`
+
+Begrensninger med vilje:
+
+- Ingen aggressiv portscan mot tredjepart.
+- Ingen IP-range scanning.
+- Ingen aktiv angrepstesting.
+- Ingen credential testing eller brute force.
+
+CRM-handlinger fra scan krever `SUPABASE_URL` og `SUPABASE_SERVICE_ROLE_KEY` server-side. Service role key brukes kun i API-ruter og eksponeres ikke til frontend.
+
+### Scan Authorization Flow
+
+Phoenix har en egen autorisasjonsflyt for skanning som krever signert kundesamtykke før scan-jobb opprettes.
+
+Adminruter:
+
+- `/admin/scan-authorizations` - opprett og se scan-autorisasjoner
+- `/admin/scan-authorizations/[id]` - detaljer, portal-lenke, signatur og queued job
+
+Kundeportal:
+
+- `/portal/scan-authorization/[token]` - sikker token-lenke uten innlogging
+
+Flyt:
+
+1. Admin oppretter autorisasjon med kunde, signatar, scan-type, domener/IP-er og vilkår.
+2. Systemet lager lang random token og portal-lenke.
+3. Kunden åpner lenken, leser vilkår, bekrefter/justerer scope og signerer digitalt.
+4. Systemet logger navn, e-post, rolle, IP-adresse, timestamp, scope, domener, IP-er, scan-type og signaturdata.
+5. Etter signering opprettes `scan_jobs` automatisk med `status='queued'`.
+
+Aktiv skanning skal ikke kjøres uten gyldig `scan_authorizations.status='signed'`. Den nåværende `/admin/security/scan`-siden gjør fortsatt kun passive DNS/HTTP/TLS/RDAP-sjekker og starter ikke aktiv testing.
+
+Migration:
+
+```bash
+supabase/migrations/20260704223000_scan_authorization_flow.sql
+```
+
+Tabeller:
+
+- `scan_authorizations`
+- `scan_scopes`
+- `scan_jobs`
+- `scan_results`
+- `scan_findings`
+- `scan_reports`
+
 ## CRM-flyt: requests -> leads -> customers -> quotes
 
 Phoenix bruker nå `requests` som inngang for henvendelser fra nettside/contact/quote forms. Original request slettes ikke ved konvertering.

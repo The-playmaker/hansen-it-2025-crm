@@ -85,11 +85,27 @@ export default function SecurityReportsPage() {
                 <p className="text-sm text-slate-400">Domene</p>
                 <p className="mt-1 text-xl font-bold text-white">{selected.domain}</p>
                 <p className="mt-2 text-sm text-slate-300">Score {selected.score}/100, karakter {selected.grade}</p>
+                {selected.report?.spoofingRisk ? <p className="mt-2 text-sm text-amber-200">Spoofing-risk: {selected.report.spoofingRisk.level} - {selected.report.spoofingRisk.reason}</p> : null}
+                {selected.report?.subdomains?.length ? <p className="mt-2 text-sm text-slate-400">Subdomener funnet: {selected.report.subdomains.length}</p> : null}
               </div>
+              {selected.report?.subdomains?.length ? (
+                <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                  <p className="font-semibold text-white">Subdomain discovery</p>
+                  <div className="mt-3 space-y-2">
+                    {selected.report.subdomains.slice(0, 8).map((item) => (
+                      <div key={item.host} className="rounded-xl border border-white/10 p-3 text-sm">
+                        <p className="font-semibold text-white">{item.host}</p>
+                        {item.a?.length ? <p className="mt-1 text-xs text-slate-400">A: {item.a.join(", ")}</p> : null}
+                        {item.cname?.length ? <p className="mt-1 text-xs text-slate-400">CNAME: {item.cname.join(", ")}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="space-y-2">
                 {(selected.report?.actions || []).slice(0, 6).map((action) => (
                   <div key={action.id} className="rounded-xl border border-white/10 p-3">
-                    <p className="font-semibold text-white">{action.title}</p>
+                    <p className="font-semibold text-white">{action.title}{action.severity ? ` (${action.severity})` : ""}</p>
                     <p className="mt-1 text-sm text-slate-400">{action.fix}</p>
                   </div>
                 ))}

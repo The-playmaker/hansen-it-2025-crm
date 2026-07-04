@@ -19,6 +19,7 @@ const baseNav = [
     icon: ShieldCheck,
     children: [
       { href: "/admin/security/scan", label: "Scan", icon: SearchCheck },
+      { href: "/admin/scan-authorizations", label: "Authorizations", icon: ShieldCheck },
       { href: "/admin/security/reports", label: "Reports", icon: ClipboardList }
     ]
   }

@@ -3,7 +3,7 @@ import { requireMe } from "@/lib/requireMe";
 import { checkEmail } from "@/lib/securityScan/checks/email";
 import { checkWeb } from "@/lib/securityScan/checks/web";
 import { checkTls } from "@/lib/securityScan/checks/tls";
-import { checkDnssec, resolveA } from "@/lib/securityScan/checks/dns";
+import { checkDnssec, discoverSubdomains, resolveA } from "@/lib/securityScan/checks/dns";
 import { checkDomainRegistration } from "@/lib/securityScan/checks/rdap";
 import { buildSecurityReport } from "@/lib/securityScan/score";
 import { saveSecurityScanReport } from "@/lib/securityScan/storage";
@@ -40,15 +40,16 @@ export async function POST(request) {
     return NextResponse.json({ error: `Fant ingen DNS-oppføringer for ${domain}.` }, { status: 404 });
   }
 
-  const [web, email, dnssec, rdap] = await Promise.all([
+  const [web, email, dnssec, rdap, subdomains] = await Promise.all([
     checkWeb(domain).catch(() => ({ reachable: false, headers: {} })),
     checkEmail(domain).catch(() => ({ hasMx: false, mx: [], spf: { present: false }, dmarc: { present: false }, dkim: { present: false, selectors: [] }, mtaSts: false, tlsRpt: false })),
     checkDnssec(domain).catch(() => ({ enabled: null })),
-    checkDomainRegistration(domain).catch(() => ({ found: false }))
+    checkDomainRegistration(domain).catch(() => ({ found: false })),
+    discoverSubdomains(domain).catch(() => [])
   ]);
 
   const tlsInfo = web.reachable ? await checkTls(web.finalHost || domain).catch(() => ({ ok: false })) : { ok: false };
-  const report = buildSecurityReport({ domain, web, tlsInfo, email, dnssec, rdap });
+  const report = buildSecurityReport({ domain, web, tlsInfo, email, dnssec, rdap, subdomains });
   const saveResult = await saveSecurityScanReport(report, me);
 
   return NextResponse.json({ ...report, saved: saveResult.saved, reportId: saveResult.id || null, saveError: saveResult.error || null });
