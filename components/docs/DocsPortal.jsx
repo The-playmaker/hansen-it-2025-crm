@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Activity, BookOpen, Boxes, Database, FileText, GitBranch, LayoutDashboard, Search, ShieldCheck } from "lucide-react";
 import { docsNavGroups } from "@/lib/docsPortal/data";
@@ -49,8 +50,10 @@ export function DocsSidebar() {
     <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-slate-950/75 lg:block">
       <div className="docs-scrollbar sticky top-0 h-screen overflow-y-auto px-3 py-4">
         <div className="mb-4 rounded-lg border border-white/10 bg-white/[0.04] p-3">
+          <Image src="/brand/hansen-it/logo/logo-horizontal-dark.svg" alt="Hansen IT" width={190} height={56} priority className="mb-3 h-auto w-36" />
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-cyan-300">Developer Portal</p>
           <p className="mt-1 text-sm font-semibold text-white">Phoenix Docs v1.0</p>
+          <p className="mt-1 text-[11px] text-slate-400">Infrastruktur · Nettverk · Support · Cybersikkerhet</p>
           <p className="mt-2 text-[11px] text-slate-500">Static draft content – markdown sync planned</p>
         </div>
         <nav className="space-y-4">
@@ -62,7 +65,7 @@ export function DocsSidebar() {
                   const baseHref = item.activePath || item.href.split("#")[0];
                   const active = pathname === baseHref && (!item.href.includes("#") || item.activePath);
                   return (
-                    <Link key={`${group.title}-${item.label}`} href={item.href} className={`block rounded px-2.5 py-1.5 text-[13px] transition ${active ? "bg-cyan-400/15 text-cyan-100 ring-1 ring-cyan-300/20" : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}>
+                    <Link key={`${group.title}-${item.label}`} href={item.href} className={`block rounded px-2.5 py-1.5 text-[13px] transition ${active ? "bg-[var(--hi-blue)]/20 text-white ring-1 ring-[var(--hi-blue-light)]/30" : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}>
                       {item.label}
                     </Link>
                   );
@@ -82,7 +85,10 @@ export function DocsTopbar({ title, description, badge = "Docs v1.0 draft" }) {
       <div className="mx-auto flex max-w-[1440px] flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-300">Project Phoenix</p>
+            <div className="mb-3 flex items-center gap-3">
+              <Image src="/brand/hansen-it/logo/logo-horizontal-dark.svg" alt="Hansen IT" width={180} height={54} priority className="h-auto w-32" />
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--hi-blue-light)]">Project Phoenix</p>
+            </div>
             <StatusBadge status="draft">{badge}</StatusBadge>
           </div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">{title}</h1>
@@ -100,16 +106,16 @@ export function DocsTopbar({ title, description, badge = "Docs v1.0 draft" }) {
 
 export function DocsLayout({ title, description, children }) {
   return (
-    <div className="docs-scrollbar min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_32%),linear-gradient(180deg,#020617,#0b1326)] text-slate-100">
+    <div className="docs-scrollbar min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(29,111,224,0.20),transparent_32%),linear-gradient(180deg,#020617,var(--hi-marine))] text-slate-100">
       <style jsx global>{`
         .docs-scrollbar {
           scrollbar-width: thin;
-          scrollbar-color: rgba(34, 211, 238, 0.38) rgba(15, 23, 42, 0.72);
+          scrollbar-color: rgba(63, 161, 255, 0.42) rgba(21, 33, 73, 0.72);
         }
         html,
         body {
           scrollbar-width: thin;
-          scrollbar-color: rgba(34, 211, 238, 0.38) rgba(15, 23, 42, 0.72);
+          scrollbar-color: rgba(63, 161, 255, 0.42) rgba(21, 33, 73, 0.72);
         }
         .docs-scrollbar::-webkit-scrollbar {
           width: 10px;
@@ -120,18 +126,18 @@ export function DocsLayout({ title, description, children }) {
           height: 10px;
         }
         .docs-scrollbar::-webkit-scrollbar-track {
-          background: rgba(15, 23, 42, 0.72);
+          background: rgba(21, 33, 73, 0.72);
         }
         body::-webkit-scrollbar-track {
-          background: rgba(15, 23, 42, 0.72);
+          background: rgba(21, 33, 73, 0.72);
         }
         .docs-scrollbar::-webkit-scrollbar-thumb {
-          background: linear-gradient(180deg, rgba(34, 211, 238, 0.42), rgba(59, 130, 246, 0.28));
+          background: linear-gradient(180deg, rgba(63, 161, 255, 0.48), rgba(29, 111, 224, 0.32));
           border: 2px solid rgba(15, 23, 42, 0.92);
           border-radius: 999px;
         }
         body::-webkit-scrollbar-thumb {
-          background: linear-gradient(180deg, rgba(34, 211, 238, 0.42), rgba(59, 130, 246, 0.28));
+          background: linear-gradient(180deg, rgba(63, 161, 255, 0.48), rgba(29, 111, 224, 0.32));
           border: 2px solid rgba(15, 23, 42, 0.92);
           border-radius: 999px;
         }

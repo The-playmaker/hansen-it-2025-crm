@@ -1,0 +1,35 @@
+<svg width="1400" height="400" viewBox="0 0 1400 400" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Hansen IT horisontal logo</title>
+  <desc>H-monogram i sirkel ved siden av firmanavnet Hansen IT med tjenestelinje</desc>
+  <defs>
+    <linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1B2A52"/>
+      <stop offset="100%" stop-color="#1455C9"/>
+    </linearGradient>
+    <linearGradient id="itg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1B66D6"/>
+      <stop offset="100%" stop-color="#3FA1FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- mark -->
+  <g transform="translate(40,40)">
+    <circle cx="160" cy="160" r="150" fill="none" stroke="#1B2A52" stroke-width="10" stroke-dasharray="665 280" stroke-linecap="round" transform="rotate(-100 160 160)"/>
+    <circle cx="160" cy="160" r="150" fill="none" stroke="#1D6FE0" stroke-width="10" stroke-dasharray="60 885" stroke-linecap="round" transform="rotate(72 160 160)"/>
+    <g transform="translate(92,96)">
+      <path d="M0 0 H43 V66 H88 V0 H131 V168 H88 V90 H43 V168 H0 Z" fill="url(#hg)"/>
+    </g>
+    <g fill="#1D6FE0">
+      <rect x="242" y="112" width="13" height="13" rx="3"/>
+      <rect x="261" y="129" width="10" height="10" rx="2" opacity="0.8"/>
+      <rect x="277" y="146" width="8" height="8" rx="2" opacity="0.6"/>
+    </g>
+  </g>
+
+  <!-- wordmark -->
+  <text x="400" y="205" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="120" letter-spacing="2" fill="#152149">HANSEN <tspan fill="url(#itg)">IT</tspan></text>
+
+  <!-- divider + tagline -->
+  <rect x="404" y="235" width="700" height="4" rx="2" fill="#1D6FE0"/>
+  <text x="404" y="282" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="25" letter-spacing="2" fill="#3A4A6B">INFRASTRUKTUR · NETTVERK · SUPPORT · CYBERSIKKERHET</text>
+</svg>

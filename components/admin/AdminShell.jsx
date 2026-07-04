@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, KanbanSquare, Users, Settings, LogOut, ChevronLeft, FileText, Lightbulb, Sparkles, Inbox, Globe2, ShieldCheck, SearchCheck, ClipboardList, BookOpen } from "lucide-react";
+import { LayoutGrid, KanbanSquare, Users, Settings, LogOut, ChevronLeft, FileText, Lightbulb, Inbox, Globe2, ShieldCheck, SearchCheck, ClipboardList, BookOpen } from "lucide-react";
 import { useMe } from "@/app/admin/useMe";
 
 const baseNav = [
@@ -60,8 +61,8 @@ export function AdminShell({ children }) {
       <aside className={`sticky top-0 z-50 hidden h-screen flex-col border-r border-white/10 bg-slate-950/90 backdrop-blur-xl transition-all duration-200 md:flex ${collapsed ? "w-16" : "w-72"}`}>
         <div className="flex h-20 items-center justify-between border-b border-white/10 px-4">
           <Link href="/admin/dashboard" className={`flex items-center gap-3 overflow-hidden ${collapsed ? "w-8" : "w-auto"}`}>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cyan-400 text-slate-950">
-              <Sparkles className="h-5 w-5" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white">
+              <Image src="/brand/hansen-it/logo/logo-icon.svg" alt="Hansen IT" width={34} height={34} priority />
             </div>
             <div className={`${collapsed ? "hidden" : "block"}`}>
               <p className="text-sm font-bold leading-tight text-white">Project Phoenix</p>

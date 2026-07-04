@@ -1,5 +1,6 @@
 import { DocsCard, DocsLayout, ReportPreviewCard, StatusBadge } from "@/components/docs/DocsPortal";
 import { reportTypes } from "@/lib/docsPortal/data";
+import Image from "next/image";
 
 export default function DocsReportsPage() {
   return (
@@ -13,7 +14,8 @@ export default function DocsReportsPage() {
           <div className="rounded-lg border border-white/10 bg-slate-950 p-5">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
-                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-cyan-300">Phoenix Scan</p>
+                <Image src="/brand/hansen-it/logo/logo-horizontal-dark.svg" alt="Hansen IT" width={180} height={54} className="mb-4 h-auto w-36" />
+                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--hi-blue-light)]">Phoenix Scan</p>
                 <h3 className="mt-1 text-xl font-semibold text-white">Security Assessment</h3>
               </div>
               <div className="text-right"><p className="text-3xl font-bold text-emerald-200">82</p><p className="text-xs text-slate-400">Score A/B</p></div>

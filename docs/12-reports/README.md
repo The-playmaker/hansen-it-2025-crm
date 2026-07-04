@@ -72,6 +72,9 @@ Skal kunne brukes i serviceavtaler og QBR/månedsmøter.
 
 ## PDF design principles
 
+- Bruk Hansen IT-logo på første side.
+- Bruk Hansen IT-paletten: Marine `#152149`, Blå `#1D6FE0`, Blå lys `#3FA1FF`, Grå tekst `#3A4A6B`.
+- Executive reports skal fremstå som profesjonelle konsulentrapporter.
 - Første side skal gi score, grade, domene/kunde, dato og topp tiltak.
 - Bruk statusfarger konsekvent: kritisk/høy/middels/lav/ok.
 - Ikke drukn kunden i rådata.
@@ -79,6 +82,8 @@ Skal kunne brukes i serviceavtaler og QBR/månedsmøter.
 - Hver anbefaling skal ha konkret neste handling.
 - PDF skal være lesbar på skjerm og utskrift.
 - Ingen dekor som gjør rapporten treg, tung eller vanskelig å lese.
+
+Standard dokumentdato er `Dato: [dato]`. Ikke hardkod geografisk sted i rapportmaler. Hvis et dokument faktisk trenger sted, brukes valgfritt `place?: string` og rendres som `{place}, {date}`. Uten sted rendres `Dato: {date}`.
 
 ## Score visualisering
 
