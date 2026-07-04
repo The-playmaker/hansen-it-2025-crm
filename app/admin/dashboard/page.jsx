@@ -18,6 +18,7 @@ export default function AdminDashboard() {
   const { data, customersById, parkTaskAsIdea, exportBackup } = usePhoenixData();
   const [requestLeads, setRequestLeads] = useState([]);
   const [requestsConfigured, setRequestsConfigured] = useState(true);
+  const [ideaStats, setIdeaStats] = useState({ total: 0, parked: 0, configured: true });
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +34,16 @@ export default function AdminDashboard() {
       }
     }
     loadRequests();
+    async function loadIdeas() {
+      try {
+        const response = await fetch("/api/admin/ideas", { cache: "no-store" });
+        const result = await response.json();
+        if (cancelled) return;
+        const ideas = result.data || [];
+        setIdeaStats({ total: ideas.length, parked: ideas.filter((idea) => idea.status === "parkert").length, configured: result.configured !== false });
+      } catch {}
+    }
+    loadIdeas();
     return () => { cancelled = true; };
   }, []);
 
@@ -42,7 +53,8 @@ export default function AdminDashboard() {
   const hastRequests = useMemo(() => requestLeads.filter((lead) => lead.priority === "hast" && isOpenLead(lead)), [requestLeads]);
   const newRequests = useMemo(() => requestLeads.filter((lead) => lead.status === "ny"), [requestLeads]);
   const openQuotes = data.quotes.filter((quote) => ["kladd", "sendt"].includes(quote.status));
-  const parkedIdeas = data.ideas.filter((idea) => idea.status === "parkert").length;
+  const parkedIdeas = ideaStats.configured ? ideaStats.parked : data.ideas.filter((idea) => idea.status === "parkert").length;
+  const totalIdeas = ideaStats.configured ? ideaStats.total : data.ideas.length;
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -61,6 +73,7 @@ export default function AdminDashboard() {
         <MetricCard label="Kunder som venter" value={openRequests.length} detail="Åpne requests" tone="emerald" />
         <MetricCard label="HAST" value={hastRequests.length} detail="priority='hast'" tone="rose" />
         <MetricCard label="Åpne tilbud" value={openQuotes.length} detail="Kladd eller sendt" tone="amber" />
+        <MetricCard label="Idébank" value={`${parkedIdeas}/${totalIdeas}`} detail={ideaStats.configured ? "Fra phoenix_ideas" : "Demo fallback"} tone="rose" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -142,3 +155,5 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+

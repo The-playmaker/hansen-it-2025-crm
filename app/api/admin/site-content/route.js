@@ -30,6 +30,8 @@ async function readCurrent() {
   const { data, error } = await supabaseAdmin
     .from("phoenix_site_content")
     .select("*")
+    .eq("key", "homepage")
+    .eq("page", "home")
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -68,11 +70,12 @@ export async function PATCH(request) {
   }
 
   const query = current.data?.id
-    ? supabaseAdmin.from("phoenix_site_content").update({ content, updated_at: new Date().toISOString() }).eq("id", current.data.id).select("*").single()
-    : supabaseAdmin.from("phoenix_site_content").insert({ content }).select("*").single();
+    ? supabaseAdmin.from("phoenix_site_content").update({ key: "homepage", title: "Hansen IT hjemmeside", content, section: "home", page: "home", updated_at: new Date().toISOString() }).eq("id", current.data.id).select("*").single()
+    : supabaseAdmin.from("phoenix_site_content").insert({ key: "homepage", title: "Hansen IT hjemmeside", content, section: "home", page: "home" }).select("*").single();
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ status: "ok", content: normalizeContent(data.content || data) });
 }
+

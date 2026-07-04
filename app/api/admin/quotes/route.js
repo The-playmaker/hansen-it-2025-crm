@@ -1,25 +1,46 @@
-import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+﻿import { NextResponse } from "next/server";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req) {
+  if (!hasSupabaseAdminConfig) return NextResponse.json({ configured: false, data: [] });
   const url = new URL(req.url);
   const search = (url.searchParams.get("search") || "").trim();
 
-  let q = supabaseAdmin
+  let query = supabaseAdmin
     .from("requests")
-    .select("id,name,email,status,created_at")
+    .select("*")
     .order("created_at", { ascending: false })
     .limit(200);
 
-  if (search) {
-    // best-effort søk (name/email/id)
-    q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%,id::text.ilike.%${search}%`);
-  }
+  if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%,id::text.ilike.%${search}%`);
 
-  const { data, error } = await q;
+  const { data, error } = await query;
+  if (error) return NextResponse.json({ configured: true, error: error.message, data: [] }, { status: 500 });
+  return NextResponse.json({ configured: true, data: data || [] });
+}
+
+export async function POST(request) {
+  if (!hasSupabaseAdminConfig) return NextResponse.json({ error: "Supabase er ikke konfigurert." }, { status: 503 });
+  const body = await request.json();
+  if (!body.name && !body.company) return NextResponse.json({ error: "Kunde/firma er påkrevd." }, { status: 400 });
+
+  const { data, error } = await supabaseAdmin
+    .from("requests")
+    .insert({
+      name: body.name || body.company,
+      customer_name: body.company || body.name || null,
+      company: body.company || null,
+      email: body.email || null,
+      phone: body.phone || null,
+      message: body.message || body.description || "Tilbud opprettet i Phoenix CRM.",
+      priority: body.priority || "normal",
+      status: body.status || "Ny"
+    })
+    .select("*")
+    .single();
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
   return NextResponse.json({ data });
 }

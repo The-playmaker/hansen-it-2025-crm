@@ -57,6 +57,8 @@ export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("phoenix_site_content")
     .select("*")
+    .eq("key", "homepage")
+    .eq("page", "home")
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -79,3 +81,4 @@ export async function GET() {
 
   return json({ status: "ok", configured: true, content: normalizeSiteContent(data) });
 }
+

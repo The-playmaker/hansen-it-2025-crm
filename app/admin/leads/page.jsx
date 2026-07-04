@@ -44,6 +44,21 @@ export default function LeadsPage() {
     });
   }, [leads, query, status, priority]);
 
+  const convertLead = async (lead) => {
+    setSavingId(lead.id);
+    try {
+      const response = await fetch(`/api/admin/requests/${lead.id}/convert`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Kunne ikke konvertere henvendelsen.");
+      setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, status: "converted", request: result.request } : item));
+      alert("Henvendelsen er konvertert til customer/contact/lead.");
+    } catch (err) {
+      alert(err.message || "Kunne ikke konvertere henvendelsen.");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   const updateLead = async (lead, patch) => {
     setSavingId(lead.id);
     try {
@@ -102,7 +117,7 @@ export default function LeadsPage() {
                   <span>Opprettet: {formatDate(lead.created_at)}</span>
                   {lead.updated_at ? <span>Oppdatert: {formatDate(lead.updated_at)}</span> : null}
                 </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={savingId === lead.id || lead.status === "converted"} onClick={() => convertLead(lead)} className="inline-flex min-h-10 items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-50">Konverter til lead/kunde</button></div><div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <Field label="Status"><SelectInput disabled={savingId === lead.id} value={lead.status} options={leadStatuses.filter((item) => item !== "alle")} onChange={(event) => updateLead(lead, { status: event.target.value })} /></Field>
                   <Field label="Prioritet"><SelectInput disabled={savingId === lead.id} value={lead.priority || "normal"} options={priorities.filter((item) => item !== "alle")} onChange={(event) => updateLead(lead, { priority: event.target.value })} /></Field>
                 </div>
@@ -114,3 +129,4 @@ export default function LeadsPage() {
     </div>
   );
 }
+

@@ -341,3 +341,57 @@ create table if not exists public.security_scan_reports (
 ```
 
 Hvis Supabase ikke er konfigurert, kan scan kjøres, men rapporten lagres ikke. Reports-siden viser da demo mode.
+
+## CRM-flyt: requests -> leads -> customers -> quotes
+
+Phoenix bruker nå `requests` som inngang for henvendelser fra nettside/contact/quote forms. Original request slettes ikke ved konvertering.
+
+Flyt:
+
+1. Ny henvendelse lagres i `requests`.
+2. Fra `/admin/leads` kan request konverteres med "Konverter til lead/kunde".
+3. Konvertering finner eller oppretter:
+   - `customers` basert på company/email
+   - `contacts` basert på name/email
+   - `leads` med `source_request_id`
+4. Request oppdateres med `customer_id`, `contact_id`, `lead_id`, `status='converted'`, `converted_at` og `converted_to_customer=true`.
+5. Tilbud opprettes fra `/admin/quotes` og åpnes i eksisterende `/admin/quotes/[id]`.
+6. Kundeportal-lenke genereres fra quote-detalj og kan åpnes via både `/portal/[token]` og `/portal/quote/[token]`.
+
+Ny migration for denne oppryddingen:
+
+```bash
+supabase/migrations/20260704210000_crm_flow_cleanup.sql
+```
+
+Den oppretter eller sikrer tabellene:
+
+- `leads`
+- `customers`
+- `contacts`
+- `phoenix_ideas`
+- `quotes`
+- `quote_items`
+- `quote_messages`
+- `quote_tokens`
+- `quote_portal_tokens`
+- `phoenix_site_content`
+
+### Quote portal
+
+Eksisterende quote portal er videreført og kompatibel med gammel `quote_portal_tokens`-flyt:
+
+- Admin åpner `/admin/quotes/[id]`.
+- Admin lager portal-lenke.
+- Token er lang og random (`randomBytes(32).toString("hex")`).
+- Kunde åpner `/portal/quote/[token]` uten innlogging.
+- Kunde kan se tilbud/request, sende melding og godkjenne eller be om endringer.
+- Meldinger lagres i `quote_messages` og vises i CRM.
+
+### Idébank
+
+`/admin/ideas` bruker `phoenix_ideas` når Supabase er konfigurert. LocalStorage brukes kun som demo fallback uten Supabase env, og siden viser tydelig Demo mode.
+
+### RLS og sikkerhet
+
+Service role brukes kun server-side i API-ruter. Den eksponeres ikke til frontend. RLS policies er ikke aktivert i denne migrationen; før produksjon bør det legges egne policies for adminbrukere og public token-tilgang til quote portal.
