@@ -230,3 +230,74 @@ supabase db push
 ```
 
 Denne migrationen lager ikke RLS policies ennå. Det bør gjøres i en egen sikkerhetsrunde før produksjonsbruk.
+
+## Supabase source of truth for leads og henvendelser
+
+Phoenix CRM bruker `public.requests` som source of truth for leads/henvendelser når Supabase er konfigurert. Fiktive mock-leads er fjernet fra Phoenix demo-data.
+
+### Requests mapping til CRM-lead
+
+CRM mapper `requests` til leads slik:
+
+- `id` -> `id`
+- `name` eller `customer_name` -> `name`
+- `email` -> `email`
+- `company` -> `company`
+- `phone` -> `phone` hvis feltet finnes
+- `message` eller `description` -> `message`
+- `priority` -> `priority` (`normal` eller `hast`)
+- `status` -> `status` (`ny`, `pågår`, `fullført`, `arkivert`)
+- `created_at` -> `created_at`
+- `updated_at` -> `updated_at` hvis feltet finnes
+
+### Forventede felter i `requests`
+
+Minimum:
+
+```sql
+id uuid primary key,
+name text,
+email text,
+company text,
+message text,
+priority text default 'normal',
+status text default 'ny',
+created_at timestamptz default now()
+```
+
+Anbefalt:
+
+```sql
+phone text,
+description text,
+updated_at timestamptz,
+customer_id uuid references customers(id),
+converted_at timestamptz,
+converted_to_customer boolean default false
+```
+
+### Bruk i CRM
+
+- `/api/public/contact` skriver nye henvendelser direkte til `requests`.
+- `/api/admin/requests` leser `requests` og returnerer både rådata og CRM-lead mapping.
+- `/api/admin/requests/[id]` støtter oppdatering av `status` og `priority`.
+- `/admin/leads` viser og oppdaterer ekte `requests`.
+- `/admin/dashboard` bruker `requests` for “Nye henvendelser”, “Kunder som venter” og “HAST”.
+
+### Demo/fallback som fortsatt finnes
+
+Når Supabase env mangler (`SUPABASE_URL` og `SUPABASE_SERVICE_ROLE_KEY`), viser Phoenix tydelig “Demo mode”. LocalStorage brukes da fortsatt for ikke-migrerte v1-moduler som kunder, oppgaver, tilbud og idebank. Disse er demo/fallback og er ikke source of truth i produksjon.
+
+### Nettsideinnhold / CMS
+
+Nettsideinnhold forventes i `phoenix_site_content`:
+
+```sql
+create table if not exists public.phoenix_site_content (
+  id uuid primary key default gen_random_uuid(),
+  content jsonb not null,
+  updated_at timestamptz default now()
+);
+```
+
+Hvis Supabase er konfigurert men `phoenix_site_content` mangler eller er tom, viser CRM “ikke konfigurert” og returnerer ikke fiktiv produksjonsdata. Fallback-content brukes bare i demo mode uten Supabase env.

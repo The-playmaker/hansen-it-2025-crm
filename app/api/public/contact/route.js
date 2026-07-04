@@ -35,11 +35,6 @@ function normalizePayload(body) {
   };
 }
 
-function isMissingTableError(error) {
-  const text = `${error?.code || ""} ${error?.message || ""}`.toLowerCase();
-  return text.includes("42p01") || text.includes("does not exist") || text.includes("relation") || text.includes("schema cache");
-}
-
 function shortMessage(message) {
   if (message.length <= 240) return message;
   return `${message.slice(0, 237)}...`;
@@ -59,12 +54,9 @@ async function notifySlack(payload, savedTarget, savedId) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text: `Ny lead fra ${payload.name} (${company})`,
+        text: `Ny henvendelse fra ${payload.name} (${company})`,
         blocks: [
-          {
-            type: "header",
-            text: { type: "plain_text", text: "Ny lead i Project Phoenix", emoji: true }
-          },
+          { type: "header", text: { type: "plain_text", text: "Ny henvendelse i Project Phoenix", emoji: true } },
           {
             type: "section",
             fields: [
@@ -76,23 +68,17 @@ async function notifySlack(payload, savedTarget, savedId) {
               { type: "mrkdwn", text: `*Kilde:*\n${source}` }
             ]
           },
-          {
-            type: "section",
-            text: { type: "mrkdwn", text: `*Melding:*\n${shortMessage(payload.message)}` }
-          },
-          {
-            type: "context",
-            elements: [{ type: "mrkdwn", text: `Lagret i ${savedTarget}${savedId ? ` (${savedId})` : ""}` }]
-          }
+          { type: "section", text: { type: "mrkdwn", text: `*Melding:*\n${shortMessage(payload.message)}` } },
+          { type: "context", elements: [{ type: "mrkdwn", text: `Lagret i ${savedTarget}${savedId ? ` (${savedId})` : ""}` }] }
         ]
       })
     });
 
     if (!response.ok) {
-      console.error("Slack lead notification failed:", { status: response.status, statusText: response.statusText });
+      console.error("Slack request notification failed:", { status: response.status, statusText: response.statusText });
     }
   } catch (error) {
-    console.error("Slack lead notification error:", error);
+    console.error("Slack request notification error:", error);
   }
 }
 
@@ -117,30 +103,6 @@ export async function POST(request) {
     );
   }
 
-  const supabase = createClient(url, key, { auth: { persistSession: false } });
-  const leadRow = {
-    name: payload.name,
-    email: payload.email,
-    phone: payload.phone || null,
-    company: payload.company || null,
-    message: payload.message,
-    category: payload.category || null,
-    source: payload.source || "hansen-it-2025",
-    status: "ny"
-  };
-
-  const leadInsert = await supabase.from("phoenix_leads").insert(leadRow).select("id").single();
-
-  if (!leadInsert.error) {
-    await notifySlack(payload, "phoenix_leads", leadInsert.data?.id || null);
-    return json({ status: "ok", message: "Takk! Henvendelsen er sendt til Hansen IT.", target: "phoenix_leads", id: leadInsert.data?.id || null });
-  }
-
-  if (!isMissingTableError(leadInsert.error)) {
-    console.error("phoenix_leads insert error:", leadInsert.error);
-    return json({ status: "error", message: "Kunne ikke lagre henvendelsen i CRM." }, { status: 500 });
-  }
-
   const description = [
     payload.category ? `Kategori: ${payload.category}` : null,
     payload.phone ? `Telefon: ${payload.phone}` : null,
@@ -149,7 +111,8 @@ export async function POST(request) {
     payload.message
   ].filter((line) => line !== null).join("\n");
 
-  const requestInsert = await supabase
+  const supabase = createClient(url, key, { auth: { persistSession: false } });
+  const { data, error } = await supabase
     .from("requests")
     .insert({
       name: payload.name,
@@ -159,17 +122,17 @@ export async function POST(request) {
       description,
       message: payload.message,
       priority: "normal",
-      status: "Ny"
+      status: "ny"
     })
     .select("id")
     .single();
 
-  if (requestInsert.error) {
-    console.error("requests fallback insert error:", requestInsert.error);
+  if (error) {
+    console.error("requests insert error:", error);
     return json({ status: "error", message: "Kunne ikke lagre henvendelsen i CRM." }, { status: 500 });
   }
 
-  await notifySlack(payload, "requests", requestInsert.data?.id || null);
+  await notifySlack(payload, "requests", data?.id || null);
 
-  return json({ status: "ok", message: "Takk! Henvendelsen er sendt til Hansen IT.", target: "requests", id: requestInsert.data?.id || null });
+  return json({ status: "ok", message: "Takk! Henvendelsen er sendt til Hansen IT.", target: "requests", id: data?.id || null });
 }

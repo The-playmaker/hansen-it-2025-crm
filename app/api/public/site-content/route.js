@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 import { phoenixSiteContentFallback } from "@/lib/phoenixMockData";
 
@@ -26,19 +26,23 @@ function normalizeSiteContent(row = {}) {
   const source = row.content && typeof row.content === "object" ? row.content : row;
   const services = Array.isArray(source.services)
     ? source.services.map(normalizeService).filter((service) => service.title || service.description)
-    : phoenixSiteContentFallback.services;
+    : [];
 
   return {
-    ...phoenixSiteContentFallback,
-    heroTitle: source.heroTitle || source.hero_title || phoenixSiteContentFallback.heroTitle,
-    heroSubtitle: source.heroSubtitle || source.hero_subtitle || phoenixSiteContentFallback.heroSubtitle,
-    ctaText: source.ctaText || source.cta_text || phoenixSiteContentFallback.ctaText,
+    heroTitle: source.heroTitle || source.hero_title || "",
+    heroSubtitle: source.heroSubtitle || source.hero_subtitle || "",
+    ctaText: source.ctaText || source.cta_text || "",
     services,
-    aboutText: source.aboutText || source.about_text || phoenixSiteContentFallback.aboutText,
-    contactText: source.contactText || source.contact_text || phoenixSiteContentFallback.contactText,
-    seoTitle: source.seoTitle || source.seo_title || phoenixSiteContentFallback.seoTitle,
-    seoDescription: source.seoDescription || source.seo_description || phoenixSiteContentFallback.seoDescription
+    aboutText: source.aboutText || source.about_text || "",
+    contactText: source.contactText || source.contact_text || "",
+    seoTitle: source.seoTitle || source.seo_title || "",
+    seoDescription: source.seoDescription || source.seo_description || ""
   };
+}
+
+function isMissingTableError(error) {
+  const text = `${error?.code || ""} ${error?.message || ""}`.toLowerCase();
+  return text.includes("42p01") || text.includes("does not exist") || text.includes("relation") || text.includes("schema cache");
 }
 
 export async function OPTIONS() {
@@ -47,7 +51,7 @@ export async function OPTIONS() {
 
 export async function GET() {
   if (!hasSupabaseAdminConfig) {
-    return json({ status: "fallback", content: phoenixSiteContentFallback });
+    return json({ status: "demo", configured: false, content: phoenixSiteContentFallback, message: "Demo mode: Supabase er ikke konfigurert." });
   }
 
   const { data, error } = await supabaseAdmin
@@ -57,10 +61,21 @@ export async function GET() {
     .limit(1)
     .maybeSingle();
 
-  if (error || !data) {
-    if (error) console.error("phoenix_site_content read error:", error);
-    return json({ status: "fallback", content: phoenixSiteContentFallback });
+  if (error) {
+    console.error("phoenix_site_content read error:", error);
+    return json({
+      status: isMissingTableError(error) ? "not_configured" : "error",
+      configured: true,
+      content: null,
+      message: isMissingTableError(error)
+        ? "phoenix_site_content-tabellen finnes ikke. TODO: opprett tabellen før produksjonsinnhold vises."
+        : "Kunne ikke hente nettsideinnhold fra Supabase."
+    }, { status: isMissingTableError(error) ? 501 : 500 });
   }
 
-  return json({ status: "ok", content: normalizeSiteContent(data) });
+  if (!data) {
+    return json({ status: "not_configured", configured: true, content: null, message: "phoenix_site_content er tom. TODO: legg inn første innholdsrad." }, { status: 501 });
+  }
+
+  return json({ status: "ok", configured: true, content: normalizeSiteContent(data) });
 }

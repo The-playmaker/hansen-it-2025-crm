@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 /**
@@ -15,7 +15,7 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data, { status: 200 });
+  return NextResponse.json({ data, configured: true }, { status: 200 });
 }
 
 /**
@@ -50,3 +50,4 @@ export async function POST(request) {
     return NextResponse.json({ error: "Intern feil" }, { status: 500 });
   }
 }
+
