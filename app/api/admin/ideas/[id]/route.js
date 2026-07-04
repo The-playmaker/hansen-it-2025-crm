@@ -8,7 +8,7 @@ export async function PATCH(request, { params }) {
   const body = await request.json();
   const { data, error } = await supabaseAdmin
     .from("phoenix_ideas")
-    .update({ title: body.title, description: body.description || null, category: body.category || null, status: body.status || "parkert", updated_at: new Date().toISOString() })
+    .update({ title: body.title, description: body.description || null, category: body.category || null, status: body.status || "parked", priority: body.priority || "normal", updated_at: new Date().toISOString() })
     .eq("id", params.id)
     .select("*")
     .single();

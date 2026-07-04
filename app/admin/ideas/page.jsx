@@ -5,7 +5,8 @@ import { ideaStatuses } from "@/lib/phoenixMockData";
 import { usePhoenixData } from "@/components/phoenix/usePhoenixData";
 import { EmptyState, Field, FormActions, PhoenixPageHeader, PhoenixPanel, RecordCard, SelectInput, TextArea, TextInput } from "@/components/phoenix/PhoenixUi";
 
-const blankIdea = { title: "", description: "", category: "", status: "parkert" };
+const blankIdea = { title: "", description: "", category: "", status: "parked", priority: "normal" };
+const ideaPriorities = ["lav", "normal", "høy", "hast"];
 
 export default function IdeasPage() {
   const demo = usePhoenixData();
@@ -88,6 +89,7 @@ export default function IdeasPage() {
               <Field label="Kategori"><TextInput value={form.category || ""} onChange={(e) => setForm({ ...form, category: e.target.value })} /></Field>
               <Field label="Status"><SelectInput value={form.status} options={ideaStatuses} onChange={(e) => setForm({ ...form, status: e.target.value })} /></Field>
             </div>
+            <Field label="Prioritet"><SelectInput value={form.priority || "normal"} options={ideaPriorities} onChange={(e) => setForm({ ...form, priority: e.target.value })} /></Field>
             <div className="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-3 text-sm text-amber-100">Rask parkering er tilsiktet: ideer skal ikke automatisk bli oppgaver, tilbud eller prosjekter.</div>
             <FormActions editing={Boolean(editingId)} onCancel={() => { setForm(blankIdea); setEditingId(null); }} />
           </form>
@@ -97,7 +99,7 @@ export default function IdeasPage() {
           <div className="mb-4 flex flex-wrap gap-2"><SelectInput value={statusFilter} options={["alle", ...ideaStatuses]} onChange={(e) => setStatusFilter(e.target.value)} className="max-w-xs" /></div>
           {loading ? <EmptyState text="Henter ideer..." /> : <div className="grid gap-3 lg:grid-cols-2">
             {filtered.length ? filtered.map((idea) => (
-              <RecordCard key={idea.id} title={idea.title} meta={idea.category || "Ingen kategori"} badge={idea.status} onEdit={() => edit(idea)} onDelete={() => deleteIdea(idea)}><p>{idea.description}</p></RecordCard>
+              <RecordCard key={idea.id} title={idea.title} meta={`${idea.category || "Ingen kategori"} - ${idea.priority || "normal"}`} badge={idea.status} onEdit={() => edit(idea)} onDelete={() => deleteIdea(idea)}><p>{idea.description}</p></RecordCard>
             )) : <EmptyState text="Ingen ideer i dette filteret." />}
           </div>}
         </PhoenixPanel>
