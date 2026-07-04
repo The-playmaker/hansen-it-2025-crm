@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, KanbanSquare, Users, Settings, LogOut, ChevronLeft, FileText, Lightbulb, Sparkles, Inbox, Globe2 } from "lucide-react";
+import { LayoutGrid, KanbanSquare, Users, Settings, LogOut, ChevronLeft, FileText, Lightbulb, Sparkles, Inbox, Globe2, ShieldCheck, SearchCheck, ClipboardList } from "lucide-react";
 import { useMe } from "@/app/admin/useMe";
 
 const baseNav = [
@@ -13,8 +13,20 @@ const baseNav = [
   { href: "/admin/kanban", label: "Oppgaver", icon: KanbanSquare },
   { href: "/admin/quotes", label: "Tilbud", icon: FileText },
   { href: "/admin/ideas", label: "Idebank", icon: Lightbulb },
-  { href: "/admin/site-content", label: "Nettside", icon: Globe2 }
+  { href: "/admin/site-content", label: "Nettside", icon: Globe2 },
+  {
+    label: "Security",
+    icon: ShieldCheck,
+    children: [
+      { href: "/admin/security/scan", label: "Scan", icon: SearchCheck },
+      { href: "/admin/security/reports", label: "Reports", icon: ClipboardList }
+    ]
+  }
 ];
+
+function flatNav(items) {
+  return items.flatMap((item) => item.children || [item]);
+}
 
 export function AdminShell({ children }) {
   const pathname = usePathname();
@@ -61,8 +73,31 @@ export function AdminShell({ children }) {
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {nav.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
+            if (item.children) {
+              const groupActive = item.children.some((child) => pathname === child.href || pathname.startsWith(child.href + "/"));
+              return (
+                <div key={item.label} className="space-y-1">
+                  <div className={`group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold ${groupActive ? "text-cyan-200" : "text-slate-500"}`} title={item.label}>
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span className={`${collapsed ? "hidden" : "block"}`}>{item.label}</span>
+                  </div>
+                  <div className={`${collapsed ? "hidden" : "space-y-1 pl-6"}`}>
+                    {item.children.map((child) => {
+                      const ChildIcon = child.icon;
+                      const active = pathname === child.href || pathname.startsWith(child.href + "/");
+                      return (
+                        <Link key={child.href} href={child.href} className={`group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition ${active ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:bg-white/10 hover:text-white"}`} title={child.label}>
+                          <ChildIcon className="h-4 w-4 shrink-0" />
+                          <span>{child.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+            const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link key={item.href} href={item.href} className={`group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition ${active ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:bg-white/10 hover:text-white"}`} title={item.label}>
                 <Icon className="h-5 w-5 shrink-0" />
@@ -82,7 +117,7 @@ export function AdminShell({ children }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="sticky top-0 z-40 flex items-center gap-2 overflow-x-auto border-b border-white/10 bg-slate-950/90 px-3 py-3 backdrop-blur md:hidden">
-          {baseNav.map((item) => {
+          {flatNav(baseNav).map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (

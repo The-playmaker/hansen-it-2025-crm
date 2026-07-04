@@ -301,3 +301,43 @@ create table if not exists public.phoenix_site_content (
 ```
 
 Hvis Supabase er konfigurert men `phoenix_site_content` mangler eller er tom, viser CRM “ikke konfigurert” og returnerer ikke fiktiv produksjonsdata. Fallback-content brukes bare i demo mode uten Supabase env.
+
+## Phoenix Scan som CRM-modul
+
+Phoenix Scan er integrert i samme kodebase som CRM-et, ikke som separat app.
+
+Adminruter:
+
+- `/admin/security/scan` - kjør passiv domeneskanning
+- `/admin/security/reports` - se lagrede rapporter
+
+API-ruter:
+
+- `POST /api/admin/security/scan`
+- `GET /api/admin/security/reports`
+
+Modulen bruker eksisterende Phoenix admin-shell, UI-komponenter, session-cookie og Supabase admin-klient.
+
+### Supabase-tabell for scan-rapporter
+
+Migration:
+
+```bash
+supabase/migrations/20260704193000_security_scan_reports.sql
+```
+
+Tabell:
+
+```sql
+create table if not exists public.security_scan_reports (
+  id uuid primary key default gen_random_uuid(),
+  domain text not null,
+  score integer not null,
+  grade text not null,
+  report jsonb not null,
+  created_by text,
+  created_at timestamptz not null default now()
+);
+```
+
+Hvis Supabase ikke er konfigurert, kan scan kjøres, men rapporten lagres ikke. Reports-siden viser da demo mode.
