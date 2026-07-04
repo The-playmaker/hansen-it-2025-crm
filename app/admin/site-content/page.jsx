@@ -8,10 +8,20 @@ import { phoenixSiteContentFallback } from "@/lib/phoenixMockData";
 import { EmptyState, Field, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SecondaryButton, TextArea, TextInput } from "@/components/phoenix/PhoenixUi";
 
 const emptyService = () => ({ title: "", description: "", href: "" });
+const emptyContent = {
+  heroTitle: "",
+  heroSubtitle: "",
+  ctaText: "",
+  services: [emptyService()],
+  aboutText: "",
+  contactText: "",
+  seoTitle: "",
+  seoDescription: ""
+};
 
-function normalizeContent(content = {}) {
+function normalizeContent(content = {}, useFallback = false) {
   return {
-    ...phoenixSiteContentFallback,
+    ...(useFallback ? phoenixSiteContentFallback : emptyContent),
     ...content,
     services: Array.isArray(content.services) && content.services.length ? content.services : [emptyService()]
   };
@@ -32,7 +42,8 @@ export default function SiteContentPage() {
         if (cancelled) return;
         setMode(result.status || (response.ok ? "ok" : "error"));
         setMessage(result.message || "");
-        if (result.content) setContent(normalizeContent(result.content));
+        if (result.content) setContent(normalizeContent(result.content, result.status === "demo"));
+        else if (result.status === "empty") setContent(normalizeContent());
       } catch (error) {
         if (!cancelled) {
           setMode("error");
@@ -76,7 +87,7 @@ export default function SiteContentPage() {
     }
   };
 
-  const readOnly = mode === "not_configured" || mode === "error" || mode === "loading";
+  const readOnly = mode === "table_missing" || mode === "error" || mode === "loading";
   const isDemo = mode === "demo";
 
   return (
@@ -89,7 +100,8 @@ export default function SiteContentPage() {
 
       {mode === "loading" ? <PhoenixPanel><EmptyState text="Henter nettsideinnhold..." /></PhoenixPanel> : null}
       {isDemo ? <PhoenixPanel title="Demo mode" description="Supabase er ikke konfigurert. Viser lokal fallback, men lagrer ikke produksjonsinnhold." /> : null}
-      {mode === "not_configured" ? <PhoenixPanel title="Ikke konfigurert" description={message || "TODO: Opprett phoenix_site_content i Supabase før produksjonsinnhold vises."}><EmptyState text="Ingen fiktiv produksjonsdata vises når Supabase er konfigurert men tabellen mangler eller er tom." /></PhoenixPanel> : null}
+      {mode === "table_missing" ? <PhoenixPanel title="Ikke konfigurert" description={message || "TODO: Opprett phoenix_site_content i Supabase før produksjonsinnhold vises."}><EmptyState text="Ingen fiktiv produksjonsdata vises når Supabase er konfigurert men tabellen mangler." /></PhoenixPanel> : null}
+      {mode === "empty" ? <PhoenixPanel title="Klar for første innholdsrad" description={message || "Fyll inn feltene og trykk Lagre. Ingen fiktiv produksjonsdata vises."} /> : null}
       {mode === "error" ? <PhoenixPanel title="Feil"><div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-200">{message}</div></PhoenixPanel> : null}
       {message && ["ok"].includes(mode) ? <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">{message}</div> : null}
 

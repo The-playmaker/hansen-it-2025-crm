@@ -46,11 +46,11 @@ export async function GET() {
 
   const { data, error } = await readCurrent();
   if (error) {
-    return NextResponse.json({ status: isMissingTableError(error) ? "not_configured" : "error", configured: true, content: null, message: isMissingTableError(error) ? "phoenix_site_content-tabellen mangler. TODO: opprett tabellen." : error.message }, { status: isMissingTableError(error) ? 501 : 500 });
+    return NextResponse.json({ status: isMissingTableError(error) ? "table_missing" : "error", configured: true, content: null, message: isMissingTableError(error) ? "phoenix_site_content-tabellen mangler. TODO: opprett tabellen." : error.message }, { status: isMissingTableError(error) ? 501 : 500 });
   }
 
   if (!data) {
-    return NextResponse.json({ status: "not_configured", configured: true, content: null, message: "phoenix_site_content er tom. TODO: legg inn første innholdsrad." }, { status: 501 });
+    return NextResponse.json({ status: "empty", configured: true, content: null, message: "phoenix_site_content er tom. Legg inn første innholdsrad og trykk Lagre." });
   }
 
   return NextResponse.json({ status: "ok", configured: true, content: normalizeContent(data.content || data) });

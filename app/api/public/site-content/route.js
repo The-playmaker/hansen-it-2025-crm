@@ -76,7 +76,7 @@ export async function GET() {
   }
 
   if (!data) {
-    return json({ status: "not_configured", configured: true, content: null, message: "phoenix_site_content er tom. TODO: legg inn første innholdsrad." }, { status: 501 });
+    return json({ status: "empty", configured: true, content: null, message: "phoenix_site_content er tom. Legg inn første innholdsrad i Phoenix CRM." }, { status: 404 });
   }
 
   return json({ status: "ok", configured: true, content: normalizeSiteContent(data) });
