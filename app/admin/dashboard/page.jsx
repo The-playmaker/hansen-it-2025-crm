@@ -14,6 +14,14 @@ function isOpenLead(lead) {
   return !["fullført", "arkivert", "converted"].includes(lead.status);
 }
 
+function reportFindings(report = {}) {
+  return report.report?.findings || report.findings || [];
+}
+
+function highFindingCount(report = {}) {
+  return reportFindings(report).filter((finding) => ["critical", "high"].includes(finding.severity || finding.status)).length;
+}
+
 export default function AdminDashboard() {
   const { data, customersById, parkTaskAsIdea, exportBackup } = usePhoenixData();
   const [requestLeads, setRequestLeads] = useState([]);
@@ -24,6 +32,8 @@ export default function AdminDashboard() {
   const [quotesConfigured, setQuotesConfigured] = useState(true);
   const [tasksConfigured, setTasksConfigured] = useState(true);
   const [ideaStats, setIdeaStats] = useState({ total: 0, parked: 0, configured: true });
+  const [scanReports, setScanReports] = useState([]);
+  const [scanConfigured, setScanConfigured] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +94,21 @@ export default function AdminDashboard() {
       } catch {}
     }
     loadIdeas();
+    async function loadScanReports() {
+      try {
+        const response = await fetch("/api/admin/security/reports", { cache: "no-store" });
+        const result = await response.json();
+        if (cancelled) return;
+        setScanConfigured(result.configured !== false);
+        setScanReports(result.data || []);
+      } catch {
+        if (!cancelled) {
+          setScanConfigured(false);
+          setScanReports([]);
+        }
+      }
+    }
+    loadScanReports();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -97,6 +122,8 @@ export default function AdminDashboard() {
   const openQuotes = quotes.filter((quote) => ["kladd", "ny", "pågår", "sendt"].includes(String(quote.status || "").toLowerCase()));
   const parkedIdeas = ideaStats.configured ? ideaStats.parked : data.ideas.filter((idea) => ["parked", "parkert"].includes(idea.status)).length;
   const totalIdeas = ideaStats.configured ? ideaStats.total : data.ideas.length;
+  const lowScoreReports = scanReports.filter((report) => Number(report.score || 0) < 60);
+  const highSeverityReports = scanReports.filter((report) => highFindingCount(report) > 0);
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -117,6 +144,8 @@ export default function AdminDashboard() {
         <MetricCard label="Åpne leads" value={openLeadCount} detail="Fra Supabase leads" tone="emerald" />
         <MetricCard label="Aktive tilbud" value={openQuotes.length} detail={quotesConfigured ? "Fra Supabase requests/quotes" : "Demo fallback"} tone="amber" />
         <MetricCard label="Idébank" value={`${parkedIdeas}/${totalIdeas}`} detail={ideaStats.configured ? "Fra phoenix_ideas" : "Demo fallback"} tone="rose" />
+        <MetricCard label="Lav scan-score" value={lowScoreReports.length} detail={scanConfigured ? "Rapporter under 60" : "Demo/ikke konfigurert"} tone="rose" />
+        <MetricCard label="High findings" value={highSeverityReports.reduce((sum, report) => sum + highFindingCount(report), 0)} detail="Fix with Hansen IT-muligheter" tone="amber" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -159,6 +188,41 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
+        <PhoenixPanel title="Siste scan reports" description="Sikkerhetsrapporter som bør følges opp i CRM/tilbudsflyt.">
+          <div className="space-y-3">
+            {scanReports.length ? scanReports.slice(0, 5).map((report) => (
+              <Link key={report.id} href={`/admin/security/reports/${report.id}`} className="block rounded-2xl border border-white/10 bg-slate-950/45 p-4 hover:bg-white/10">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-white">{report.domain}</p>
+                    <p className="mt-1 text-sm text-slate-400">{report.customer?.company_name || report.request?.company || "Ingen kunde koblet"} - {formatDate(report.created_at)}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge>{report.score}/100</StatusBadge>
+                    {highFindingCount(report) ? <StatusBadge>{highFindingCount(report)} high</StatusBadge> : null}
+                  </div>
+                </div>
+              </Link>
+            )) : <EmptyState text={scanConfigured ? "Ingen lagrede scan-rapporter." : "Security reports er ikke konfigurert."} />}
+          </div>
+        </PhoenixPanel>
+
+        <PhoenixPanel title="Fix with Hansen IT" description="Funn som kan bli oppgaver, kundenotater eller tilbudskladd.">
+          <div className="space-y-3">
+            {highSeverityReports.length ? highSeverityReports.slice(0, 5).map((report) => (
+              <Link key={report.id} href={`/admin/security/reports/${report.id}`} className="block rounded-2xl border border-white/10 bg-slate-950/45 p-4 hover:bg-white/10">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-white">{report.domain}</p>
+                    <p className="mt-1 text-sm text-slate-400">{reportFindings(report).find((finding) => ["critical", "high"].includes(finding.severity || finding.status))?.title || "High severity funn"}</p>
+                  </div>
+                  <StatusBadge>{highFindingCount(report)} funn</StatusBadge>
+                </div>
+              </Link>
+            )) : <EmptyState text="Ingen high severity-funn som venter på oppfølging." />}
+          </div>
+        </PhoenixPanel>
+
         <PhoenixPanel title="Åpne tilbud" description="Quotes-flyt i enkel v1-form.">
           <div className="space-y-3">
             {openQuotes.map((quote) => (

@@ -2,9 +2,28 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Download, FileJson, Link as LinkIcon, Mail, SearchCheck } from "lucide-react";
+import { Download, Eye, FileJson, Link as LinkIcon, Mail, SearchCheck } from "lucide-react";
 import { downloadSecurityReportJson, downloadSecurityReportPdf } from "@/lib/securityScan/exportClient";
 import { EmptyState, Field, formatDate, MetricCard, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SecondaryButton, StatusBadge, TextArea, TextInput } from "@/components/phoenix/PhoenixUi";
+
+function rowReport(row = {}) {
+  return row.report && typeof row.report === "object" ? row.report : row;
+}
+
+function severityCounts(row = {}) {
+  const findings = rowReport(row).findings || [];
+  return findings.reduce((counts, finding) => {
+    const severity = finding.severity || finding.status || "low";
+    if (severity === "critical" || severity === "high") counts.high += 1;
+    else if (severity === "medium") counts.medium += 1;
+    else if (severity === "low") counts.low += 1;
+    return counts;
+  }, { high: 0, medium: 0, low: 0 });
+}
+
+function customerLabel(row = {}) {
+  return row.customer?.company_name || row.request?.company || row.request?.name || row.report?.customerName || "Ingen kunde koblet";
+}
 
 export default function SecurityReportsPage() {
   const [reports, setReports] = useState([]);
@@ -39,9 +58,10 @@ export default function SecurityReportsPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const filtered = useMemo(() => reports.filter((report) => report.domain?.toLowerCase().includes(query.toLowerCase())), [reports, query]);
+  const filtered = useMemo(() => reports.filter((report) => `${report.domain || ""} ${customerLabel(report)}`.toLowerCase().includes(query.toLowerCase())), [reports, query]);
   const averageScore = reports.length ? Math.round(reports.reduce((sum, report) => sum + Number(report.score || 0), 0) / reports.length) : 0;
   const weakReports = reports.filter((report) => Number(report.score || 0) < 60).length;
+  const highSeverityTotal = reports.reduce((sum, report) => sum + severityCounts(report).high, 0);
 
   const openReport = (report) => {
     setSelected(report);
@@ -108,26 +128,39 @@ export default function SecurityReportsPage() {
         <MetricCard label="Rapporter" value={reports.length} detail="Lagret i security_scan_reports" tone="cyan" />
         <MetricCard label="Snittscore" value={averageScore} detail="Gjennomsnitt av lagrede scans" tone="emerald" />
         <MetricCard label="Under 60" value={weakReports} detail="Bør følges opp" tone="rose" />
+        <MetricCard label="High findings" value={highSeverityTotal} detail="Kritisk/høy severity" tone="amber" />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
+      <div className="grid gap-6 xl:grid-cols-[1fr_460px]">
         <PhoenixPanel title="Rapportliste">
-          <TextInput className="mb-4" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Søk domene..." />
+          <TextInput className="mb-4" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Søk domene eller kunde..." />
           {loading ? <EmptyState text="Henter rapporter..." /> : null}
           {!loading ? (
             <div className="space-y-3">
-              {filtered.length ? filtered.map((report) => (
+              {filtered.length ? filtered.map((report) => {
+                const counts = severityCounts(report);
+                return (
                 <article key={report.id} className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h3 className="font-semibold text-white">{report.domain}</h3>
-                      <p className="mt-1 text-sm text-slate-400">{formatDate(report.created_at)}{report.created_by ? ` - ${report.created_by}` : ""}</p>
+                      <p className="mt-1 text-sm text-slate-400">{customerLabel(report)} · {formatDate(report.created_at)}{report.created_by ? ` · ${report.created_by}` : ""}</p>
                     </div>
                     <div className="flex flex-wrap gap-2"><StatusBadge>{report.grade}</StatusBadge><StatusBadge>{report.score}/100</StatusBadge></div>
                   </div>
-                  <div className="mt-4"><SecondaryButton type="button" onClick={() => openReport(report)}>Åpne detaljer</SecondaryButton></div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-300">
+                    <StatusBadge>High {counts.high}</StatusBadge>
+                    <StatusBadge>Medium {counts.medium}</StatusBadge>
+                    <StatusBadge>Low {counts.low}</StatusBadge>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <SecondaryButton type="button" onClick={() => openReport(report)}><Eye size={16} />View</SecondaryButton>
+                    <Link href={`/admin/security/reports/${report.id}`} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10">Detaljside</Link>
+                    <SecondaryButton type="button" onClick={() => downloadSecurityReportPdf(report)}><Download size={16} />PDF</SecondaryButton>
+                    <SecondaryButton type="button" onClick={() => downloadSecurityReportJson(report)}><FileJson size={16} />JSON</SecondaryButton>
+                  </div>
                 </article>
-              )) : <EmptyState text={configured ? "Ingen rapporter funnet." : "Ingen rapporter i demo mode."} />}
+              );}) : <EmptyState text={configured ? "Ingen rapporter funnet." : "Ingen rapporter i demo mode."} />}
             </div>
           ) : null}
         </PhoenixPanel>
@@ -138,6 +171,7 @@ export default function SecurityReportsPage() {
               <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
                 <p className="text-sm text-slate-400">Domene</p>
                 <p className="mt-1 text-xl font-bold text-white">{selected.domain}</p>
+                <p className="mt-1 text-sm text-slate-400">{customerLabel(selected)}</p>
                 <p className="mt-2 text-sm text-slate-300">Score {selected.score}/100, karakter {selected.grade}</p>
                 {selected.report?.spoofingRisk ? <p className="mt-2 text-sm text-amber-200">Spoofing-risk: {selected.report.spoofingRisk.level} - {selected.report.spoofingRisk.reason}</p> : null}
                 {selected.report?.subdomains?.length ? <p className="mt-2 text-sm text-slate-400">Subdomener funnet: {selected.report.subdomains.length}</p> : null}
@@ -145,6 +179,7 @@ export default function SecurityReportsPage() {
                   <SecondaryButton type="button" onClick={() => downloadSecurityReportPdf(selected)}><Download size={16} />PDF</SecondaryButton>
                   <SecondaryButton type="button" onClick={() => downloadSecurityReportJson(selected)}><FileJson size={16} />JSON</SecondaryButton>
                   <SecondaryButton type="button" disabled={Boolean(actionBusy)} onClick={createShareLink}><LinkIcon size={16} />{actionBusy === "share" ? "Lager..." : "Del lenke"}</SecondaryButton>
+                  <Link href={`/admin/security/reports/${selected.id}`} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"><Eye size={16} />Åpne side</Link>
                 </div>
                 {shareUrl ? <div className="mt-3 rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-3 text-sm text-cyan-100"><p className="font-semibold">Delbar lenke</p><p className="mt-1 break-all">{shareUrl}</p></div> : null}
                 {actionMessage ? <div className="mt-3 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">{actionMessage}</div> : null}

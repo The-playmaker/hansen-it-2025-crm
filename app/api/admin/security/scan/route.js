@@ -18,6 +18,10 @@ function normalizeDomain(input) {
   return String(input || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0].split(":")[0];
 }
 
+function cleanId(value) {
+  return value ? String(value).trim() : null;
+}
+
 export async function POST(request) {
   const me = requireMe();
   if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
@@ -50,7 +54,18 @@ export async function POST(request) {
 
   const tlsInfo = web.reachable ? await checkTls(web.finalHost || domain).catch(() => ({ ok: false })) : { ok: false };
   const report = buildSecurityReport({ domain, web, tlsInfo, email, dnssec, rdap, subdomains });
-  const saveResult = await saveSecurityScanReport(report, me);
+  const links = {
+    customer_id: cleanId(body.customer_id),
+    request_id: cleanId(body.request_id),
+    lead_id: cleanId(body.lead_id)
+  };
+  const saveResult = await saveSecurityScanReport(report, me, links);
 
-  return NextResponse.json({ ...report, saved: saveResult.saved, reportId: saveResult.id || null, saveError: saveResult.error || null });
+  return NextResponse.json({
+    ...report,
+    ...links,
+    saved: saveResult.saved,
+    reportId: saveResult.id || null,
+    saveError: saveResult.error || null
+  });
 }
