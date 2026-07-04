@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Activity, BookOpen, Boxes, Database, FileText, GitBranch, LayoutDashboard, Search, ShieldCheck } from "lucide-react";
-import { docsNav } from "@/lib/docsPortal/data";
+import { docsNavGroups } from "@/lib/docsPortal/data";
 
 const statusTone = {
   active: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
@@ -30,8 +30,8 @@ export function StatusBadge({ children, status = "planned" }) {
 
 export function DocsCard({ title, eyebrow, children, action, className = "" }) {
   return (
-    <section className={`rounded-lg border border-white/10 bg-slate-900/60 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] backdrop-blur ${className}`}>
-      <div className="mb-4 flex items-start justify-between gap-4">
+    <section className={`rounded-lg border border-white/10 bg-slate-900/60 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] backdrop-blur ${className}`}>
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           {eyebrow ? <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-300/80">{eyebrow}</p> : null}
           {title ? <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-50">{title}</h2> : null}
@@ -46,32 +46,40 @@ export function DocsCard({ title, eyebrow, children, action, className = "" }) {
 export function DocsSidebar() {
   const pathname = usePathname();
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-slate-950/70 lg:block">
-      <div className="sticky top-0 h-screen overflow-y-auto px-3 py-5">
-        <div className="mb-5 rounded-lg border border-white/10 bg-white/[0.04] p-3">
+    <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-slate-950/75 lg:block">
+      <div className="docs-scrollbar sticky top-0 h-screen overflow-y-auto px-3 py-4">
+        <div className="mb-4 rounded-lg border border-white/10 bg-white/[0.04] p-3">
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-cyan-300">Developer Portal</p>
           <p className="mt-1 text-sm font-semibold text-white">Phoenix Docs v1.0</p>
+          <p className="mt-2 text-[11px] text-slate-500">Static draft content – markdown sync planned</p>
         </div>
-        <nav className="space-y-1">
-          {docsNav.map((item) => {
-            const baseHref = item.href.split("#")[0];
-            const active = pathname === baseHref;
-            return (
-              <Link key={item.label} href={item.href} className={`block rounded px-3 py-2 text-sm transition ${active ? "bg-cyan-400/15 text-cyan-100 ring-1 ring-cyan-300/20" : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}>
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="space-y-4">
+          {docsNavGroups.map((group) => (
+            <div key={group.title}>
+              <p className="mb-1 px-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{group.title}</p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const baseHref = item.activePath || item.href.split("#")[0];
+                  const active = pathname === baseHref && (!item.href.includes("#") || item.activePath);
+                  return (
+                    <Link key={`${group.title}-${item.label}`} href={item.href} className={`block rounded px-2.5 py-1.5 text-[13px] transition ${active ? "bg-cyan-400/15 text-cyan-100 ring-1 ring-cyan-300/20" : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}>
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
       </div>
     </aside>
   );
 }
 
-export function DocsTopbar({ title, description, badge = "Draft v1.0" }) {
+export function DocsTopbar({ title, description, badge = "Docs v1.0 draft" }) {
   return (
-    <header className="border-b border-white/10 bg-slate-950/70 px-4 py-4 backdrop-blur lg:px-8">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+    <header className="border-b border-white/10 bg-slate-950/75 px-4 py-4 backdrop-blur lg:px-6">
+      <div className="mx-auto flex max-w-[1440px] flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-300">Project Phoenix</p>
@@ -79,6 +87,7 @@ export function DocsTopbar({ title, description, badge = "Draft v1.0" }) {
           </div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">{title}</h1>
           {description ? <p className="mt-2 max-w-3xl text-sm text-slate-400">{description}</p> : null}
+          <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.12em] text-slate-500">Static draft content – markdown sync planned</p>
         </div>
         <div className="flex min-h-10 items-center gap-2 rounded border border-white/10 bg-slate-900/70 px-3 text-sm text-slate-400">
           <Search className="h-4 w-4" />
@@ -91,12 +100,50 @@ export function DocsTopbar({ title, description, badge = "Draft v1.0" }) {
 
 export function DocsLayout({ title, description, children }) {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_32%),linear-gradient(180deg,#020617,#0b1326)] text-slate-100">
+    <div className="docs-scrollbar min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_32%),linear-gradient(180deg,#020617,#0b1326)] text-slate-100">
+      <style jsx global>{`
+        .docs-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(34, 211, 238, 0.38) rgba(15, 23, 42, 0.72);
+        }
+        html,
+        body {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(34, 211, 238, 0.38) rgba(15, 23, 42, 0.72);
+        }
+        .docs-scrollbar::-webkit-scrollbar {
+          width: 10px;
+          height: 10px;
+        }
+        body::-webkit-scrollbar {
+          width: 10px;
+          height: 10px;
+        }
+        .docs-scrollbar::-webkit-scrollbar-track {
+          background: rgba(15, 23, 42, 0.72);
+        }
+        body::-webkit-scrollbar-track {
+          background: rgba(15, 23, 42, 0.72);
+        }
+        .docs-scrollbar::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, rgba(34, 211, 238, 0.42), rgba(59, 130, 246, 0.28));
+          border: 2px solid rgba(15, 23, 42, 0.92);
+          border-radius: 999px;
+        }
+        body::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, rgba(34, 211, 238, 0.42), rgba(59, 130, 246, 0.28));
+          border: 2px solid rgba(15, 23, 42, 0.92);
+          border-radius: 999px;
+        }
+        .docs-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(34, 211, 238, 0.56);
+        }
+      `}</style>
       <div className="flex">
         <DocsSidebar />
         <div className="min-w-0 flex-1">
           <DocsTopbar title={title} description={description} />
-          <main className="mx-auto max-w-7xl space-y-6 p-4 lg:p-8">{children}</main>
+          <main className="mx-auto max-w-[1440px] space-y-5 p-4 lg:p-6 xl:p-7">{children}</main>
         </div>
       </div>
     </div>
@@ -107,7 +154,7 @@ export function ArchitectureCard({ title, status, items }) {
   const Icon = iconMap.architecture;
   return (
     <DocsCard title={title} action={<StatusBadge status={status}>{status}</StatusBadge>}>
-      <Icon className="mb-4 h-5 w-5 text-cyan-300" />
+      <Icon className="mb-3 h-5 w-5 text-cyan-300" />
       <ul className="space-y-2 text-sm text-slate-300">
         {items.map((item) => <li key={item} className="rounded border border-white/10 bg-white/[0.03] px-3 py-2">{item}</li>)}
       </ul>
