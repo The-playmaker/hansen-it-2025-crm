@@ -62,8 +62,7 @@ export function DocsSidebar() {
               <p className="mb-1 px-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{group.title}</p>
               <div className="space-y-0.5">
                 {group.items.map((item) => {
-                  const baseHref = item.activePath || item.href.split("#")[0];
-                  const active = pathname === baseHref && (!item.href.includes("#") || item.activePath);
+                  const active = pathname === item.href;
                   return (
                     <Link key={`${group.title}-${item.label}`} href={item.href} className={`block rounded px-2.5 py-1.5 text-[13px] transition ${active ? "bg-[var(--hi-blue)]/20 text-white ring-1 ring-[var(--hi-blue-light)]/30" : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}>
                       {item.label}
