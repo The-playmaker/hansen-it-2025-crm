@@ -16,9 +16,15 @@ function json(body, init = {}) {
 
 function normalizeService(service = {}) {
   return {
+    id: String(service.id || service.href || service.title || service.name || "").replace(/^\//, "").trim(),
+    name: String(service.name || service.title || "").trim(),
     title: String(service.title || service.name || "").trim(),
+    short_description: String(service.short_description || service.description || "").trim(),
     description: String(service.description || service.short_description || "").trim(),
-    href: String(service.href || "").trim()
+    href: String(service.href || "").trim(),
+    features: Array.isArray(service.features)
+      ? service.features.map((feature) => String(feature || "").trim()).filter(Boolean)
+      : []
   };
 }
 

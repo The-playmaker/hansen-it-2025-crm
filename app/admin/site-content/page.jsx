@@ -7,7 +7,7 @@ import { Plus, Save, Trash2 } from "lucide-react";
 import { phoenixSiteContentFallback } from "@/lib/phoenixMockData";
 import { EmptyState, Field, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SecondaryButton, TextArea, TextInput } from "@/components/phoenix/PhoenixUi";
 
-const emptyService = () => ({ title: "", description: "", href: "" });
+const emptyService = () => ({ title: "", description: "", href: "", features: [] });
 const emptyContent = {
   heroTitle: "",
   heroSubtitle: "",
@@ -23,7 +23,14 @@ function normalizeContent(content = {}, useFallback = false) {
   return {
     ...(useFallback ? phoenixSiteContentFallback : emptyContent),
     ...content,
-    services: Array.isArray(content.services) && content.services.length ? content.services : [emptyService()]
+    services: Array.isArray(content.services) && content.services.length
+      ? content.services.map((service) => ({
+        title: service.title || service.name || "",
+        description: service.description || service.short_description || "",
+        href: service.href || "",
+        features: Array.isArray(service.features) ? service.features : []
+      }))
+      : [emptyService()]
   };
 }
 
@@ -126,6 +133,15 @@ export default function SiteContentPage() {
                       <Field label="Lenke"><TextInput value={service.href || ""} placeholder="/contact" onChange={(event) => updateService(index, { href: event.target.value })} /></Field>
                       <button type="button" onClick={() => removeService(index)} className="mt-6 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-400/30 text-rose-200 hover:bg-rose-500/10" title="Fjern seksjon"><Trash2 size={16} /></button>
                     </div>
+                    <div className="mt-3">
+                      <Field label="Punkter / features (én per linje)">
+                        <TextArea
+                          value={(service.features || []).join("\n")}
+                          onChange={(event) => updateService(index, { features: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean) })}
+                          placeholder={"Brannmur\nEndpoint-beskyttelse\nBackup"}
+                        />
+                      </Field>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -145,7 +161,7 @@ export default function SiteContentPage() {
           <PhoenixPanel title="Forhåndsvisning">
             <div className="space-y-5 rounded-2xl border border-white/10 bg-slate-950/45 p-4">
               <div><p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Hero</p><h2 className="mt-2 text-2xl font-bold text-white">{content.heroTitle}</h2><p className="mt-2 text-sm text-slate-300">{content.heroSubtitle}</p></div>
-              <div><p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Tjenester</p><div className="mt-2 space-y-2">{content.services.map((service, index) => <div key={`${service.title}-preview-${index}`} className="rounded-xl border border-white/10 p-3"><p className="font-semibold text-white">{service.title || "Uten tittel"}</p><p className="mt-1 text-sm text-slate-400">{service.description || "Ingen beskrivelse"}</p></div>)}</div></div>
+              <div><p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Tjenester</p><div className="mt-2 space-y-2">{content.services.map((service, index) => <div key={`${service.title}-preview-${index}`} className="rounded-xl border border-white/10 p-3"><p className="font-semibold text-white">{service.title || "Uten tittel"}</p><p className="mt-1 text-sm text-slate-400">{service.description || "Ingen beskrivelse"}</p>{service.features?.length ? <ul className="mt-2 space-y-1 text-xs text-cyan-200">{service.features.map((feature) => <li key={feature}>✓ {feature}</li>)}</ul> : null}</div>)}</div></div>
             </div>
           </PhoenixPanel>
         </div>

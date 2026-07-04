@@ -16,8 +16,13 @@ function normalizeContent(content = {}) {
     ctaText: String(content.ctaText || "").trim(),
     services: Array.isArray(content.services) ? content.services.map((service) => ({
       title: String(service.title || "").trim(),
+      name: String(service.name || service.title || "").trim(),
       description: String(service.description || "").trim(),
-      href: String(service.href || "").trim()
+      short_description: String(service.short_description || service.description || "").trim(),
+      href: String(service.href || "").trim(),
+      features: Array.isArray(service.features)
+        ? service.features.map((feature) => String(feature || "").trim()).filter(Boolean)
+        : String(service.features || "").split(/[\n,;]/).map((feature) => feature.trim()).filter(Boolean)
     })) : [],
     aboutText: String(content.aboutText || "").trim(),
     contactText: String(content.contactText || "").trim(),
