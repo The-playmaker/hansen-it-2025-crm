@@ -1,4 +1,43 @@
-# Hansen IT CRM v1.6 – Kanban + Teams varsler
+# Project Phoenix CRM
+
+Project Phoenix CRM er Hansen ITs interne plattform for kundehåndtering, henvendelser, tilbud, sikkerhetsskanning, rapporter og kundeportal.
+
+## Status
+
+Draft / active development.
+
+## Moduler
+
+- CRM
+- Requests / Leads
+- Customers / Contacts
+- Quotes / Quote Portal
+- Ideas
+- Site Content / CMS
+- Phoenix Scan
+- Reports
+- Scan Authorization
+- Developer Portal
+
+## Tech stack
+
+- Next.js
+- React
+- Tailwind
+- Supabase
+- Resend
+- Teams/Slack webhooks
+
+## Kjør lokalt
+
+```bash
+npm install
+npm run dev
+```
+
+Åpne `http://localhost:3000/login` og gå videre til Phoenix admin.
+
+## Operativ dokumentasjon
 
 ## Miljøvariabler (.env.local / Vercel)
 ```
@@ -27,13 +66,6 @@ Opprett Teams Incoming Webhook i en kanal (Channel → Connectors → Incoming W
 ## Koble n8n → Supabase
 - n8n Insert til `public.requests` (felter: name, email, company, message, priority)
 - Realtime gjør at nye saker dukker opp automatisk i både Tabell og Kanban
-
-## Kjør lokalt
-```bash
-npm install
-npm run dev
-```
-Åpne /login → Microsoft → /dashboard eller /dashboard/kanban
 
 ## Project Phoenix v1
 
