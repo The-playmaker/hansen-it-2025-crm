@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Project Phoenix | Architecture Decisions &amp; Proposals</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Geist:wght@400;600;700&amp;family=JetBrains+Mono:wght@450&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .active-nav-indicator {
+            position: absolute;
+            left: 0;
+            width: 2px;
+            height: 24px;
+            background-color: #adc6ff;
+        }
+        .status-badge {
+            font-size: 10px;
+            letter-spacing: 0.05em;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary-container": "#3131c0",
+                      "on-surface": "#dae2fd",
+                      "surface-dim": "#0b1326",
+                      "secondary-fixed-dim": "#c0c1ff",
+                      "surface-container-lowest": "#060e20",
+                      "secondary": "#c0c1ff",
+                      "on-error-container": "#ffdad6",
+                      "surface": "#0b1326",
+                      "on-tertiary-fixed": "#311400",
+                      "inverse-primary": "#005ac2",
+                      "on-primary-fixed-variant": "#004395",
+                      "primary-container": "#4d8eff",
+                      "on-secondary": "#1000a9",
+                      "inverse-surface": "#dae2fd",
+                      "inverse-on-surface": "#283044",
+                      "on-primary-container": "#00285d",
+                      "on-tertiary": "#502400",
+                      "on-surface-variant": "#c2c6d6",
+                      "background": "#0b1326",
+                      "tertiary-fixed": "#ffdcc6",
+                      "error-container": "#93000a",
+                      "on-tertiary-fixed-variant": "#723600",
+                      "primary": "#adc6ff",
+                      "on-primary": "#002e6a",
+                      "primary-fixed": "#d8e2ff",
+                      "surface-bright": "#31394d",
+                      "outline-variant": "#424754",
+                      "secondary-fixed": "#e1e0ff",
+                      "error": "#ffb4ab",
+                      "on-secondary-fixed": "#07006c",
+                      "on-error": "#690005",
+                      "tertiary-fixed-dim": "#ffb786",
+                      "outline": "#8c909f",
+                      "tertiary-container": "#df7412",
+                      "on-background": "#dae2fd",
+                      "surface-container-low": "#131b2e",
+                      "surface-variant": "#2d3449",
+                      "surface-container-highest": "#2d3449",
+                      "surface-container-high": "#222a3d",
+                      "primary-fixed-dim": "#adc6ff",
+                      "on-primary-fixed": "#001a42",
+                      "on-secondary-container": "#b0b2ff",
+                      "surface-container": "#171f33",
+                      "tertiary": "#ffb786",
+                      "on-tertiary-container": "#461f00",
+                      "surface-tint": "#adc6ff",
+                      "on-secondary-fixed-variant": "#2f2ebe"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "base": "4px",
+                      "sidebar-width": "260px",
+                      "gutter": "16px",
+                      "margin-desktop": "32px",
+                      "margin-mobile": "16px",
+                      "widget-gap": "12px"
+              },
+              "fontFamily": {
+                      "display": ["Geist"],
+                      "label-caps": ["Inter"],
+                      "headline-md": ["Geist"],
+                      "body-lg": ["Inter"],
+                      "code-md": ["JetBrains Mono"],
+                      "headline-lg": ["Geist"],
+                      "body-sm": ["Inter"],
+                      "body-md": ["Inter"]
+              },
+              "fontSize": {
+                      "display": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "code-md": ["13px", {"lineHeight": "20px", "fontWeight": "450"}],
+                      "headline-lg": ["30px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                      "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-hidden flex h-screen">
+<!-- Left Side Navigation Rail -->
+<aside class="fixed left-0 top-0 h-full w-[260px] bg-surface border-r border-outline-variant flex flex-col py-gutter px-2 z-50">
+<div class="mb-8 px-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">rocket_launch</span>
+</div>
+<div>
+<h1 class="font-display text-headline-md font-bold text-on-surface">Project Phoenix</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant/60">Hansen IT Infrastructure</p>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto scrollbar-hide space-y-1">
+<!-- Simplified mapping from JSON for readability -->
+<a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="font-label-caps text-label-caps">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px]">account_tree</span>
+<span class="font-label-caps text-label-caps">Architecture</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 text-primary bg-primary/5 border-l-2 border-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">history_edu</span>
+<span class="font-label-caps text-label-caps">ADR / RFC</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px]">memory</span>
+<span class="font-label-caps text-label-caps">Platform Core</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px]">api</span>
+<span class="font-label-caps text-label-caps">APIs</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px]">security</span>
+<span class="font-label-caps text-label-caps">Security</span>
+</a>
+<div class="pt-4 pb-2 px-4">
+<p class="font-label-caps text-[10px] text-outline uppercase tracking-widest">Internal</p>
+</div>
+<a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px]">analytics</span>
+<span class="font-label-caps text-label-caps">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px]">map</span>
+<span class="font-label-caps text-label-caps">Roadmap</span>
+</a>
+</nav>
+<div class="mt-auto pt-6 px-2 space-y-1">
+<button class="w-full bg-primary text-on-primary font-label-caps text-label-caps py-2.5 rounded hover:opacity-90 transition-all flex items-center justify-center gap-2 mb-4">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                New RFC
+            </button>
+<a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span class="font-label-caps text-label-caps">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+<span class="font-label-caps text-label-caps">Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-[260px] flex-1 flex flex-col h-full bg-background overflow-hidden">
+<!-- Top Navbar -->
+<header class="h-16 flex items-center justify-between px-margin-desktop bg-surface/80 backdrop-blur-md border-b border-outline-variant sticky top-0 z-40">
+<div class="flex items-center gap-8">
+<h2 class="font-display text-headline-md font-bold text-on-surface">ADR / RFC Index</h2>
+<nav class="hidden md:flex gap-6">
+<a class="text-primary font-bold border-b-2 border-primary py-4 font-body-md" href="#">RFCs</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-opacity py-4 font-body-md" href="#">Docs</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-opacity py-4 font-body-md" href="#">Support</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline text-[20px]">search</span>
+<input class="bg-surface-container border-outline-variant text-body-md rounded-full pl-10 pr-4 py-1.5 w-64 focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none" placeholder="Search architecture..." type="text"/>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-secondary-container flex items-center justify-center overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a female software architect in her 30s with short dark hair, wearing a high-tech obsidian-colored blazer. She is set against a blurred background of a modern data center with soft neon blue and amber lights. The lighting is crisp and cinematic, emphasizing her focused and authoritative expression." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDnhbD6kazu6tmpFbYzVqUTis9rNIA74IH_pLMj9TNOxOus7Wp1Lc5csFJfXQLg0CQxPuXnxlBLicBy-Z8WV0_Fj7jgEv1g_7gijTz9gn72o3qBXOvzfeuPv_2Z5F32JptDIZa2kxkG7ohHE9w7rgJBGsNzS8kKW0MfThgyVjrVzHH5pBVPeUcCeMGtp3sQkxknrNvkTEUYGK3YmFf0_wSi9KSrOfAQU_aMJH5phs7iVeQGRHb6tQrEhqRZdyh4t3LP6Pkgr80UHTEq"/>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="flex-1 overflow-y-auto p-margin-desktop scrollbar-hide">
+<div class="max-w-6xl mx-auto space-y-12">
+<!-- Section Header -->
+<div class="flex justify-between items-end border-b border-outline-variant pb-6">
+<div>
+<div class="flex items-center gap-2 text-primary mb-2">
+<span class="material-symbols-outlined text-[18px]">history_edu</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">Technical Governance</span>
+</div>
+<h3 class="font-display text-headline-lg text-on-surface">Architecture Decision Records</h3>
+<p class="text-on-surface-variant max-w-2xl mt-2 font-body-md">Long-term immutable records of technical decisions that shape the Project Phoenix infrastructure and software lifecycle.</p>
+</div>
+<div class="flex gap-2">
+<button class="p-2 border border-outline-variant rounded hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+<button class="p-2 border border-outline-variant rounded hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined">grid_view</span>
+</button>
+</div>
+</div>
+<!-- ADR Cards Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-widget-gap">
+<!-- ADR Card 1 -->
+<div class="glass-card rounded-xl p-6 flex flex-col h-full group relative overflow-hidden">
+<div class="flex justify-between items-start mb-4">
+<div>
+<span class="font-code-md text-primary text-[12px]">ADR-014</span>
+<h4 class="font-headline-md text-on-surface mt-1">Multi-Cloud Orchestration Layer</h4>
+</div>
+<span class="status-badge bg-primary/10 text-primary border border-primary/20">Accepted</span>
+</div>
+<div class="space-y-4 flex-1">
+<div>
+<p class="font-label-caps text-[10px] text-outline uppercase mb-1">Decision</p>
+<p class="text-on-surface-variant font-body-sm leading-relaxed">Adopt HashiCorp Nomad for cross-region scheduling to reduce dependency on vendor-locked Kubernetes distributions while maintaining hybrid-cloud portability.</p>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<p class="font-label-caps text-[10px] text-outline uppercase mb-1">Alternatives</p>
+<ul class="text-on-surface-variant font-body-sm list-disc pl-4">
+<li>EKS/GKE Hybrid</li>
+<li>Bare Metal K8s</li>
+</ul>
+</div>
+<div>
+<p class="font-label-caps text-[10px] text-outline uppercase mb-1">Consequences</p>
+<p class="text-on-surface-variant font-body-sm italic">Increased training cost for infrastructure team.</p>
+</div>
+</div>
+</div>
+<div class="mt-6 pt-4 border-t border-outline-variant flex items-center justify-between text-body-sm text-outline">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span>Oct 24, 2023</span>
+</div>
+<span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity text-primary">arrow_forward</span>
+</div>
+</div>
+<!-- ADR Card 2 -->
+<div class="glass-card rounded-xl p-6 flex flex-col h-full group relative overflow-hidden">
+<div class="flex justify-between items-start mb-4">
+<div>
+<span class="font-code-md text-primary text-[12px]">ADR-015</span>
+<h4 class="font-headline-md text-on-surface mt-1">Event-Driven Security Auditing</h4>
+</div>
+<span class="status-badge bg-secondary/10 text-secondary border border-secondary/20">Proposed</span>
+</div>
+<div class="space-y-4 flex-1">
+<div>
+<p class="font-label-caps text-[10px] text-outline uppercase mb-1">Decision</p>
+<p class="text-on-surface-variant font-body-sm leading-relaxed">Implement a unified NATS-based event stream for all infrastructure mutations to enable real-time compliance monitoring and automated rollback.</p>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<p class="font-label-caps text-[10px] text-outline uppercase mb-1">Alternatives</p>
+<ul class="text-on-surface-variant font-body-sm list-disc pl-4">
+<li>Webhook polling</li>
+<li>CloudTrail only</li>
+</ul>
+</div>
+<div>
+<p class="font-label-caps text-[10px] text-outline uppercase mb-1">Consequences</p>
+<p class="text-on-surface-variant font-body-sm italic">Latency overhead on API writes (+12ms).</p>
+</div>
+</div>
+</div>
+<div class="mt-6 pt-4 border-t border-outline-variant flex items-center justify-between text-body-sm text-outline">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span>Nov 12, 2023</span>
+</div>
+<span class="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity text-primary">arrow_forward</span>
+</div>
+</div>
+</div>
+<!-- RFC Section -->
+<div class="pt-8">
+<div class="flex justify-between items-end border-b border-outline-variant pb-6 mb-8">
+<div>
+<div class="flex items-center gap-2 text-tertiary mb-2">
+<span class="material-symbols-outlined text-[18px]">forum</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">Collaborative Planning</span>
+</div>
+<h3 class="font-display text-headline-lg text-on-surface">Request for Comments</h3>
+<p class="text-on-surface-variant max-w-2xl mt-2 font-body-md">Active proposals for system changes requiring cross-team feedback and validation before becoming ADRs.</p>
+</div>
+</div>
+<!-- RFC List / Bento Style -->
+<div class="grid grid-cols-1 gap-6">
+<!-- RFC Card 1 (Large Featured) -->
+<div class="glass-card rounded-xl p-8 border-l-4 border-l-tertiary">
+<div class="flex flex-col md:flex-row gap-8">
+<div class="flex-1 space-y-6">
+<div class="flex justify-between items-start">
+<div>
+<span class="font-code-md text-tertiary text-[12px]">RFC-204</span>
+<h4 class="font-headline-lg text-on-surface mt-1">Zero-Trust Identity Mesh Integration</h4>
+</div>
+<div class="flex flex-col items-end gap-2">
+<span class="status-badge bg-tertiary/10 text-tertiary border border-tertiary/20">Under Review</span>
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border border-background bg-slate-500 overflow-hidden" title="Author: JD">
+<img class="w-full h-full object-cover" data-alt="Close up avatar of a professional developer wearing glasses, digital workspace reflection in lenses." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUEDMlwHvvAMiYqxmnclhKXWQKpYxwmt8D8LjokFTsiE83UyTBNkHttZdaK45t1DVxvJJenUw3Hh3W3_VUAgf4XaLbkoOoNApC4DxmcO2KYMpdLCIcOYmTh0nOOjQWbR_taVy66mgGYjLpIpfeUavGoiCAwFOCuzkGVDGjmYI_oMGINjY_6RhiPSmKQgSGKLh_EZ-GRLxMpf5efpHHKgxvjiY2Kuc-pKkpblasRJR3FCmBVV50Wk8ZZ72oEkOacpV2I2ljVpC2FiU7"/>
+</div>
+<div class="w-6 h-6 rounded-full border border-background bg-slate-700 flex items-center justify-center text-[10px] text-white">+4</div>
+</div>
+</div>
+</div>
+<div class="grid md:grid-cols-2 gap-8">
+<div class="space-y-4">
+<div>
+<h5 class="font-label-caps text-label-caps text-on-surface flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-[16px] text-tertiary">report_problem</span>
+                                                    Problem Statement
+                                                </h5>
+<p class="text-on-surface-variant font-body-md">Current internal services rely on perimeter security (VPN). This is insufficient for the upcoming Phoenix-Edge node deployment where nodes exist on untrusted external networks.</p>
+</div>
+<div>
+<h5 class="font-label-caps text-label-caps text-on-surface flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-[16px] text-tertiary">rocket</span>
+                                                    Proposed Solution
+                                                </h5>
+<p class="text-on-surface-variant font-body-md">Implementing SPIFFE/Spire as the identity provider for all service-to-service communication, coupled with a WireGuard-based overlay mesh for encrypted transit.</p>
+</div>
+</div>
+<div class="bg-surface-container/50 p-4 rounded-lg border border-outline-variant space-y-4">
+<div>
+<h5 class="font-label-caps text-label-caps text-on-surface mb-2">MVP Scope</h5>
+<ul class="text-on-surface-variant font-body-sm space-y-1">
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Core Spire server in US-East-1</li>
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Sidecar injection for 3 pilot services</li>
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Certificate rotation within 1hr TTL</li>
+</ul>
+</div>
+<div>
+<h5 class="font-label-caps text-label-caps text-on-surface mb-2">Open Questions</h5>
+<p class="text-on-surface-variant font-body-sm italic">"How do we handle legacy Windows Server 2019 nodes that don't support the SPIFFE Unix Domain Socket natively?"</p>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4 pt-4">
+<button class="bg-tertiary-container text-on-tertiary-container font-label-caps text-label-caps px-4 py-2 rounded flex items-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">comment</span>
+                                            Join Discussion
+                                        </button>
+<button class="text-on-surface-variant font-label-caps text-label-caps px-4 py-2 rounded border border-outline-variant hover:bg-surface-variant transition-colors">
+                                            View Full Proposal
+                                        </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Secondary RFC Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-widget-gap">
+<div class="glass-card rounded-xl p-6 border-l-4 border-l-outline">
+<div class="flex justify-between items-start mb-4">
+<div>
+<span class="font-code-md text-outline text-[12px]">RFC-205</span>
+<h4 class="font-headline-md text-on-surface mt-1">GraphQL Federated Gateway</h4>
+</div>
+<span class="status-badge bg-surface-variant text-outline border border-outline/20">Drafting</span>
+</div>
+<p class="text-on-surface-variant font-body-sm mb-4">Proposal to unify disparate microservice APIs under a single Apollo Federation gateway for frontend consumption.</p>
+<div class="flex items-center justify-between mt-auto pt-4 border-t border-outline-variant">
+<span class="text-body-sm text-outline">3 Comments</span>
+<span class="material-symbols-outlined text-outline">open_in_new</span>
+</div>
+</div>
+<div class="glass-card rounded-xl p-6 border-l-4 border-l-error">
+<div class="flex justify-between items-start mb-4">
+<div>
+<span class="font-code-md text-error text-[12px]">RFC-198</span>
+<h4 class="font-headline-md text-on-surface mt-1">Manual Database Sharding</h4>
+</div>
+<span class="status-badge bg-error/10 text-error border border-error/20">Rejected</span>
+</div>
+<p class="text-on-surface-variant font-body-sm mb-4">Initial proposal to shard PostgreSQL instances manually. Rejected in favor of Vitess / Distributed SQL approach (See ADR-012).</p>
+<div class="flex items-center justify-between mt-auto pt-4 border-t border-outline-variant">
+<span class="text-body-sm text-outline">Archived Jan 2024</span>
+<span class="material-symbols-outlined text-outline">history</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Spacer -->
+<div class="h-12"></div>
+</div>
+</div>
+</main>
+<!-- AI Assistant Right Panel -->
+<aside class="w-[320px] bg-surface-container-low border-l border-outline-variant flex flex-col h-full z-30">
+<div class="p-6 border-b border-outline-variant flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<span class="font-headline-md text-[18px]">Phoenix AI</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-[10px] uppercase font-bold text-outline">Active</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
+<div class="bg-surface-variant/30 rounded-lg p-4 text-body-sm border border-outline-variant">
+<p class="text-on-surface mb-2 font-bold">Context Insight</p>
+<p class="text-on-surface-variant leading-relaxed">I've scanned <span class="text-primary">RFC-204</span>. It appears to conflict with <span class="text-tertiary">ADR-009</span> regarding MTLS termination. Would you like me to highlight the overlapping sections?</p>
+</div>
+<div class="space-y-4">
+<p class="font-label-caps text-label-caps text-outline uppercase px-2">Suggestions</p>
+<button class="w-full text-left p-3 rounded-lg border border-outline-variant hover:bg-surface-variant transition-colors group">
+<p class="text-on-surface font-body-sm group-hover:text-primary transition-colors">Generate impact analysis for RFC-204</p>
+</button>
+<button class="w-full text-left p-3 rounded-lg border border-outline-variant hover:bg-surface-variant transition-colors group">
+<p class="text-on-surface font-body-sm group-hover:text-primary transition-colors">Compare ADR-014 with AWS Native</p>
+</button>
+<button class="w-full text-left p-3 rounded-lg border border-outline-variant hover:bg-surface-variant transition-colors group">
+<p class="text-on-surface font-body-sm group-hover:text-primary transition-colors">Summarize latest RFC feedback</p>
+</button>
+</div>
+<div class="pt-4 border-t border-outline-variant">
+<div class="w-full h-32 rounded-lg bg-cover bg-center mb-4" data-alt="A sophisticated 3D visualization of a neural network or a complex architecture diagram. The lines are glowing in a soft cyan and deep indigo, interconnected by nodes of light. The overall aesthetic is dark and minimalist, fitting an enterprise software interface for infrastructure management. Soft bokeh light in the background creates depth and focus on the central data pathways." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBqetxOQ4TP5tr-Ddmf4sX42R_HdSB2S2mmE4g8iOKhMM0VIgv9cMQH6nfB6OnPFowVnihlrwaHdFwdbwwfKr4aiAkpoRcUp6n09lhev-EahTjgF55y2hdNVU7uyrRYyGEr61FlsrfEjTpkr4paclRRCnZRVCnL8IrKQLHSacdkGq00V68RSXSYRqi2XCqOqwShnIfHKfbTPi5aNd1ANFWeJOdmIwZ1U8Akqez1WXn9lnQqoWeox_Dt8B5XcyVTgFipnibjJnK3EXlK')"></div>
+<p class="text-[11px] text-outline text-center">AI is currently analyzing architecture graph metadata.</p>
+</div>
+</div>
+<div class="p-4 border-t border-outline-variant">
+<div class="relative">
+<textarea class="w-full bg-surface-container-highest border-outline-variant rounded-xl text-body-sm p-3 pr-10 focus:ring-1 focus:ring-primary outline-none min-h-[80px] resize-none" placeholder="Ask AI about architecture..."></textarea>
+<button class="absolute right-3 bottom-3 text-primary">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+</aside>
+<!-- Background Atmospheric Effect -->
+<div class="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+
+</div>
+<script>
+        // Simple interactive script for hover effects or tab switching if needed
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                card.style.setProperty('--mouse-x', `${x}px`);
+                card.style.setProperty('--mouse-y', `${y}px`);
+            });
+        });
+    </script>
+</body></html>

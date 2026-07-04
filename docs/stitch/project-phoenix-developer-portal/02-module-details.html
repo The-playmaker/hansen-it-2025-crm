@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Module Details | Project Phoenix</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Geist:wght@600;700&amp;family=JetBrains+Mono:wght@450&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .inner-glow:hover {
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b1326;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2d3449;
+            border-radius: 10px;
+        }
+        @keyframes pulse-soft {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .animate-pulse-soft {
+            animation: pulse-soft 3s infinite ease-in-out;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-container": "#3131c0",
+                        "on-surface": "#dae2fd",
+                        "surface-dim": "#0b1326",
+                        "secondary-fixed-dim": "#c0c1ff",
+                        "surface-container-lowest": "#060e20",
+                        "secondary": "#c0c1ff",
+                        "on-error-container": "#ffdad6",
+                        "surface": "#0b1326",
+                        "on-tertiary-fixed": "#311400",
+                        "inverse-primary": "#005ac2",
+                        "on-primary-fixed-variant": "#004395",
+                        "primary-container": "#4d8eff",
+                        "on-secondary": "#1000a9",
+                        "inverse-surface": "#dae2fd",
+                        "inverse-on-surface": "#283044",
+                        "on-primary-container": "#00285d",
+                        "on-tertiary": "#502400",
+                        "on-surface-variant": "#c2c6d6",
+                        "background": "#0b1326",
+                        "tertiary-fixed": "#ffdcc6",
+                        "error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#723600",
+                        "primary": "#adc6ff",
+                        "on-primary": "#002e6a",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-bright": "#31394d",
+                        "outline-variant": "#424754",
+                        "secondary-fixed": "#e1e0ff",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed": "#07006c",
+                        "on-error": "#690005",
+                        "tertiary-fixed-dim": "#ffb786",
+                        "outline": "#8c909f",
+                        "tertiary-container": "#df7412",
+                        "on-background": "#dae2fd",
+                        "surface-container-low": "#131b2e",
+                        "surface-variant": "#2d3449",
+                        "surface-container-highest": "#2d3449",
+                        "surface-container-high": "#222a3d",
+                        "primary-fixed-dim": "#adc6ff",
+                        "on-primary-fixed": "#001a42",
+                        "on-secondary-container": "#b0b2ff",
+                        "surface-container": "#171f33",
+                        "tertiary": "#ffb786",
+                        "on-tertiary-container": "#461f00",
+                        "surface-tint": "#adc6ff",
+                        "on-secondary-fixed-variant": "#2f2ebe"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "sidebar-width": "260px",
+                        "gutter": "16px",
+                        "margin-desktop": "32px",
+                        "margin-mobile": "16px",
+                        "widget-gap": "12px"
+                    },
+                    "fontFamily": {
+                        "display": ["Geist"],
+                        "label-caps": ["Inter"],
+                        "headline-md": ["Geist"],
+                        "body-lg": ["Inter"],
+                        "code-md": ["JetBrains Mono"],
+                        "headline-lg": ["Geist"],
+                        "body-sm": ["Inter"],
+                        "body-md": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md selection:bg-primary/30 selection:text-primary-fixed overflow-hidden">
+<!-- Global Layout Shell -->
+<div class="flex h-screen w-full overflow-hidden">
+<!-- SIDE NAVBAR (JSON Anchor) -->
+<aside class="fixed left-0 top-0 h-full w-sidebar-width border-r border-outline-variant bg-surface flex flex-col py-gutter px-2 z-50">
+<div class="flex items-center gap-3 px-3 mb-8">
+<div class="w-8 h-8 rounded bg-primary flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">rocket_launch</span>
+</div>
+<div>
+<h1 class="font-display text-headline-md font-bold text-on-surface leading-none">Project Phoenix</h1>
+<p class="text-[10px] font-label-caps uppercase tracking-widest text-outline mt-1">Hansen IT Infrastructure</p>
+</div>
+</div>
+<button class="mx-2 mb-6 py-2 bg-primary-container text-on-primary-container font-label-caps text-[12px] rounded flex items-center justify-center gap-2 hover:opacity-90 transition-all">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                New RFC
+            </button>
+<nav class="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
+<!-- Active Item: Modules -->
+<div class="flex items-center gap-3 px-3 py-2 text-primary border-l-2 border-primary bg-primary/5 transition-all duration-200 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="extension">extension</span>
+<span class="font-label-caps text-label-caps">Modules</span>
+</div>
+<script>
+                    const navItems = [
+                        {icon: "dashboard", label: "Overview"},
+                        {icon: "visibility", label: "Vision"},
+                        {icon: "psychology", label: "Philosophy"},
+                        {icon: "account_tree", label: "Architecture"},
+                        {icon: "memory", label: "Platform Core"},
+                        {icon: "database", label: "Database"},
+                        {icon: "api", label: "APIs"},
+                        {icon: "security", label: "Security"},
+                        {icon: "smart_toy", label: "AI Engine"},
+                        {icon: "palette", label: "Design System"},
+                        {icon: "alt_route", label: "Integrations"},
+                        {icon: "analytics", label: "Reports"},
+                        {icon: "rocket_launch", label: "Deployment"},
+                        {icon: "map", label: "Roadmap"},
+                        {icon: "business_center", label: "Business"},
+                        {icon: "settings_applications", label: "Operations"},
+                        {icon: "biotech", label: "Testing"}
+                    ];
+                    
+                    const navContainer = document.currentScript.parentElement;
+                    navItems.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = "flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors cursor-pointer";
+                        div.innerHTML = `<span class="material-symbols-outlined">${item.icon}</span><span class="font-label-caps text-label-caps">${item.label}</span>`;
+                        navContainer.appendChild(div);
+                    });
+                </script>
+</nav>
+<div class="mt-auto pt-4 border-t border-outline-variant space-y-1">
+<div class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors cursor-pointer">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-caps text-label-caps">Settings</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors cursor-pointer">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+<span class="font-label-caps text-label-caps">Support</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 ml-sidebar-width flex flex-col min-w-0 bg-surface-dim relative">
+<!-- TOP NAVBAR (JSON Anchor) -->
+<header class="sticky top-0 w-full h-16 px-margin-desktop bg-surface/80 backdrop-blur-md border-b border-outline-variant flex justify-between items-center z-40">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 bg-surface-container h-10 px-4 rounded border border-outline-variant w-96">
+<span class="material-symbols-outlined text-outline text-[20px]">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-sm text-on-surface w-full placeholder:text-outline" placeholder="Search infrastructure, modules, or RFCs..." type="text"/>
+<span class="text-[10px] bg-outline-variant px-1.5 py-0.5 rounded text-outline font-code-md">CMD+K</span>
+</div>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-on-surface-variant hover:text-on-surface font-body-md transition-opacity" href="#">RFCs</a>
+<a class="text-primary font-bold border-b-2 border-primary py-5" href="#">Docs</a>
+<a class="text-on-surface-variant hover:text-on-surface font-body-md transition-opacity" href="#">Support</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-4 py-1.5 rounded-full bg-secondary-container text-on-secondary-container font-label-caps text-[12px] flex items-center gap-2 transition-all hover:brightness-110 focus:ring-1 ring-primary">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+                        Ask AI
+                    </button>
+<div class="h-8 w-[1px] bg-outline-variant mx-2"></div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-on-surface">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-on-surface">history</span>
+<div class="w-8 h-8 rounded-full bg-surface-variant border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional studio portrait of a technology lead with short dark hair, wearing a dark navy mock-neck sweater. The lighting is dramatic with cool blue rim lighting, reflecting a high-end enterprise developer portal aesthetic. The background is a blurred server room with subtle bokeh lights in teal and amber." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYS-38undxGC6UANfLHdV1u1Um1zjQrC1OvMDrLk3GD0bPrpIUn7Ggw2b6vHjyvl6tkL4VqGCpFiqnEXoVYuEJCIKykfx9D4RIfbQJpEImDSbMM7Id-uyVc99OijPGJONwzs3DO4BFs5FCdHGCbjlXKTVttmGRgaZvpATf-CpooUvFWVtP1lvtHVkRGQ4-lKUGB6HE3i-sihTmaPM1N7ng0G7b78CLS2RDe0eVr4MqxaenH0SvAOsbuWksWr5pnwRgvPj72ibB3_zs"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Page Content (Bento Style Module Detail) -->
+<div class="flex-1 overflow-y-auto p-margin-desktop pb-24">
+<!-- Breadcrumbs -->
+<nav class="flex items-center gap-2 mb-6 text-body-sm text-outline">
+<span>Modules</span>
+<span class="opacity-40">/</span>
+<span class="text-primary">Identity Engine v4</span>
+<span class="ml-4 px-2 py-0.5 rounded bg-tertiary-container/20 text-tertiary font-label-caps text-[10px] border border-tertiary/30">PRE-PRODUCTION</span>
+</nav>
+<div class="flex flex-col lg:flex-row gap-gutter items-start">
+<!-- Content Stack (Left/Center) -->
+<div class="flex-1 grid grid-cols-12 gap-widget-gap w-full">
+<!-- Header Module Card -->
+<div class="col-span-12 glass-panel p-8 rounded-xl relative overflow-hidden">
+
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-4">
+<h2 class="font-display text-display text-on-surface">Identity Engine</h2>
+<div class="flex gap-2">
+<div class="flex flex-col items-end">
+<span class="text-body-sm text-outline">Stability Score</span>
+<span class="font-code-md text-primary">98.4%</span>
+</div>
+<div class="w-12 h-12 rounded-lg border border-outline-variant flex items-center justify-center bg-surface">
+<span class="material-symbols-outlined text-primary">fingerprint</span>
+</div>
+</div>
+</div>
+<p class="text-body-lg text-on-surface-variant max-w-2xl mb-6">
+                                    A distributed, high-concurrency authentication and authorization layer built for Hansen IT's multi-cloud infrastructure. Replaces the legacy LDAP-Sync with an OIDC-native architecture.
+                                </p>
+<div class="flex gap-6">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">group</span>
+<span class="text-body-sm">Lead: <span class="text-on-surface font-semibold">Sarah Jenkins</span></span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">schedule</span>
+<span class="text-body-sm">Last Sync: <span class="text-on-surface font-semibold">14m ago</span></span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">alt_route</span>
+<span class="text-body-sm">Version: <span class="font-code-md text-on-surface">4.12.0-stable</span></span>
+</div>
+</div>
+</div>
+</div>
+<!-- Technical Specification Grid -->
+<!-- Problem & Users -->
+<div class="col-span-12 md:col-span-6 glass-panel p-6 rounded-xl inner-glow">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-error" style="font-variation-settings: 'FILL' 1;">warning</span>
+<h3 class="font-label-caps text-label-caps text-outline uppercase">Problem Statement</h3>
+</div>
+<p class="text-body-md text-on-surface-variant leading-relaxed">
+                                Current auth latency in region AP-SOUTH-1 exceeds 450ms. High coupling with legacy DB2 clusters prevents horizontal scaling. 42% of tickets relate to session mismatch during failover.
+                            </p>
+<div class="mt-6">
+<h4 class="font-label-caps text-[10px] text-outline uppercase mb-2">Target Users</h4>
+<div class="flex flex-wrap gap-2">
+<span class="px-2 py-1 rounded bg-surface-variant text-on-surface text-[11px] border border-outline-variant">External Developers</span>
+<span class="px-2 py-1 rounded bg-surface-variant text-on-surface text-[11px] border border-outline-variant">Internal DevOps</span>
+<span class="px-2 py-1 rounded bg-surface-variant text-on-surface text-[11px] border border-outline-variant">Compliance Audit</span>
+</div>
+</div>
+</div>
+<!-- Scope -->
+<div class="col-span-12 md:col-span-6 glass-panel p-6 rounded-xl inner-glow">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary">target</span>
+<h3 class="font-label-caps text-label-caps text-outline uppercase">MVP Scope</h3>
+</div>
+<ul class="space-y-2 mb-4">
+<li class="flex items-start gap-2 text-body-md">
+<span class="material-symbols-outlined text-primary text-[16px] mt-0.5">check_circle</span>
+                                    JWT-based stateless sessions
+                                </li>
+<li class="flex items-start gap-2 text-body-md">
+<span class="material-symbols-outlined text-primary text-[16px] mt-0.5">check_circle</span>
+                                    Multi-Region replication (CockroachDB)
+                                </li>
+<li class="flex items-start gap-2 text-body-md text-outline">
+<span class="material-symbols-outlined text-[16px] mt-0.5">cancel</span>
+<span class="line-through">Legacy NTLM Support (Out of Scope)</span>
+</li>
+</ul>
+<div class="pt-4 border-t border-outline-variant">
+<h4 class="font-label-caps text-[10px] text-outline uppercase mb-2">Non-Functional Goals</h4>
+<div class="flex items-center gap-4">
+<div class="flex-1 h-1.5 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[92%]"></div>
+</div>
+<span class="font-code-md text-xs text-on-surface">99.999% SLA</span>
+</div>
+</div>
+</div>
+<!-- Database & API (Tech Specs) -->
+<div class="col-span-12 md:col-span-8 glass-panel p-6 rounded-xl inner-glow">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">database</span>
+<h3 class="font-label-caps text-label-caps text-outline uppercase">Infrastructure &amp; API</h3>
+</div>
+<span class="font-code-md text-[11px] text-secondary">PROTOBUF / GRPC</span>
+</div>
+<div class="grid grid-cols-2 gap-8">
+<div>
+<h4 class="text-body-sm font-semibold mb-3">Database Layer</h4>
+<div class="p-3 bg-surface-container rounded border border-outline-variant font-code-md text-[12px] text-on-surface-variant">
+<div class="flex justify-between border-b border-outline-variant pb-1 mb-1">
+<span>Engine:</span>
+<span class="text-secondary">PostgreSQL 15</span>
+</div>
+<div class="flex justify-between border-b border-outline-variant pb-1 mb-1">
+<span>Cache:</span>
+<span class="text-secondary">Redis Cluster</span>
+</div>
+<div class="flex justify-between">
+<span>Partition:</span>
+<span class="text-secondary">Geo-Shard</span>
+</div>
+</div>
+</div>
+<div>
+<h4 class="text-body-sm font-semibold mb-3">API Exposure</h4>
+<div class="space-y-2">
+<div class="flex items-center justify-between text-[12px] p-2 hover:bg-surface-variant transition-colors cursor-pointer group">
+<span class="font-code-md">GET /v4/identity/:id</span>
+<span class="material-symbols-outlined text-[14px] opacity-0 group-hover:opacity-100">open_in_new</span>
+</div>
+<div class="flex items-center justify-between text-[12px] p-2 hover:bg-surface-variant transition-colors cursor-pointer group">
+<span class="font-code-md">POST /v4/token/refresh</span>
+<span class="material-symbols-outlined text-[14px] opacity-0 group-hover:opacity-100">open_in_new</span>
+</div>
+<div class="flex items-center justify-between text-[12px] p-2 hover:bg-surface-variant transition-colors cursor-pointer group">
+<span class="font-code-md">PUT /v4/policy/grant</span>
+<span class="material-symbols-outlined text-[14px] opacity-0 group-hover:opacity-100">open_in_new</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Integrations -->
+<div class="col-span-12 md:col-span-4 glass-panel p-6 rounded-xl inner-glow">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-tertiary">hub</span>
+<h3 class="font-label-caps text-label-caps text-outline uppercase">Integrations</h3>
+</div>
+<div class="space-y-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">cloud</span>
+</div>
+<div class="flex-1">
+<div class="text-[12px] font-semibold">AWS IAM</div>
+<div class="text-[10px] text-outline">Cross-account trust</div>
+</div>
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">shield_person</span>
+</div>
+<div class="flex-1">
+<div class="text-[12px] font-semibold">Okta Workforce</div>
+<div class="text-[10px] text-outline">SCIM Provisioning</div>
+</div>
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+<div class="flex items-center gap-3 opacity-50">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">terminal</span>
+</div>
+<div class="flex-1">
+<div class="text-[12px] font-semibold">Terraform Provider</div>
+<div class="text-[10px] text-outline">Pending Approval</div>
+</div>
+<div class="w-2 h-2 rounded-full bg-outline"></div>
+</div>
+</div>
+</div>
+<!-- Roadmap Timeline -->
+<div class="col-span-12 glass-panel p-6 rounded-xl inner-glow overflow-hidden">
+<div class="flex items-center justify-between mb-8">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">map</span>
+<h3 class="font-label-caps text-label-caps text-outline uppercase">Engineering Roadmap</h3>
+</div>
+<button class="text-[11px] text-primary hover:underline">View GANTT Chart</button>
+</div>
+<div class="relative flex justify-between">
+<div class="absolute top-[18px] left-0 right-0 h-0.5 bg-outline-variant"></div>
+<div class="relative z-10 flex flex-col items-center group cursor-pointer">
+<div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center border-4 border-surface mb-3 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-on-primary text-[16px]" style="font-variation-settings: 'FILL' 1;">done</span>
+</div>
+<span class="font-label-caps text-[11px]">Q1: Design</span>
+<span class="text-[9px] text-outline">COMPLETED</span>
+</div>
+<div class="relative z-10 flex flex-col items-center group cursor-pointer">
+<div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center border-4 border-surface mb-3 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-on-primary text-[16px]" style="font-variation-settings: 'FILL' 1;">sync</span>
+</div>
+<span class="font-label-caps text-[11px]">Q2: Pilot</span>
+<span class="text-[9px] text-primary font-bold">ACTIVE</span>
+</div>
+<div class="relative z-10 flex flex-col items-center group cursor-pointer">
+<div class="w-10 h-10 rounded-full bg-surface-variant flex items-center justify-center border-4 border-surface mb-3 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-outline text-[16px]">hourglass_empty</span>
+</div>
+<span class="font-label-caps text-[11px]">Q3: Scaling</span>
+<span class="text-[9px] text-outline">QUEUED</span>
+</div>
+<div class="relative z-10 flex flex-col items-center group cursor-pointer">
+<div class="w-10 h-10 rounded-full bg-surface-variant flex items-center justify-center border-4 border-surface mb-3 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-outline text-[16px]">rocket</span>
+</div>
+<span class="font-label-caps text-[11px]">Q4: Release</span>
+<span class="text-[9px] text-outline">PLANNED</span>
+</div>
+</div>
+</div>
+</div>
+<!-- AI Assistant Sidebar (Right) -->
+<div class="w-full lg:w-80 h-full sticky top-[80px] space-y-gutter">
+<!-- AI Assistant Box -->
+<div class="glass-panel rounded-xl overflow-hidden flex flex-col border-primary/20 shadow-xl shadow-primary/5">
+<div class="p-4 bg-primary/10 border-b border-primary/20 flex items-center gap-2">
+<div class="w-6 h-6 bg-primary rounded flex items-center justify-center animate-pulse-soft">
+<span class="material-symbols-outlined text-[14px] text-on-primary" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<span class="font-label-caps text-label-caps text-primary">Phoenix AI Insight</span>
+</div>
+<div class="p-5">
+<p class="text-[13px] text-on-surface-variant leading-relaxed mb-4">
+                                    "I noticed the Identity Engine v4 is currently showing <span class="text-primary font-bold">elevated cold-start times</span> in the APAC regions. Would you like me to suggest a pre-warming strategy for the Redis cache?"
+                                </p>
+<div class="space-y-2">
+<button class="w-full text-left p-2 rounded bg-surface-variant hover:bg-primary/10 hover:text-primary transition-all text-[12px] flex items-center justify-between border border-outline-variant">
+<span>Show Optimization Strategy</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+</button>
+<button class="w-full text-left p-2 rounded bg-surface-variant hover:bg-primary/10 hover:text-primary transition-all text-[12px] flex items-center justify-between border border-outline-variant">
+<span>Compare with v3 Metrics</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+</button>
+</div>
+</div>
+<div class="p-3 bg-surface-container-highest flex items-center gap-2">
+<input class="flex-1 bg-transparent border-none text-[12px] focus:ring-0 placeholder:text-outline" placeholder="Ask follow up..." type="text"/>
+<span class="material-symbols-outlined text-outline cursor-pointer hover:text-primary">send</span>
+</div>
+</div>
+<!-- Security Compliance -->
+<div class="glass-panel p-5 rounded-xl border-error/20">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-error" style="font-variation-settings: 'FILL' 1;">security</span>
+<h3 class="font-label-caps text-label-caps text-error uppercase">Security Audit</h3>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between items-center text-[12px]">
+<span class="text-outline">SOC2 Compliance</span>
+<span class="text-on-surface">Verified</span>
+</div>
+<div class="flex justify-between items-center text-[12px]">
+<span class="text-outline">Pen-Test Date</span>
+<span class="text-on-surface">Dec 2023</span>
+</div>
+<div class="flex justify-between items-center text-[12px]">
+<span class="text-outline">Authz Model</span>
+<span class="font-code-md text-primary">RBAC + ABAC</span>
+</div>
+</div>
+<button class="w-full mt-4 py-1.5 border border-error/40 text-error font-label-caps text-[10px] rounded hover:bg-error/10 transition-colors uppercase">
+                                View Security Report
+                            </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer / Status Bar -->
+<footer class="h-8 bg-surface border-t border-outline-variant flex items-center px-margin-desktop justify-between text-[10px] font-label-caps text-outline fixed bottom-0 w-[calc(100%-260px)] ml-sidebar-width z-40">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                        SYSTEMS NOMINAL
+                    </div>
+<div class="flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-primary/40"></span>
+                        K8S CLUSTER: PHOENIX-PROD-01
+                    </div>
+</div>
+<div class="flex items-center gap-4">
+<span>BUILD: 88219-X</span>
+<span class="text-on-surface">GITHUB: /HANSEN-IT/IDENTITY-V4</span>
+</div>
+</footer>
+</main>
+</div>
+<!-- Micro-interactions Script -->
+<script>
+        document.addEventListener('keydown', (e) => {
+            if (e.metaKey && e.key === 'k') {
+                e.preventDefault();
+                alert('Command Palette (CMD+K) feature coming soon!');
+            }
+        });
+
+        // Simple Hover Effects for Bento Cards
+        const cards = document.querySelectorAll('.glass-panel');
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-2px)';
+                card.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0)';
+            });
+        });
+    </script>
+</body></html>

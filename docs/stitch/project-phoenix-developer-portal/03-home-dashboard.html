@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Project Phoenix | Developer Portal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=JetBrains+Mono:wght@450&amp;family=Geist:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-container": "#3131c0",
+                    "on-surface": "#dae2fd",
+                    "surface-dim": "#0b1326",
+                    "secondary-fixed-dim": "#c0c1ff",
+                    "surface-container-lowest": "#060e20",
+                    "secondary": "#c0c1ff",
+                    "on-error-container": "#ffdad6",
+                    "surface": "#0b1326",
+                    "on-tertiary-fixed": "#311400",
+                    "inverse-primary": "#005ac2",
+                    "on-primary-fixed-variant": "#004395",
+                    "primary-container": "#4d8eff",
+                    "on-secondary": "#1000a9",
+                    "inverse-surface": "#dae2fd",
+                    "inverse-on-surface": "#283044",
+                    "on-primary-container": "#00285d",
+                    "on-tertiary": "#502400",
+                    "on-surface-variant": "#c2c6d6",
+                    "background": "#0b1326",
+                    "tertiary-fixed": "#ffdcc6",
+                    "error-container": "#93000a",
+                    "on-tertiary-fixed-variant": "#723600",
+                    "primary": "#adc6ff",
+                    "on-primary": "#002e6a",
+                    "primary-fixed": "#d8e2ff",
+                    "surface-bright": "#31394d",
+                    "outline-variant": "#424754",
+                    "secondary-fixed": "#e1e0ff",
+                    "error": "#ffb4ab",
+                    "on-secondary-fixed": "#07006c",
+                    "on-error": "#690005",
+                    "tertiary-fixed-dim": "#ffb786",
+                    "outline": "#8c909f",
+                    "tertiary-container": "#df7412",
+                    "on-background": "#dae2fd",
+                    "surface-container-low": "#131b2e",
+                    "surface-variant": "#2d3449",
+                    "surface-container-highest": "#2d3449",
+                    "surface-container-high": "#222a3d",
+                    "primary-fixed-dim": "#adc6ff",
+                    "on-primary-fixed": "#001a42",
+                    "on-secondary-container": "#b0b2ff",
+                    "surface-container": "#171f33",
+                    "tertiary": "#ffb786",
+                    "on-tertiary-container": "#461f00",
+                    "surface-tint": "#adc6ff",
+                    "on-secondary-fixed-variant": "#2f2ebe"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "base": "4px",
+                    "sidebar-width": "260px",
+                    "gutter": "16px",
+                    "margin-desktop": "32px",
+                    "margin-mobile": "16px",
+                    "widget-gap": "12px"
+            },
+            "fontFamily": {
+                    "display": ["Geist"],
+                    "label-caps": ["Inter"],
+                    "headline-md": ["Geist"],
+                    "body-lg": ["Inter"],
+                    "code-md": ["JetBrains Mono"],
+                    "headline-lg": ["Geist"],
+                    "body-sm": ["Inter"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "display": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "code-md": ["13px", {"lineHeight": "20px", "fontWeight": "450"}],
+                    "headline-lg": ["30px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #020617;
+            color: #dae2fd;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-panel:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.02);
+        }
+        .active-nav-indicator {
+            position: absolute;
+            left: 0;
+            width: 2px;
+            height: 24px;
+            background-color: #adc6ff;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #424754; border-radius: 2px; }
+    </style>
+</head>
+<body class="overflow-hidden">
+<!-- Side Navigation -->
+<aside class="fixed left-0 top-0 h-full w-sidebar-width border-r border-outline-variant bg-surface flex flex-col py-gutter px-2 z-50">
+<div class="px-4 mb-8">
+<h1 class="font-display text-headline-md font-bold text-on-surface">Project Phoenix</h1>
+<p class="text-body-sm text-on-surface-variant">Hansen IT Infrastructure</p>
+</div>
+<nav class="flex-1 overflow-y-auto space-y-1">
+<!-- Active: Overview -->
+<a class="flex items-center gap-3 px-4 py-2 text-primary bg-primary/5 border-l-2 border-primary transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="visibility">visibility</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Vision</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="psychology">psychology</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Philosophy</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="account_tree">account_tree</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Architecture</span>
+</a>
+<div class="pt-4 pb-2 px-4 text-outline font-label-caps text-[10px] uppercase tracking-widest">Platform</div>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="memory">memory</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Platform Core</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="database">database</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Database</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="api">api</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">APIs</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="security">security</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Security</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="smart_toy">smart_toy</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">AI Engine</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="palette">palette</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Design System</span>
+</a>
+</nav>
+<div class="mt-auto px-2 pt-4 border-t border-outline-variant/30">
+<button class="w-full mb-4 flex items-center justify-center gap-2 py-2 px-4 bg-primary text-on-primary rounded-lg font-bold hover:opacity-90 transition-all">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+<span class="font-label-caps text-label-caps uppercase">New RFC</span>
+</button>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="help_outline">help_outline</span>
+<span class="font-label-caps text-label-caps uppercase tracking-wider">Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-sidebar-width h-screen flex flex-col relative overflow-hidden bg-background">
+<!-- Top Bar -->
+<header class="h-16 flex justify-between items-center px-margin-desktop bg-surface/80 backdrop-blur-md border-b border-outline-variant sticky top-0 z-40">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]" data-icon="search">search</span>
+<input class="w-full bg-surface-container border border-outline-variant rounded-full pl-10 pr-4 py-1.5 text-body-md focus:ring-1 focus:ring-primary focus:outline-none transition-all" placeholder="Search architecture, RFCs, or code..." type="text"/>
+</div>
+<div class="hidden md:flex gap-6 items-center px-4">
+<a class="text-on-surface-variant hover:text-on-surface text-body-md transition-all" href="#">RFCs</a>
+<a class="text-on-surface-variant hover:text-on-surface text-body-md transition-all" href="#">Docs</a>
+<a class="text-on-surface-variant hover:text-on-surface text-body-md transition-all" href="#">Support</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-4 py-1.5 bg-primary-container text-on-primary-container rounded-lg font-bold text-body-md hover:opacity-90 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="auto_awesome">auto_awesome</span>
+                    Ask AI
+                </button>
+<div class="flex items-center gap-2 border-l border-outline-variant ml-2 pl-4">
+<span class="material-symbols-outlined p-1.5 text-on-surface-variant hover:bg-surface-variant rounded-full cursor-pointer transition-colors" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined p-1.5 text-on-surface-variant hover:bg-surface-variant rounded-full cursor-pointer transition-colors" data-icon="history">history</span>
+<div class="w-8 h-8 rounded-full overflow-hidden ml-2 border border-outline">
+<img class="w-full h-full object-cover" data-alt="A professional studio portrait of a high-end tech executive or developer, minimalist and clean style. The background is a soft, deep charcoal grey. The lighting is dramatic but controlled, highlighting the contours of the face with a blue-toned rim light consistent with a dark mode enterprise application. The image conveys intelligence and authority." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBfwdknBA1xAsNzvxRUKXBfEwUjylM1HMrznxU9z87kUDmylQkT2MOG184kLVZlhZE0VJ_dNtdP5hwal52xIfid6JCqHuVftoqdOY0A9humgrcqEbn94M1lCzEWfhPsqIqLdA5BZe2jpkUgGydPutRjZQvk9f0G7-_JFnVRFc5810dcx55tzunMLY1v24AFdyknG3BmhcQZ71L42y_t2LOg3FRRIxBLlDqQO-dM96lX7D8mnlIOIPqXIiWsL68SWxPqsPlBzWEc5WNO"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Scrollable Dashboard -->
+<div class="flex-1 overflow-y-auto px-margin-desktop py-8 flex">
+<div class="flex-1 max-w-6xl">
+<!-- Hero Section -->
+<div class="mb-12 relative">
+<div class="flex items-start justify-between">
+<div>
+<div class="flex items-center gap-3 mb-2">
+<span class="bg-error-container text-error px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase">Draft v1.0</span>
+<span class="text-outline text-body-sm">Last update: 2 hours ago</span>
+</div>
+<h2 class="font-display text-display text-on-surface">Project Phoenix</h2>
+<p class="font-headline-md text-headline-md text-on-surface-variant opacity-80 mt-2">The Living Architecture of Project Phoenix</p>
+</div>
+</div>
+<!-- Decorative Element -->
+<div class="absolute -top-12 -right-12 w-64 h-64 bg-primary/10 blur-[100px] rounded-full -z-10"></div>
+</div>
+<!-- Bento Grid: Quick Cards -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-widget-gap mb-12">
+<div class="glass-panel p-5 rounded-xl flex flex-col gap-4 group cursor-pointer">
+<div class="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" data-icon="architecture">architecture</span>
+</div>
+<div>
+<h3 class="font-headline-md text-body-lg mb-1">Platform Architecture</h3>
+<p class="text-body-sm text-on-surface-variant">Core infrastructure schemas and diagrams.</p>
+</div>
+</div>
+<div class="glass-panel p-5 rounded-xl flex flex-col gap-4 group cursor-pointer">
+<div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+</div>
+<div>
+<h3 class="font-headline-md text-body-lg mb-1">CRM</h3>
+<p class="text-body-sm text-on-surface-variant">Manage identity, access and customer logic.</p>
+</div>
+</div>
+<div class="glass-panel p-5 rounded-xl flex flex-col gap-4 group cursor-pointer">
+<div class="w-10 h-10 rounded-lg bg-tertiary/10 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined" data-icon="policy">policy</span>
+</div>
+<div>
+<h3 class="font-headline-md text-body-lg mb-1">Security Insight</h3>
+<p class="text-body-sm text-on-surface-variant">Real-time vulnerability and scan reports.</p>
+</div>
+</div>
+<div class="glass-panel p-5 rounded-xl flex flex-col gap-4 group cursor-pointer">
+<div class="w-10 h-10 rounded-lg bg-on-surface-variant/10 flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+</div>
+<div>
+<h3 class="font-headline-md text-body-lg mb-1">Reports</h3>
+<p class="text-body-sm text-on-surface-variant">Data visualization and export engine.</p>
+</div>
+</div>
+<div class="glass-panel p-5 rounded-xl flex flex-col gap-4 group cursor-pointer">
+<div class="w-10 h-10 rounded-lg bg-primary-container/10 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined" data-icon="smart_toy">smart_toy</span>
+</div>
+<div>
+<h3 class="font-headline-md text-body-lg mb-1">AI Engine</h3>
+<p class="text-body-sm text-on-surface-variant">Context-aware developer assistance.</p>
+</div>
+</div>
+<div class="glass-panel p-5 rounded-xl flex flex-col gap-4 group cursor-pointer">
+<div class="w-10 h-10 rounded-lg bg-error/10 flex items-center justify-center text-error">
+<span class="material-symbols-outlined" data-icon="monitor_heart">monitor_heart</span>
+</div>
+<div>
+<h3 class="font-headline-md text-body-lg mb-1">NOC</h3>
+<p class="text-body-sm text-on-surface-variant">Network operations and uptime control.</p>
+</div>
+</div>
+<div class="glass-panel p-5 rounded-xl flex flex-col gap-4 group cursor-pointer">
+<div class="w-10 h-10 rounded-lg bg-secondary-container/10 flex items-center justify-center text-secondary-container">
+<span class="material-symbols-outlined" data-icon="shield">shield</span>
+</div>
+<div>
+<h3 class="font-headline-md text-body-lg mb-1">SOC</h3>
+<p class="text-body-sm text-on-surface-variant">Threat intelligence and audit logs.</p>
+</div>
+</div>
+<div class="glass-panel p-5 rounded-xl flex flex-col gap-4 group cursor-pointer">
+<div class="w-10 h-10 rounded-lg bg-surface-bright/20 flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined" data-icon="open_in_new">open_in_new</span>
+</div>
+<div>
+<h3 class="font-headline-md text-body-lg mb-1">Customer Portal</h3>
+<p class="text-body-sm text-on-surface-variant">External facing interfaces and branding.</p>
+</div>
+</div>
+</div>
+<!-- Main Content Split -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-16">
+<!-- Current Focus Section -->
+<div class="lg:col-span-2 space-y-6">
+<div class="flex items-center justify-between">
+<h4 class="font-headline-md text-headline-md">Current Focus</h4>
+<button class="text-primary text-body-sm hover:underline">View Roadmap</button>
+</div>
+<div class="space-y-4">
+<div class="glass-panel rounded-xl overflow-hidden group">
+<div class="p-6 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-2 h-12 bg-primary rounded-full"></div>
+<div>
+<h5 class="text-body-lg font-bold">Phoenix CRM</h5>
+<p class="text-body-sm text-on-surface-variant">Standardizing the auth-flow across all modular nodes.</p>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[10px] text-outline mb-1 uppercase font-bold">Progress</div>
+<div class="w-32 h-1.5 bg-surface-container rounded-full overflow-hidden">
+<div class="w-3/4 h-full bg-primary"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="glass-panel rounded-xl overflow-hidden group">
+<div class="p-6 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-2 h-12 bg-secondary rounded-full"></div>
+<div>
+<h5 class="text-body-lg font-bold">Phoenix Scan</h5>
+<p class="text-body-sm text-on-surface-variant">Integrating OWASP ZAP into the CI pipeline.</p>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[10px] text-outline mb-1 uppercase font-bold">Progress</div>
+<div class="w-32 h-1.5 bg-surface-container rounded-full overflow-hidden">
+<div class="w-1/4 h-full bg-secondary"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="glass-panel rounded-xl overflow-hidden group">
+<div class="p-6 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-2 h-12 bg-tertiary rounded-full"></div>
+<div>
+<h5 class="text-body-lg font-bold">Phoenix Report Engine</h5>
+<p class="text-body-sm text-on-surface-variant">Custom DSL for building PDF and CSV data streams.</p>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[10px] text-outline mb-1 uppercase font-bold">Progress</div>
+<div class="w-32 h-1.5 bg-surface-container rounded-full overflow-hidden">
+<div class="w-1/2 h-full bg-tertiary"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="glass-panel rounded-xl overflow-hidden group">
+<div class="p-6 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-2 h-12 bg-outline rounded-full"></div>
+<div>
+<h5 class="text-body-lg font-bold">Phoenix Docs</h5>
+<p class="text-body-sm text-on-surface-variant">Migrating markdown from legacy Git to internal portal.</p>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[10px] text-outline mb-1 uppercase font-bold">Progress</div>
+<div class="w-32 h-1.5 bg-surface-container rounded-full overflow-hidden">
+<div class="w-4/5 h-full bg-outline"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Architecture Rules Card -->
+<div class="space-y-6">
+<h4 class="font-headline-md text-headline-md">Architecture Rules</h4>
+<div class="bg-surface-container p-6 rounded-xl border border-outline-variant relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-[64px]" data-icon="gavel">gavel</span>
+</div>
+<ul class="space-y-4 relative z-10">
+<li class="flex gap-3">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="check_circle">check_circle</span>
+<span class="text-body-md font-bold">Single Source of Truth</span>
+</li>
+<li class="flex gap-3">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="check_circle">check_circle</span>
+<span class="text-body-md font-bold">Security by Default</span>
+</li>
+<li class="flex gap-3">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="check_circle">check_circle</span>
+<span class="text-body-md font-bold">Documentation by Design</span>
+</li>
+<li class="flex gap-3">
+<span class="material-symbols-outlined text-secondary text-[18px]" data-icon="auto_awesome">auto_awesome</span>
+<span class="text-body-md font-bold italic">AI Assisted, Not AI Replaced</span>
+</li>
+<li class="flex gap-3">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="check_circle">check_circle</span>
+<span class="text-body-md font-bold">API First</span>
+</li>
+<li class="flex gap-3">
+<span class="material-symbols-outlined text-tertiary text-[18px]" data-icon="info">info</span>
+<span class="text-body-md font-bold">Practical Before Perfect</span>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Panel: AI Assistant & Next Decisions -->
+<aside class="w-80 ml-8 hidden xl:flex flex-col gap-8">
+<!-- AI Assistant Section -->
+<div class="glass-panel rounded-2xl flex flex-col h-[400px] relative overflow-hidden">
+<div class="p-4 border-b border-outline-variant bg-surface-container/50 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="bolt">bolt</span>
+<span class="font-bold text-body-md">Phoenix AI</span>
+</div>
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+</div>
+<div class="flex-1 p-4 overflow-y-auto space-y-4">
+<div class="bg-surface-variant/30 p-3 rounded-lg rounded-tl-none">
+<p class="text-body-sm">Welcome back. I've analyzed the last 3 RFCs. The database migration for <code class="bg-black/20 px-1 rounded">Phoenix CRM</code> is the highest priority for this sprint.</p>
+</div>
+<div class="bg-primary/10 p-3 rounded-lg rounded-tr-none self-end ml-6 border border-primary/20">
+<p class="text-body-sm">Show me the latest scan authorization flow issues.</p>
+</div>
+<div class="bg-surface-variant/30 p-3 rounded-lg rounded-tl-none">
+<p class="text-body-sm">I've found 2 unresolved security tokens in the <code class="bg-black/20 px-1 rounded">auth-v2-dev</code> branch. Would you like to review them?</p>
+</div>
+</div>
+<div class="p-4 bg-surface-container">
+<div class="relative">
+<input class="w-full bg-surface text-body-sm border border-outline-variant rounded-lg px-3 py-2 focus:ring-1 focus:ring-primary focus:outline-none" placeholder="Type a command..." type="text"/>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-primary" data-icon="send">send</span>
+</div>
+</div>
+</div>
+<!-- Next Decisions -->
+<div class="space-y-4">
+<h4 class="font-headline-md text-body-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary" data-icon="pending_actions">pending_actions</span>
+                        Next Decisions
+                    </h4>
+<div class="space-y-2">
+<div class="p-3 bg-surface-container-low border border-outline-variant rounded-lg flex items-start gap-3 group hover:border-primary/50 cursor-pointer transition-all">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+<span class="text-body-sm leading-tight">Finalize database model for Project Phoenix Core</span>
+</div>
+<div class="p-3 bg-surface-container-low border border-outline-variant rounded-lg flex items-start gap-3 group hover:border-primary/50 cursor-pointer transition-all">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+<span class="text-body-sm leading-tight">Define reporting engine DSL requirements</span>
+</div>
+<div class="p-3 bg-surface-container-low border border-outline-variant rounded-lg flex items-start gap-3 group hover:border-primary/50 cursor-pointer transition-all">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+<span class="text-body-sm leading-tight">Define scan authorization flow for SOC integration</span>
+</div>
+<div class="p-3 bg-surface-container-low border border-outline-variant rounded-lg flex items-start gap-3 group hover:border-primary/50 cursor-pointer transition-all">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+<span class="text-body-sm leading-tight">Restore quote portal after legacy server decommission</span>
+</div>
+<div class="p-3 bg-surface-container-low border border-outline-variant rounded-lg flex items-start gap-3 group hover:border-primary/50 cursor-pointer transition-all">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+<span class="text-body-sm leading-tight">Move idea bank from CSV to Supabase Instance</span>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<!-- Micro-interaction Scripts -->
+<script>
+        // Simple hover effect for glass panels
+        document.querySelectorAll('.glass-panel').forEach(panel => {
+            panel.addEventListener('mousemove', (e) => {
+                const rect = panel.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                panel.style.setProperty('--mouse-x', `${x}px`);
+                panel.style.setProperty('--mouse-y', `${y}px`);
+            });
+        });
+
+        // Command K interaction placeholder
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                alert('Command Palette (CMD+K) coming soon to Project Phoenix.');
+            }
+        });
+    </script>
+</body></html>
