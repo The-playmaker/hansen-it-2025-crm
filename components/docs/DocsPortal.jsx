@@ -1,0 +1,157 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Activity, BookOpen, Boxes, Database, FileText, GitBranch, LayoutDashboard, Search, ShieldCheck } from "lucide-react";
+import { docsNav } from "@/lib/docsPortal/data";
+
+const statusTone = {
+  active: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+  accepted: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+  draft: "border-amber-400/30 bg-amber-400/10 text-amber-200",
+  planned: "border-cyan-400/30 bg-cyan-400/10 text-cyan-200",
+  risk: "border-rose-400/30 bg-rose-400/10 text-rose-200"
+};
+
+const iconMap = {
+  overview: LayoutDashboard,
+  architecture: GitBranch,
+  database: Database,
+  modules: Boxes,
+  reports: FileText,
+  security: ShieldCheck,
+  activity: Activity,
+  docs: BookOpen
+};
+
+export function StatusBadge({ children, status = "planned" }) {
+  return <span className={`inline-flex rounded border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${statusTone[status] || statusTone.planned}`}>{children}</span>;
+}
+
+export function DocsCard({ title, eyebrow, children, action, className = "" }) {
+  return (
+    <section className={`rounded-lg border border-white/10 bg-slate-900/60 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] backdrop-blur ${className}`}>
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          {eyebrow ? <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-300/80">{eyebrow}</p> : null}
+          {title ? <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-50">{title}</h2> : null}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+export function DocsSidebar() {
+  const pathname = usePathname();
+  return (
+    <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-slate-950/70 lg:block">
+      <div className="sticky top-0 h-screen overflow-y-auto px-3 py-5">
+        <div className="mb-5 rounded-lg border border-white/10 bg-white/[0.04] p-3">
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-cyan-300">Developer Portal</p>
+          <p className="mt-1 text-sm font-semibold text-white">Phoenix Docs v1.0</p>
+        </div>
+        <nav className="space-y-1">
+          {docsNav.map((item) => {
+            const baseHref = item.href.split("#")[0];
+            const active = pathname === baseHref;
+            return (
+              <Link key={item.label} href={item.href} className={`block rounded px-3 py-2 text-sm transition ${active ? "bg-cyan-400/15 text-cyan-100 ring-1 ring-cyan-300/20" : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}>
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+    </aside>
+  );
+}
+
+export function DocsTopbar({ title, description, badge = "Draft v1.0" }) {
+  return (
+    <header className="border-b border-white/10 bg-slate-950/70 px-4 py-4 backdrop-blur lg:px-8">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-300">Project Phoenix</p>
+            <StatusBadge status="draft">{badge}</StatusBadge>
+          </div>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">{title}</h1>
+          {description ? <p className="mt-2 max-w-3xl text-sm text-slate-400">{description}</p> : null}
+        </div>
+        <div className="flex min-h-10 items-center gap-2 rounded border border-white/10 bg-slate-900/70 px-3 text-sm text-slate-400">
+          <Search className="h-4 w-4" />
+          <span>Search docs / CMD+K</span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+export function DocsLayout({ title, description, children }) {
+  return (
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_32%),linear-gradient(180deg,#020617,#0b1326)] text-slate-100">
+      <div className="flex">
+        <DocsSidebar />
+        <div className="min-w-0 flex-1">
+          <DocsTopbar title={title} description={description} />
+          <main className="mx-auto max-w-7xl space-y-6 p-4 lg:p-8">{children}</main>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ArchitectureCard({ title, status, items }) {
+  const Icon = iconMap.architecture;
+  return (
+    <DocsCard title={title} action={<StatusBadge status={status}>{status}</StatusBadge>}>
+      <Icon className="mb-4 h-5 w-5 text-cyan-300" />
+      <ul className="space-y-2 text-sm text-slate-300">
+        {items.map((item) => <li key={item} className="rounded border border-white/10 bg-white/[0.03] px-3 py-2">{item}</li>)}
+      </ul>
+    </DocsCard>
+  );
+}
+
+export function ModuleCard({ module }) {
+  return (
+    <DocsCard title={module.title} eyebrow={module.owner} action={<StatusBadge status={module.status}>{module.status}</StatusBadge>}>
+      <p className="text-sm text-slate-300">{module.description}</p>
+      <div className="mt-4 grid gap-3 text-xs text-slate-400 md:grid-cols-2">
+        <div><p className="mb-2 font-mono uppercase tracking-[0.12em] text-slate-500">Inputs</p>{module.inputs.map((item) => <span key={item} className="mr-2 mt-2 inline-flex rounded bg-white/[0.06] px-2 py-1">{item}</span>)}</div>
+        <div><p className="mb-2 font-mono uppercase tracking-[0.12em] text-slate-500">Outputs</p>{module.outputs.map((item) => <span key={item} className="mr-2 mt-2 inline-flex rounded bg-cyan-400/10 px-2 py-1 text-cyan-200">{item}</span>)}</div>
+      </div>
+    </DocsCard>
+  );
+}
+
+export function DecisionCard({ decision }) {
+  return (
+    <DocsCard title={`${decision.id}: ${decision.title}`} eyebrow={decision.type} action={<StatusBadge status={decision.status}>{decision.status}</StatusBadge>}>
+      <p className="text-sm text-slate-300">{decision.decision}</p>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div>
+          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-slate-500">Alternativer</p>
+          <ul className="mt-2 space-y-1 text-sm text-slate-300">{decision.alternatives.map((item) => <li key={item}>- {item}</li>)}</ul>
+        </div>
+        <div>
+          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-slate-500">Konsekvenser / åpne spørsmål</p>
+          <ul className="mt-2 space-y-1 text-sm text-slate-300">{decision.consequences.map((item) => <li key={item}>- {item}</li>)}</ul>
+        </div>
+      </div>
+    </DocsCard>
+  );
+}
+
+export function ReportPreviewCard({ report }) {
+  return (
+    <DocsCard title={report.title} eyebrow={report.audience} action={<StatusBadge status={report.status}>{report.status}</StatusBadge>}>
+      <p className="text-sm text-slate-300">{report.description}</p>
+      <div className="mt-4 h-2 rounded bg-slate-800">
+        <div className="h-2 w-3/4 rounded bg-gradient-to-r from-cyan-300 to-indigo-400" />
+      </div>
+    </DocsCard>
+  );
+}
