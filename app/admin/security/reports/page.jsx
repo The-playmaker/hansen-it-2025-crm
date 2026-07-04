@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { SearchCheck } from "lucide-react";
-import { EmptyState, formatDate, MetricCard, PhoenixPageHeader, PhoenixPanel, SecondaryButton, StatusBadge, TextInput } from "@/components/phoenix/PhoenixUi";
+import { Download, FileJson, Link as LinkIcon, Mail, SearchCheck } from "lucide-react";
+import { downloadSecurityReportJson, downloadSecurityReportPdf } from "@/lib/securityScan/exportClient";
+import { EmptyState, Field, formatDate, MetricCard, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SecondaryButton, StatusBadge, TextArea, TextInput } from "@/components/phoenix/PhoenixUi";
 
 export default function SecurityReportsPage() {
   const [reports, setReports] = useState([]);
@@ -12,6 +13,10 @@ export default function SecurityReportsPage() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null);
+  const [actionBusy, setActionBusy] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
+  const [sendForm, setSendForm] = useState({ recipient_email: "", message: "" });
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +42,55 @@ export default function SecurityReportsPage() {
   const filtered = useMemo(() => reports.filter((report) => report.domain?.toLowerCase().includes(query.toLowerCase())), [reports, query]);
   const averageScore = reports.length ? Math.round(reports.reduce((sum, report) => sum + Number(report.score || 0), 0) / reports.length) : 0;
   const weakReports = reports.filter((report) => Number(report.score || 0) < 60).length;
+
+  const openReport = (report) => {
+    setSelected(report);
+    setShareUrl("");
+    setActionMessage("");
+    setError("");
+  };
+
+  const createShareLink = async () => {
+    if (!selected?.id) return;
+    setActionBusy("share");
+    setActionMessage("");
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/security/reports/${selected.id}/share`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Kunne ikke lage delbar lenke.");
+      setShareUrl(result.url);
+      setActionMessage("Delbar rapportlenke er klar.");
+    } catch (err) {
+      setError(err.message || "Kunne ikke lage delbar lenke.");
+    } finally {
+      setActionBusy("");
+    }
+  };
+
+  const sendReport = async (event) => {
+    event.preventDefault();
+    if (!selected?.id) return;
+    setActionBusy("send");
+    setActionMessage("");
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/security/reports/${selected.id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sendForm)
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Kunne ikke sende rapport.");
+      setShareUrl(result.url);
+      setActionMessage("Rapporten er sendt.");
+      setSendForm({ recipient_email: "", message: "" });
+    } catch (err) {
+      setError(err.message || "Kunne ikke sende rapport.");
+    } finally {
+      setActionBusy("");
+    }
+  };
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -71,7 +125,7 @@ export default function SecurityReportsPage() {
                     </div>
                     <div className="flex flex-wrap gap-2"><StatusBadge>{report.grade}</StatusBadge><StatusBadge>{report.score}/100</StatusBadge></div>
                   </div>
-                  <div className="mt-4"><SecondaryButton type="button" onClick={() => setSelected(report)}>Åpne detaljer</SecondaryButton></div>
+                  <div className="mt-4"><SecondaryButton type="button" onClick={() => openReport(report)}>Åpne detaljer</SecondaryButton></div>
                 </article>
               )) : <EmptyState text={configured ? "Ingen rapporter funnet." : "Ingen rapporter i demo mode."} />}
             </div>
@@ -87,7 +141,22 @@ export default function SecurityReportsPage() {
                 <p className="mt-2 text-sm text-slate-300">Score {selected.score}/100, karakter {selected.grade}</p>
                 {selected.report?.spoofingRisk ? <p className="mt-2 text-sm text-amber-200">Spoofing-risk: {selected.report.spoofingRisk.level} - {selected.report.spoofingRisk.reason}</p> : null}
                 {selected.report?.subdomains?.length ? <p className="mt-2 text-sm text-slate-400">Subdomener funnet: {selected.report.subdomains.length}</p> : null}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <SecondaryButton type="button" onClick={() => downloadSecurityReportPdf(selected)}><Download size={16} />PDF</SecondaryButton>
+                  <SecondaryButton type="button" onClick={() => downloadSecurityReportJson(selected)}><FileJson size={16} />JSON</SecondaryButton>
+                  <SecondaryButton type="button" disabled={Boolean(actionBusy)} onClick={createShareLink}><LinkIcon size={16} />{actionBusy === "share" ? "Lager..." : "Del lenke"}</SecondaryButton>
+                </div>
+                {shareUrl ? <div className="mt-3 rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-3 text-sm text-cyan-100"><p className="font-semibold">Delbar lenke</p><p className="mt-1 break-all">{shareUrl}</p></div> : null}
+                {actionMessage ? <div className="mt-3 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">{actionMessage}</div> : null}
               </div>
+              <form onSubmit={sendReport} className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <p className="font-semibold text-white">Send rapport</p>
+                <div className="mt-3 space-y-3">
+                  <Field label="Mottaker"><TextInput type="email" value={sendForm.recipient_email} onChange={(event) => setSendForm((current) => ({ ...current, recipient_email: event.target.value }))} placeholder="kunde@example.no" /></Field>
+                  <Field label="Melding"><TextArea value={sendForm.message} onChange={(event) => setSendForm((current) => ({ ...current, message: event.target.value }))} placeholder="Kort valgfri melding..." /></Field>
+                  <PrimaryButton type="submit" disabled={actionBusy === "send"}><Mail size={16} />{actionBusy === "send" ? "Sender..." : "Send rapport"}</PrimaryButton>
+                </div>
+              </form>
               {selected.report?.subdomains?.length ? (
                 <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
                   <p className="font-semibold text-white">Subdomain discovery</p>

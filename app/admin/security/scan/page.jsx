@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, FileText, SearchCheck, ShieldAlert } from "lucide-react";
-import { EmptyState, Field, MetricCard, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SecondaryButton, StatusBadge, TextInput } from "@/components/phoenix/PhoenixUi";
+import { AlertTriangle, CheckCircle2, Download, FileJson, FileText, Link as LinkIcon, Mail, SearchCheck, ShieldAlert } from "lucide-react";
+import { downloadSecurityReportJson, downloadSecurityReportPdf } from "@/lib/securityScan/exportClient";
+import { EmptyState, Field, MetricCard, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SecondaryButton, StatusBadge, TextArea, TextInput } from "@/components/phoenix/PhoenixUi";
 
 const categoryLabels = { web: "Web", email: "E-post", domain: "Domene" };
 const severityLabels = { critical: "kritisk", high: "høy", medium: "middels", low: "lav", ok: "ok" };
@@ -23,6 +24,8 @@ export default function SecurityScanPage() {
   const [report, setReport] = useState(null);
   const [actionBusy, setActionBusy] = useState("");
   const [actionResult, setActionResult] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
+  const [sendForm, setSendForm] = useState({ recipient_email: "", message: "" });
 
   const problems = useMemo(() => report?.findings?.filter((finding) => finding.status !== "ok") || [], [report]);
   const okFindings = useMemo(() => report?.findings?.filter((finding) => finding.status === "ok") || [], [report]);
@@ -33,6 +36,7 @@ export default function SecurityScanPage() {
     setState("scanning");
     setError("");
     setActionResult("");
+    setShareUrl("");
     setReport(null);
 
     try {
@@ -48,6 +52,52 @@ export default function SecurityScanPage() {
     } catch (err) {
       setError(err.message || "Skanningen feilet.");
       setState("error");
+    }
+  };
+
+  const createShareLink = async () => {
+    if (!report?.reportId) {
+      setError("Rapporten må være lagret før den kan deles.");
+      return;
+    }
+    setActionBusy("share");
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/security/reports/${report.reportId}/share`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Kunne ikke lage delbar lenke.");
+      setShareUrl(result.url);
+      setActionResult("Delbar rapportlenke er klar.");
+    } catch (err) {
+      setError(err.message || "Kunne ikke lage delbar lenke.");
+    } finally {
+      setActionBusy("");
+    }
+  };
+
+  const sendReport = async (event) => {
+    event.preventDefault();
+    if (!report?.reportId) {
+      setError("Rapporten må være lagret før den kan sendes.");
+      return;
+    }
+    setActionBusy("send");
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/security/reports/${report.reportId}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sendForm)
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Kunne ikke sende rapport.");
+      setShareUrl(result.url);
+      setActionResult("Rapporten er sendt.");
+      setSendForm({ recipient_email: "", message: "" });
+    } catch (err) {
+      setError(err.message || "Kunne ikke sende rapport.");
+    } finally {
+      setActionBusy("");
     }
   };
 
@@ -109,7 +159,22 @@ export default function SecurityScanPage() {
               {report.reportId ? <span>Rapport-ID: {report.reportId}</span> : null}
               {report.saveError ? <span className="text-amber-200">Lagring feilet: {report.saveError}</span> : null}
             </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <SecondaryButton type="button" onClick={() => downloadSecurityReportPdf(report)}><Download size={16} />Last ned PDF</SecondaryButton>
+              <SecondaryButton type="button" onClick={() => downloadSecurityReportJson(report)}><FileJson size={16} />Last ned JSON</SecondaryButton>
+              <SecondaryButton type="button" disabled={!report.reportId || Boolean(actionBusy)} onClick={createShareLink}><LinkIcon size={16} />{actionBusy === "share" ? "Lager..." : "Lag delbar lenke"}</SecondaryButton>
+            </div>
+            {!report.reportId ? <p className="mt-3 text-sm text-amber-200">Rapport må lagres før deling eller sending.</p> : null}
+            {shareUrl ? <div className="mt-3 rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-3 text-sm text-cyan-100"><p className="font-semibold">Delbar lenke</p><p className="mt-1 break-all">{shareUrl}</p></div> : null}
             {actionResult ? <div className="mt-3 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">{actionResult}</div> : null}
+          </PhoenixPanel>
+
+          <PhoenixPanel title="Send rapport" description="Sender sikker rapportlenke via Resend. Krever RESEND_API_KEY i miljøet.">
+            <form onSubmit={sendReport} className="grid gap-3 md:grid-cols-[1fr_1.4fr_auto]">
+              <Field label="Mottaker"><TextInput type="email" value={sendForm.recipient_email} onChange={(event) => setSendForm((current) => ({ ...current, recipient_email: event.target.value }))} placeholder="kunde@example.no" /></Field>
+              <Field label="Melding"><TextArea value={sendForm.message} onChange={(event) => setSendForm((current) => ({ ...current, message: event.target.value }))} placeholder="Kort valgfri melding..." /></Field>
+              <div className="flex items-end"><PrimaryButton type="submit" disabled={!report.reportId || actionBusy === "send"}><Mail size={16} />{actionBusy === "send" ? "Sender..." : "Send"}</PrimaryButton></div>
+            </form>
           </PhoenixPanel>
 
           <PhoenixPanel title="Subdomain discovery" description="Passiv DNS-sjekk av vanlige subdomener. Ingen portscan eller IP-range scanning.">

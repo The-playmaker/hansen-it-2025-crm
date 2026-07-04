@@ -363,6 +363,50 @@ Begrensninger med vilje:
 
 CRM-handlinger fra scan krever `SUPABASE_URL` og `SUPABASE_SERVICE_ROLE_KEY` server-side. Service role key brukes kun i API-ruter og eksponeres ikke til frontend.
 
+### Scan rapport eksport, deling og sending
+
+Lagrede rapporter kan eksporteres og deles fra `/admin/security/scan` og `/admin/security/reports`:
+
+- Last ned PDF
+- Last ned JSON
+- Lag delbar token-lenke
+- Send rapportlenke på e-post via Resend
+
+Public rapportportal:
+
+```http
+GET /portal/security-report/[token]
+GET /api/portal/security-report/[token]
+```
+
+Admin API:
+
+```http
+POST /api/admin/security/reports/[id]/share
+POST /api/admin/security/reports/[id]/send
+```
+
+Migration:
+
+```bash
+supabase/migrations/20260704231500_security_scan_report_sharing.sql
+```
+
+Nye tabeller:
+
+- `security_scan_report_shares`
+- `security_scan_report_deliveries`
+
+Miljøvariabler for sending:
+
+```bash
+RESEND_API_KEY=<resend-api-key>
+SCAN_REPORT_FROM=Hansen IT <rapport@hansen-it.com>
+NEXT_PUBLIC_CRM_PUBLIC_URL=https://crm.hansen-it.com
+```
+
+Hvis `RESEND_API_KEY` mangler, returnerer send-API kontrollert `503`. Delbar lenke og eksport fungerer fortsatt.
+
 ### Scan Authorization Flow
 
 Phoenix har en egen autorisasjonsflyt for skanning som krever signert kundesamtykke før scan-jobb opprettes.
