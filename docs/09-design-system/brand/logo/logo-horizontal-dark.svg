@@ -1,0 +1,26 @@
+<svg width="1400" height="400" viewBox="0 0 1400 400" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Hansen IT horisontal logo, mork bakgrunn</title>
+  <desc>Hvit variant av logo for mork bakgrunn</desc>
+  <defs>
+    <linearGradient id="itgd" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#5FA8FF"/>
+      <stop offset="100%" stop-color="#8FC4FF"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1400" height="400" fill="#152149"/>
+  <g transform="translate(40,40)">
+    <circle cx="160" cy="160" r="150" fill="none" stroke="#FFFFFF" stroke-width="10" stroke-dasharray="665 280" stroke-linecap="round" transform="rotate(-100 160 160)"/>
+    <circle cx="160" cy="160" r="150" fill="none" stroke="#5FA8FF" stroke-width="10" stroke-dasharray="60 885" stroke-linecap="round" transform="rotate(72 160 160)"/>
+    <g transform="translate(92,96)">
+      <path d="M0 0 H43 V66 H88 V0 H131 V168 H88 V90 H43 V168 H0 Z" fill="#FFFFFF"/>
+    </g>
+    <g fill="#5FA8FF">
+      <rect x="242" y="112" width="13" height="13" rx="3"/>
+      <rect x="261" y="129" width="10" height="10" rx="2" opacity="0.8"/>
+      <rect x="277" y="146" width="8" height="8" rx="2" opacity="0.6"/>
+    </g>
+  </g>
+  <text x="400" y="205" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="120" letter-spacing="2" fill="#FFFFFF">HANSEN <tspan fill="url(#itgd)">IT</tspan></text>
+  <rect x="404" y="235" width="700" height="4" rx="2" fill="#5FA8FF"/>
+  <text x="404" y="282" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="25" letter-spacing="2" fill="#B8C6E2">INFRASTRUKTUR · NETTVERK · SUPPORT · CYBERSIKKERHET</text>
+</svg>

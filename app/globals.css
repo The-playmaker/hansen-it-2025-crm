@@ -2,7 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { --bg: #0f172a; --fg: #e5e7eb; --accent: #00e0ff; }
+:root {
+  --bg: #0f172a;
+  --fg: #e5e7eb;
+  --accent: #00e0ff;
+  --hi-marine: #152149;
+  --hi-marine-deep: #1b2a52;
+  --hi-blue: #1d6fe0;
+  --hi-blue-light: #3fa1ff;
+  --hi-text-muted: #3a4a6b;
+  --hi-gray-light: #8b96ac;
+}
 body { background: var(--bg); color: var(--fg); }
 .container-default { @apply max-w-6xl mx-auto px-4; }
 .card { @apply rounded-xl border border-white/10 bg-black/30; }

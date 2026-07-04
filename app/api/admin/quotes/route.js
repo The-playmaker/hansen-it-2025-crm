@@ -26,18 +26,25 @@ export async function POST(request) {
   const body = await request.json();
   if (!body.name && !body.company) return NextResponse.json({ error: "Kunde/firma er påkrevd." }, { status: 400 });
 
+  const payload = {
+    name: body.name || body.company,
+    customer_name: body.company || body.name || null,
+    company: body.company || null,
+    email: body.email || null,
+    phone: body.phone || null,
+    message: body.message || body.description || "Tilbud opprettet i Phoenix CRM.",
+    priority: body.priority || "normal",
+    status: body.status || "kladd"
+  };
+
+  if (body.customer_id) payload.customer_id = body.customer_id;
+  if (body.contact_id) payload.contact_id = body.contact_id;
+  if (body.lead_id) payload.lead_id = body.lead_id;
+  if (body.source_request_id) payload.source_request_id = body.source_request_id;
+
   const { data, error } = await supabaseAdmin
     .from("requests")
-    .insert({
-      name: body.name || body.company,
-      customer_name: body.company || body.name || null,
-      company: body.company || null,
-      email: body.email || null,
-      phone: body.phone || null,
-      message: body.message || body.description || "Tilbud opprettet i Phoenix CRM.",
-      priority: body.priority || "normal",
-      status: body.status || "Ny"
-    })
+    .insert(payload)
     .select("*")
     .single();
 

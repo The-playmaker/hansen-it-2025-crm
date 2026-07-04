@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Project Phoenix | Database Architecture</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Geist:wght@400;600;700&amp;family=JetBrains+Mono:wght@450&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            background-color: #0b1326;
+            color: #dae2fd;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .relationship-line {
+            stroke: #424754;
+            stroke-width: 1.5;
+            fill: none;
+            stroke-dasharray: 4;
+        }
+        .table-header {
+            background: rgba(45, 52, 73, 0.5);
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0b1326; }
+        ::-webkit-scrollbar-thumb { background: #424754; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #8c909f; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-container": "#3131c0",
+                        "on-surface": "#dae2fd",
+                        "surface-dim": "#0b1326",
+                        "secondary-fixed-dim": "#c0c1ff",
+                        "surface-container-lowest": "#060e20",
+                        "secondary": "#c0c1ff",
+                        "on-error-container": "#ffdad6",
+                        "surface": "#0b1326",
+                        "on-tertiary-fixed": "#311400",
+                        "inverse-primary": "#005ac2",
+                        "on-primary-fixed-variant": "#004395",
+                        "primary-container": "#4d8eff",
+                        "on-secondary": "#1000a9",
+                        "inverse-surface": "#dae2fd",
+                        "inverse-on-surface": "#283044",
+                        "on-primary-container": "#00285d",
+                        "on-tertiary": "#502400",
+                        "on-surface-variant": "#c2c6d6",
+                        "background": "#0b1326",
+                        "tertiary-fixed": "#ffdcc6",
+                        "error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#723600",
+                        "primary": "#adc6ff",
+                        "on-primary": "#002e6a",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-bright": "#31394d",
+                        "outline-variant": "#424754",
+                        "secondary-fixed": "#e1e0ff",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed": "#07006c",
+                        "on-error": "#690005",
+                        "tertiary-fixed-dim": "#ffb786",
+                        "outline": "#8c909f",
+                        "tertiary-container": "#df7412",
+                        "on-background": "#dae2fd",
+                        "surface-container-low": "#131b2e",
+                        "surface-variant": "#2d3449",
+                        "surface-container-highest": "#2d3449",
+                        "surface-container-high": "#222a3d",
+                        "primary-fixed-dim": "#adc6ff",
+                        "on-primary-fixed": "#001a42",
+                        "on-secondary-container": "#b0b2ff",
+                        "surface-container": "#171f33",
+                        "tertiary": "#ffb786",
+                        "on-tertiary-container": "#461f00",
+                        "surface-tint": "#adc6ff",
+                        "on-secondary-fixed-variant": "#2f2ebe"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "sidebar-width": "260px",
+                        "gutter": "16px",
+                        "margin-desktop": "32px",
+                        "margin-mobile": "16px",
+                        "widget-gap": "12px"
+                    },
+                    "fontFamily": {
+                        "display": ["Geist"],
+                        "label-caps": ["Inter"],
+                        "headline-md": ["Geist"],
+                        "body-lg": ["Inter"],
+                        "code-md": ["JetBrains Mono"],
+                        "headline-lg": ["Geist"],
+                        "body-sm": ["Inter"],
+                        "body-md": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="flex min-h-screen">
+<!-- Side Navigation Shell -->
+<aside class="fixed left-0 top-0 h-full w-sidebar-width border-r border-outline-variant bg-surface flex flex-col py-gutter px-2 z-50">
+<div class="mb-8 px-4">
+<h1 class="font-display text-headline-md font-bold text-on-surface">Project Phoenix</h1>
+<p class="text-on-surface-variant font-body-sm opacity-70">Hansen IT Infrastructure</p>
+</div>
+<nav class="flex-1 overflow-y-auto space-y-1">
+<!-- Navigation Items Mapping from JSON -->
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-caps text-label-caps">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined">visibility</span>
+<span class="font-label-caps text-label-caps">Vision</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-label-caps text-label-caps">Philosophy</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-label-caps text-label-caps">Architecture</span>
+</a>
+<div class="pt-4 pb-2 px-4 text-[10px] uppercase tracking-widest text-outline">Core Systems</div>
+<a class="flex items-center gap-3 px-4 py-2 text-primary border-l-2 border-primary bg-primary/5 transition-colors" href="#">
+<span class="material-symbols-outlined">database</span>
+<span class="font-label-caps text-label-caps font-bold">Database</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined">api</span>
+<span class="font-label-caps text-label-caps">APIs</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined">security</span>
+<span class="font-label-caps text-label-caps">Security</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined">smart_toy</span>
+<span class="font-label-caps text-label-caps">AI Engine</span>
+</a>
+<!-- Extended tabs as per JSON -->
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined">palette</span>
+<span class="font-label-caps text-label-caps">Design System</span>
+</a>
+</nav>
+<div class="mt-auto border-t border-outline-variant pt-4 px-2 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-caps text-label-caps">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded" href="#">
+<span class="material-symbols-outlined">help_outline</span>
+<span class="font-label-caps text-label-caps">Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-sidebar-width flex-1 flex flex-col min-h-screen">
+<!-- Top Nav Bar -->
+<header class="sticky top-0 z-40 h-16 flex justify-between items-center px-margin-desktop bg-surface/80 backdrop-blur-md border-b border-outline-variant">
+<div class="flex items-center gap-6">
+<div class="flex items-center bg-surface-container rounded-lg px-3 py-1.5 border border-outline-variant w-80">
+<span class="material-symbols-outlined text-outline text-lg">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-sm w-full" placeholder="Search schema, tables, indices..." type="text"/>
+<span class="text-[10px] text-outline border border-outline px-1 rounded">⌘K</span>
+</div>
+<nav class="hidden md:flex gap-6">
+<a class="text-on-surface-variant hover:text-on-surface font-body-md" href="#">RFCs</a>
+<a class="text-primary font-bold border-b-2 border-primary font-body-md py-5 -mb-px" href="#">Docs</a>
+<a class="text-on-surface-variant hover:text-on-surface font-body-md" href="#">Support</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 px-4 py-1.5 bg-primary-container text-on-primary-container rounded font-bold text-body-sm hover:opacity-90 transition-all">
+<span class="material-symbols-outlined text-sm">auto_awesome</span>
+                    Ask AI
+                </button>
+<div class="flex gap-2">
+<span class="material-symbols-outlined p-2 text-on-surface-variant hover:bg-surface-variant rounded-full cursor-pointer">notifications</span>
+<span class="material-symbols-outlined p-2 text-on-surface-variant hover:bg-surface-variant rounded-full cursor-pointer">history</span>
+</div>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline">
+<img class="w-full h-full object-cover" data-alt="Close up profile photo of a software engineer in a modern workspace, with professional cinematic lighting and cool blue tones, high resolution, sharp focus on technical expertise." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnG5pIAAoV9-u0V-BHFwxnDqxLBQ2PeUoyV2sT-ayAXPSQZrYb0Qnmmet8rb62jHneJz0MUf2xpr7za03UeamF394y1K_HjrpycI8_z1MWfK9mTUaDzGVUvHdgBC6k7ibelcPFL4Mhh1NS-8TVcPYDb-zDwGw9JQcXrBxVtLslJ9rpbB9Iq6VsRhIP76FJg6kHp3u4_oOQDMUegDaSriOha8iKXuXlpJHYoGajufyD5mXPuLiWNofU0GB1OLU1R9az4Dsg1iJrBsUo"/>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="flex flex-1">
+<section class="flex-1 p-margin-desktop overflow-y-auto bg-surface-dim relative">
+<!-- Background Decoration -->
+<div class="absolute inset-0 pointer-events-none opacity-5">
+<svg height="100%" width="100%" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<pattern height="40" id="grid" patternunits="userSpaceOnUse" width="40">
+<path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" stroke-width="0.5"></path>
+</pattern>
+</defs>
+<rect fill="url(#grid)" height="100%" width="100%"></rect>
+</svg>
+</div>
+<div class="relative z-10 max-w-7xl mx-auto">
+<div class="mb-10">
+<div class="flex items-center gap-2 text-body-sm text-outline mb-2">
+<span>Architecture</span>
+<span class="material-symbols-outlined text-xs">chevron_right</span>
+<span class="text-on-surface">Database Entities</span>
+</div>
+<h2 class="font-display text-headline-lg font-bold text-on-surface">Relational Architecture</h2>
+<p class="text-on-surface-variant mt-2 max-w-2xl font-body-md">Comprehensive map of the Project Phoenix Postgres cluster. Detailed schema for CRM flow, content management, and security scan pipelines.</p>
+</div>
+<!-- Schema Visualization Section -->
+<div class="space-y-12">
+<!-- CRM Flow: Requests to Projects -->
+<div>
+<div class="flex items-center gap-3 mb-6">
+<div class="p-2 bg-secondary/10 text-secondary rounded">
+<span class="material-symbols-outlined">hub</span>
+</div>
+<h3 class="font-headline-md text-on-surface">Commercial Operations Schema</h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-widget-gap">
+<!-- requests -->
+<div class="glass-panel rounded-lg overflow-hidden border border-outline-variant flex flex-col">
+<div class="table-header px-3 py-2 border-b border-outline-variant flex justify-between items-center">
+<span class="font-code-md text-primary">requests</span>
+<span class="material-symbols-outlined text-xs text-outline">key</span>
+</div>
+<div class="p-3 space-y-1.5">
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">id</span>
+<span class="text-outline">uuid [PK]</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">source</span>
+<span class="text-outline">varchar</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">payload</span>
+<span class="text-outline">jsonb</span>
+</div>
+</div>
+</div>
+<!-- leads -->
+<div class="glass-panel rounded-lg overflow-hidden border border-outline-variant flex flex-col">
+<div class="table-header px-3 py-2 border-b border-outline-variant flex justify-between items-center">
+<span class="font-code-md text-primary">leads</span>
+<span class="material-symbols-outlined text-xs text-outline">link</span>
+</div>
+<div class="p-3 space-y-1.5">
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">id</span>
+<span class="text-outline">uuid [PK]</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-secondary">request_id</span>
+<span class="text-outline">uuid [FK]</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">score</span>
+<span class="text-outline">int</span>
+</div>
+</div>
+</div>
+<!-- customers -->
+<div class="glass-panel rounded-lg overflow-hidden border border-outline-variant flex flex-col">
+<div class="table-header px-3 py-2 border-b border-outline-variant flex justify-between items-center">
+<span class="font-code-md text-primary">customers</span>
+<span class="material-symbols-outlined text-xs text-outline">group</span>
+</div>
+<div class="p-3 space-y-1.5">
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">id</span>
+<span class="text-outline">uuid [PK]</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">org_name</span>
+<span class="text-outline">varchar</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-tertiary">lead_id</span>
+<span class="text-outline">uuid [FK]</span>
+</div>
+</div>
+</div>
+<!-- contacts -->
+<div class="glass-panel rounded-lg overflow-hidden border border-outline-variant flex flex-col">
+<div class="table-header px-3 py-2 border-b border-outline-variant flex justify-between items-center">
+<span class="font-code-md text-primary">contacts</span>
+<span class="material-symbols-outlined text-xs text-outline">person</span>
+</div>
+<div class="p-3 space-y-1.5">
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">id</span>
+<span class="text-outline">uuid [PK]</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-primary">customer_id</span>
+<span class="text-outline">uuid [FK]</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">email</span>
+<span class="text-outline">varchar [U]</span>
+</div>
+</div>
+</div>
+<!-- quotes -->
+<div class="glass-panel rounded-lg overflow-hidden border border-outline-variant flex flex-col">
+<div class="table-header px-3 py-2 border-b border-outline-variant flex justify-between items-center">
+<span class="font-code-md text-primary">quotes</span>
+<span class="material-symbols-outlined text-xs text-outline">description</span>
+</div>
+<div class="p-3 space-y-1.5">
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">id</span>
+<span class="text-outline">uuid [PK]</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-secondary">customer_id</span>
+<span class="text-outline">uuid [FK]</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">total_value</span>
+<span class="text-outline">numeric</span>
+</div>
+</div>
+</div>
+<!-- quote_messages -->
+<div class="glass-panel rounded-lg overflow-hidden border border-outline-variant flex flex-col">
+<div class="table-header px-3 py-2 border-b border-outline-variant flex justify-between items-center">
+<span class="font-code-md text-primary">quote_messages</span>
+<span class="material-symbols-outlined text-xs text-outline">forum</span>
+</div>
+<div class="p-3 space-y-1.5">
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">id</span>
+<span class="text-outline">uuid [PK]</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-tertiary">quote_id</span>
+<span class="text-outline">uuid [FK]</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">content</span>
+<span class="text-outline">text</span>
+</div>
+</div>
+</div>
+<!-- projects/tickets -->
+<div class="glass-panel rounded-lg overflow-hidden border border-outline-variant flex flex-col lg:col-span-2">
+<div class="table-header px-3 py-2 border-b border-outline-variant flex justify-between items-center">
+<span class="font-code-md text-primary">projects_tickets</span>
+<span class="material-symbols-outlined text-xs text-outline">task</span>
+</div>
+<div class="p-3 grid grid-cols-2 gap-4">
+<div class="space-y-1.5">
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">id</span>
+<span class="text-outline">uuid [PK]</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-primary">quote_id</span>
+<span class="text-outline">uuid [FK]</span>
+</div>
+</div>
+<div class="space-y-1.5">
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">status</span>
+<span class="text-outline">enum</span>
+</div>
+<div class="flex justify-between font-code-md text-body-sm">
+<span class="text-on-surface">deadline</span>
+<span class="text-outline">timestamp</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Security & Scans Schema -->
+<div>
+<div class="flex items-center gap-3 mb-6">
+<div class="p-2 bg-error/10 text-error rounded">
+<span class="material-symbols-outlined">verified_user</span>
+</div>
+<h3 class="font-headline-md text-on-surface">Infrastructure Scan Pipeline</h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-widget-gap overflow-x-auto pb-4">
+<!-- scan_authorizations -->
+<div class="glass-panel min-w-[200px] rounded-lg border border-outline-variant">
+<div class="table-header px-3 py-2 border-b border-outline-variant font-code-md text-primary text-xs">scan_authorizations</div>
+<div class="p-3 space-y-1 text-xs font-code-md">
+<div class="flex justify-between"><span class="text-on-surface">id</span><span class="text-outline">PK</span></div>
+<div class="flex justify-between"><span class="text-on-surface">user_id</span><span class="text-outline">FK</span></div>
+</div>
+</div>
+<!-- scan_scopes -->
+<div class="glass-panel min-w-[200px] rounded-lg border border-outline-variant">
+<div class="table-header px-3 py-2 border-b border-outline-variant font-code-md text-primary text-xs">scan_scopes</div>
+<div class="p-3 space-y-1 text-xs font-code-md">
+<div class="flex justify-between"><span class="text-on-surface">id</span><span class="text-outline">PK</span></div>
+<div class="flex justify-between"><span class="text-secondary">auth_id</span><span class="text-outline">FK</span></div>
+</div>
+</div>
+<!-- scan_jobs -->
+<div class="glass-panel min-w-[200px] rounded-lg border border-outline-variant">
+<div class="table-header px-3 py-2 border-b border-outline-variant font-code-md text-primary text-xs">scan_jobs</div>
+<div class="p-3 space-y-1 text-xs font-code-md">
+<div class="flex justify-between"><span class="text-on-surface">id</span><span class="text-outline">PK</span></div>
+<div class="flex justify-between"><span class="text-tertiary">scope_id</span><span class="text-outline">FK</span></div>
+</div>
+</div>
+<!-- scan_results -->
+<div class="glass-panel min-w-[200px] rounded-lg border border-outline-variant">
+<div class="table-header px-3 py-2 border-b border-outline-variant font-code-md text-primary text-xs">scan_results</div>
+<div class="p-3 space-y-1 text-xs font-code-md">
+<div class="flex justify-between"><span class="text-on-surface">id</span><span class="text-outline">PK</span></div>
+<div class="flex justify-between"><span class="text-primary">job_id</span><span class="text-outline">FK</span></div>
+</div>
+</div>
+<!-- scan_findings -->
+<div class="glass-panel min-w-[200px] rounded-lg border border-outline-variant">
+<div class="table-header px-3 py-2 border-b border-outline-variant font-code-md text-primary text-xs">scan_findings</div>
+<div class="p-3 space-y-1 text-xs font-code-md">
+<div class="flex justify-between"><span class="text-on-surface">id</span><span class="text-outline">PK</span></div>
+<div class="flex justify-between"><span class="text-secondary">result_id</span><span class="text-outline">FK</span></div>
+</div>
+</div>
+<!-- scan_reports -->
+<div class="glass-panel min-w-[200px] rounded-lg border border-outline-variant">
+<div class="table-header px-3 py-2 border-b border-outline-variant font-code-md text-primary text-xs">scan_reports</div>
+<div class="p-3 space-y-1 text-xs font-code-md">
+<div class="flex justify-between"><span class="text-on-surface">id</span><span class="text-outline">PK</span></div>
+<div class="flex justify-between"><span class="text-tertiary">findings_id</span><span class="text-outline">FK</span></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Site Content & Ideation -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-widget-gap">
+<div class="glass-panel rounded-lg border border-outline-variant">
+<div class="px-4 py-3 border-b border-outline-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">lightbulb</span>
+<h3 class="font-headline-md text-on-surface">phoenix_ideas</h3>
+</div>
+<div class="p-4">
+<table class="w-full font-code-md text-body-sm">
+<tbody><tr class="text-outline border-b border-outline-variant">
+<th class="text-left py-2 font-semibold">Column</th>
+<th class="text-left py-2 font-semibold">Type</th>
+<th class="text-right py-2 font-semibold">Constraint</th>
+</tr>
+<tr>
+<td class="py-2 text-on-surface">id</td>
+<td class="py-2 text-outline">serial</td>
+<td class="py-2 text-right text-outline">PRIMARY KEY</td>
+</tr>
+<tr>
+<td class="py-2 text-on-surface">title</td>
+<td class="py-2 text-outline">varchar(255)</td>
+<td class="py-2 text-right text-outline">NOT NULL</td>
+</tr>
+<tr>
+<td class="py-2 text-on-surface">proposal_doc</td>
+<td class="py-2 text-outline">jsonb</td>
+<td class="py-2 text-right text-outline">-</td>
+</tr>
+<tr>
+<td class="py-2 text-on-surface">creator_id</td>
+<td class="py-2 text-outline">uuid</td>
+<td class="py-2 text-right text-outline">FOREIGN KEY</td>
+</tr>
+</tbody></table>
+</div>
+</div>
+<div class="glass-panel rounded-lg border border-outline-variant">
+<div class="px-4 py-3 border-b border-outline-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">web_stories</span>
+<h3 class="font-headline-md text-on-surface">phoenix_site_content</h3>
+</div>
+<div class="p-4">
+<table class="w-full font-code-md text-body-sm">
+<tbody><tr class="text-outline border-b border-outline-variant">
+<th class="text-left py-2 font-semibold">Column</th>
+<th class="text-left py-2 font-semibold">Type</th>
+<th class="text-right py-2 font-semibold">Constraint</th>
+</tr>
+<tr>
+<td class="py-2 text-on-surface">slug</td>
+<td class="py-2 text-outline">varchar(100)</td>
+<td class="py-2 text-right text-outline">PRIMARY KEY</td>
+</tr>
+<tr>
+<td class="py-2 text-on-surface">content_blob</td>
+<td class="py-2 text-outline">text</td>
+<td class="py-2 text-right text-outline">-</td>
+</tr>
+<tr>
+<td class="py-2 text-on-surface">version_id</td>
+<td class="py-2 text-outline">int4</td>
+<td class="py-2 text-right text-outline">NOT NULL</td>
+</tr>
+<tr>
+<td class="py-2 text-on-surface">published_at</td>
+<td class="py-2 text-outline">timestamptz</td>
+<td class="py-2 text-right text-outline">DEFAULT now()</td>
+</tr>
+</tbody></table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Sidebar: AI Assistant -->
+<aside class="w-80 border-l border-outline-variant bg-surface flex flex-col hidden xl:flex">
+<div class="p-4 border-b border-outline-variant flex justify-between items-center">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+<span class="font-headline-md text-[18px] text-on-surface">Phoenix AI</span>
+</div>
+<span class="material-symbols-outlined text-outline cursor-pointer hover:text-on-surface">close</span>
+</div>
+<div class="flex-1 p-4 overflow-y-auto space-y-4">
+<div class="bg-surface-variant p-3 rounded-lg border border-outline-variant">
+<p class="font-body-sm text-on-surface">Analyzing schema relationships... Detected a potential circular reference in <code class="bg-background px-1 rounded">projects</code> table via <code class="bg-background px-1 rounded">lead_id</code>. Recommendation: Normalize via intermediate mapping table.</p>
+</div>
+<div class="bg-primary/5 p-3 rounded-lg border border-primary/20">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-primary text-sm">bolt</span>
+<span class="font-label-caps text-label-caps text-primary">Optimization Tip</span>
+</div>
+<p class="font-body-sm text-on-surface-variant">Indexing <code class="bg-background/40 px-1 rounded">scan_results.job_id</code> will improve query performance for compliance reports by approx. 40%.</p>
+</div>
+<div class="space-y-2">
+<div class="text-[11px] uppercase tracking-wider text-outline font-bold">Suggested Actions</div>
+<button class="w-full text-left p-2 rounded hover:bg-surface-variant border border-transparent hover:border-outline-variant transition-all flex items-center justify-between group">
+<span class="font-body-sm">Generate SQL Migration</span>
+<span class="material-symbols-outlined text-xs opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+</button>
+<button class="w-full text-left p-2 rounded hover:bg-surface-variant border border-transparent hover:border-outline-variant transition-all flex items-center justify-between group">
+<span class="font-body-sm">Export Mermaid Diagram</span>
+<span class="material-symbols-outlined text-xs opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+</button>
+</div>
+</div>
+<div class="p-4 bg-surface-container-high border-t border-outline-variant">
+<div class="relative">
+<input class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 pr-10 text-body-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" placeholder="Ask about the schema..." type="text"/>
+<span class="material-symbols-outlined absolute right-3 top-2.5 text-primary cursor-pointer">send</span>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<!-- Global Visual Interactions Scripts -->
+<script>
+        document.querySelectorAll('.glass-panel').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.borderColor = 'rgba(173, 198, 255, 0.4)';
+                card.style.transition = 'all 0.3s ease';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+            });
+        });
+    </script>
+</body></html>

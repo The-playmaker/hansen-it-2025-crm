@@ -7,17 +7,22 @@ import { usePhoenixData } from "@/components/phoenix/usePhoenixData";
 import { EmptyState, formatCurrency, formatDate, MetricCard, PhoenixPageHeader, PhoenixPanel, SecondaryButton, StatusBadge } from "@/components/phoenix/PhoenixUi";
 
 function priorityRank(priority) {
-  return { lav: 1, normal: 2, høy: 3, hast: 4 }[priority] || 0;
+  return { low: 1, lav: 1, normal: 2, high: 3, høy: 3, hast: 4, urgent: 4 }[priority] || 0;
 }
 
 function isOpenLead(lead) {
-  return !["fullført", "arkivert"].includes(lead.status);
+  return !["fullført", "arkivert", "converted"].includes(lead.status);
 }
 
 export default function AdminDashboard() {
   const { data, customersById, parkTaskAsIdea, exportBackup } = usePhoenixData();
   const [requestLeads, setRequestLeads] = useState([]);
+  const [actualLeads, setActualLeads] = useState([]);
+  const [quotes, setQuotes] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [requestsConfigured, setRequestsConfigured] = useState(true);
+  const [quotesConfigured, setQuotesConfigured] = useState(true);
+  const [tasksConfigured, setTasksConfigured] = useState(true);
   const [ideaStats, setIdeaStats] = useState({ total: 0, parked: 0, configured: true });
 
   useEffect(() => {
@@ -34,26 +39,63 @@ export default function AdminDashboard() {
       }
     }
     loadRequests();
+    async function loadLeads() {
+      try {
+        const response = await fetch("/api/admin/leads", { cache: "no-store" });
+        const result = await response.json();
+        if (cancelled) return;
+        setActualLeads(result.data || []);
+      } catch {
+        if (!cancelled) setActualLeads([]);
+      }
+    }
+    loadLeads();
+    async function loadQuotes() {
+      try {
+        const response = await fetch("/api/admin/quotes", { cache: "no-store" });
+        const result = await response.json();
+        if (cancelled) return;
+        setQuotesConfigured(result.configured !== false);
+        setQuotes(result.configured === false ? data.quotes : result.data || []);
+      } catch {
+        if (!cancelled) setQuotes(data.quotes);
+      }
+    }
+    loadQuotes();
+    async function loadTasks() {
+      try {
+        const response = await fetch("/api/admin/tasks", { cache: "no-store" });
+        const result = await response.json();
+        if (cancelled) return;
+        setTasksConfigured(result.configured !== false);
+        setTasks(result.configured === false ? data.tasks : result.data || []);
+      } catch {
+        if (!cancelled) setTasks(data.tasks);
+      }
+    }
+    loadTasks();
     async function loadIdeas() {
       try {
         const response = await fetch("/api/admin/ideas", { cache: "no-store" });
         const result = await response.json();
         if (cancelled) return;
         const ideas = result.data || [];
-        setIdeaStats({ total: ideas.length, parked: ideas.filter((idea) => idea.status === "parkert").length, configured: result.configured !== false });
+        setIdeaStats({ total: ideas.length, parked: ideas.filter((idea) => ["parked", "parkert"].includes(idea.status)).length, configured: result.configured !== false });
       } catch {}
     }
     loadIdeas();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const activeTasks = data.tasks.filter((task) => task.status !== "ferdig");
-  const todaysThree = [...activeTasks].sort((a, b) => priorityRank(b.priority) - priorityRank(a.priority) || String(a.dueDate).localeCompare(String(b.dueDate))).slice(0, 3);
+  const activeTasks = tasks.filter((task) => !["ferdig", "done", "completed"].includes(String(task.status || "").toLowerCase()));
+  const todaysThree = [...activeTasks].sort((a, b) => priorityRank(b.priority) - priorityRank(a.priority) || String(a.due_date || a.dueDate || "").localeCompare(String(b.due_date || b.dueDate || ""))).slice(0, 3);
   const openRequests = useMemo(() => requestLeads.filter(isOpenLead), [requestLeads]);
   const hastRequests = useMemo(() => requestLeads.filter((lead) => lead.priority === "hast" && isOpenLead(lead)), [requestLeads]);
   const newRequests = useMemo(() => requestLeads.filter((lead) => lead.status === "ny"), [requestLeads]);
-  const openQuotes = data.quotes.filter((quote) => ["kladd", "sendt"].includes(quote.status));
-  const parkedIdeas = ideaStats.configured ? ideaStats.parked : data.ideas.filter((idea) => idea.status === "parkert").length;
+  const openLeadCount = actualLeads.filter((lead) => !["closed", "lost", "won", "done", "converted"].includes(String(lead.status || "").toLowerCase())).length;
+  const openQuotes = quotes.filter((quote) => ["kladd", "ny", "pågår", "sendt"].includes(String(quote.status || "").toLowerCase()));
+  const parkedIdeas = ideaStats.configured ? ideaStats.parked : data.ideas.filter((idea) => ["parked", "parkert"].includes(idea.status)).length;
   const totalIdeas = ideaStats.configured ? ideaStats.total : data.ideas.length;
 
   return (
@@ -72,7 +114,8 @@ export default function AdminDashboard() {
         <MetricCard label="Nye henvendelser" value={newRequests.length} detail="Fra Supabase requests" tone="cyan" />
         <MetricCard label="Kunder som venter" value={openRequests.length} detail="Åpne requests" tone="emerald" />
         <MetricCard label="HAST" value={hastRequests.length} detail="priority='hast'" tone="rose" />
-        <MetricCard label="Åpne tilbud" value={openQuotes.length} detail="Kladd eller sendt" tone="amber" />
+        <MetricCard label="Åpne leads" value={openLeadCount} detail="Fra Supabase leads" tone="emerald" />
+        <MetricCard label="Aktive tilbud" value={openQuotes.length} detail={quotesConfigured ? "Fra Supabase requests/quotes" : "Demo fallback"} tone="amber" />
         <MetricCard label="Idébank" value={`${parkedIdeas}/${totalIdeas}`} detail={ideaStats.configured ? "Fra phoenix_ideas" : "Demo fallback"} tone="rose" />
       </div>
 
@@ -84,13 +127,13 @@ export default function AdminDashboard() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="font-semibold text-white">{task.title}</h3>
-                    <p className="mt-1 text-sm text-slate-400">{customersById.get(task.customerId)?.companyName || "Ingen kunde"} - {formatDate(task.dueDate)}</p>
+                    <p className="mt-1 text-sm text-slate-400">{task.customer?.company_name || customersById.get(task.customerId)?.companyName || "Ingen kunde"} - {formatDate(task.due_date || task.dueDate)}</p>
                   </div>
                   <StatusBadge>{task.priority}</StatusBadge>
                 </div>
                 <p className="mt-3 text-sm text-slate-300">{task.description}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <SecondaryButton onClick={() => parkTaskAsIdea(task.id)}>Parker som idé</SecondaryButton>
+                  <SecondaryButton onClick={() => tasksConfigured ? alert("Parker som idé er foreløpig bare tilgjengelig for demo/localStorage-oppgaver.") : parkTaskAsIdea(task.id)}>Parker som idé</SecondaryButton>
                   <Link href="/admin/kanban" className="inline-flex min-h-10 items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Rediger i kanban</Link>
                 </div>
               </div>
@@ -123,7 +166,7 @@ export default function AdminDashboard() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-white">{quote.title}</p>
-                    <p className="mt-1 text-sm text-slate-400">{customersById.get(quote.customerId)?.companyName || "Ingen kunde"} - {formatCurrency(quote.priceExVat)}</p>
+                    <p className="mt-1 text-sm text-slate-400">{quote.customer_name || quote.company || customersById.get(quote.customerId)?.companyName || "Ingen kunde"} - {quote.total_ex_vat || quote.priceExVat ? formatCurrency(quote.total_ex_vat || quote.priceExVat) : formatDate(quote.created_at)}</p>
                   </div>
                   <StatusBadge>{quote.status}</StatusBadge>
                 </div>

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Reports | Project Phoenix</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=JetBrains+Mono:wght@450&amp;family=Geist:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-container": "#3131c0",
+                    "on-surface": "#dae2fd",
+                    "surface-dim": "#0b1326",
+                    "secondary-fixed-dim": "#c0c1ff",
+                    "surface-container-lowest": "#060e20",
+                    "secondary": "#c0c1ff",
+                    "on-error-container": "#ffdad6",
+                    "surface": "#0b1326",
+                    "on-tertiary-fixed": "#311400",
+                    "inverse-primary": "#005ac2",
+                    "on-primary-fixed-variant": "#004395",
+                    "primary-container": "#4d8eff",
+                    "on-secondary": "#1000a9",
+                    "inverse-surface": "#dae2fd",
+                    "inverse-on-surface": "#283044",
+                    "on-primary-container": "#00285d",
+                    "on-tertiary": "#502400",
+                    "on-surface-variant": "#c2c6d6",
+                    "background": "#0b1326",
+                    "tertiary-fixed": "#ffdcc6",
+                    "error-container": "#93000a",
+                    "on-tertiary-fixed-variant": "#723600",
+                    "primary": "#adc6ff",
+                    "on-primary": "#002e6a",
+                    "primary-fixed": "#d8e2ff",
+                    "surface-bright": "#31394d",
+                    "outline-variant": "#424754",
+                    "secondary-fixed": "#e1e0ff",
+                    "error": "#ffb4ab",
+                    "on-secondary-fixed": "#07006c",
+                    "on-error": "#690005",
+                    "tertiary-fixed-dim": "#ffb786",
+                    "outline": "#8c909f",
+                    "tertiary-container": "#df7412",
+                    "on-background": "#dae2fd",
+                    "surface-container-low": "#131b2e",
+                    "surface-variant": "#2d3449",
+                    "surface-container-highest": "#2d3449",
+                    "surface-container-high": "#222a3d",
+                    "primary-fixed-dim": "#adc6ff",
+                    "on-primary-fixed": "#001a42",
+                    "on-secondary-container": "#b0b2ff",
+                    "surface-container": "#171f33",
+                    "tertiary": "#ffb786",
+                    "on-tertiary-container": "#461f00",
+                    "surface-tint": "#adc6ff",
+                    "on-secondary-fixed-variant": "#2f2ebe"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "base": "4px",
+                    "sidebar-width": "260px",
+                    "gutter": "16px",
+                    "margin-desktop": "32px",
+                    "margin-mobile": "16px",
+                    "widget-gap": "12px"
+            },
+            "fontFamily": {
+                    "display": ["Geist"],
+                    "label-caps": ["Inter"],
+                    "headline-md": ["Geist"],
+                    "body-lg": ["Inter"],
+                    "code-md": ["JetBrains Mono"],
+                    "headline-lg": ["Geist"],
+                    "body-sm": ["Inter"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "display": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "code-md": ["13px", {"lineHeight": "20px", "fontWeight": "450"}],
+                    "headline-lg": ["30px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .internal-glow:hover {
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+        }
+        .status-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #424754;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md selection:bg-primary/30">
+<!-- Sidebar -->
+<aside class="fixed left-0 top-0 h-full w-sidebar-width bg-surface border-r border-outline-variant flex flex-col z-50">
+<div class="flex flex-col h-full py-gutter px-2">
+<!-- Brand -->
+<div class="px-4 mb-8">
+<h1 class="font-display text-headline-md font-bold text-on-surface">Project Phoenix</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant opacity-70">Hansen IT Infrastructure</p>
+</div>
+<!-- Main Nav -->
+<nav class="flex-1 space-y-1 custom-scrollbar overflow-y-auto pr-1">
+<div class="px-4 py-2 font-label-caps text-label-caps text-outline uppercase tracking-widest opacity-50 mb-2">Systems</div>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="font-label-caps text-label-caps">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined text-[20px]">account_tree</span>
+<span class="font-label-caps text-label-caps">Architecture</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined text-[20px]">smart_toy</span>
+<span class="font-label-caps text-label-caps">AI Engine</span>
+</a>
+<!-- Active State for Reports -->
+<a class="flex items-center gap-3 px-4 py-2 text-primary border-l-2 border-primary bg-primary/5 transition-all duration-200 group" href="#">
+<span class="material-symbols-outlined text-[20px]">analytics</span>
+<span class="font-label-caps text-label-caps">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined text-[20px]">security</span>
+<span class="font-label-caps text-label-caps">Security</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined text-[20px]">history_edu</span>
+<span class="font-label-caps text-label-caps">ADR</span>
+</a>
+</nav>
+<button class="m-2 bg-primary text-on-primary font-label-caps text-label-caps py-3 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition-all">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                New RFC
+            </button>
+<!-- Footer Nav -->
+<div class="mt-auto pt-4 border-t border-outline-variant/30 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span class="font-label-caps text-label-caps">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+<span class="font-label-caps text-label-caps">Support</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Top Bar -->
+<header class="fixed top-0 left-0 right-0 h-16 ml-sidebar-width bg-surface/80 backdrop-blur-md border-b border-outline-variant z-40 flex items-center justify-between px-margin-desktop">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-lg pl-10 pr-4 py-2 text-body-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all" placeholder="Search reports, metrics, or assets..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-on-surface-variant hover:text-on-surface font-body-md" href="#">RFCs</a>
+<a class="text-on-surface-variant hover:text-on-surface font-body-md" href="#">Docs</a>
+<a class="text-primary font-bold border-b-2 border-primary py-5" href="#">Reports</a>
+</nav>
+<div class="h-6 w-px bg-outline-variant mx-2"></div>
+<div class="flex items-center gap-3">
+<button class="text-on-surface-variant hover:text-on-surface transition-opacity"><span class="material-symbols-outlined">notifications</span></button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A high-contrast professional headshot of a senior software engineer with a neutral expression, set against a dark, minimalist studio background with subtle cool blue rim lighting. The style is modern corporate, matching the dark glassmorphic theme of the Project Phoenix interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAhtMGZtMyGWypfVH0vmk8XT4uct_hOoeSQRjf-3N65xh2mkycRtfW8Fp6AweiDj1I800xYcyUyVYhtNaHRiSZOI11Sn38JQZWqmPQAEF2YXDH10FzNpte9qCiSJe7D8TXj8Y4icsEk3SnpXQTCjzsOiZ8BkDjnM065hLMKT9E_W3yPQQIAEU_SnUlh2SxtZpCb2UrCx4L66R78frG4NaI1D3Qxndub9PVVKpKsXScaQhJb0u915-Qs5rK6pL_9FJVA7PqW_9Cm-f6C"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="ml-sidebar-width pt-24 pb-12 px-margin-desktop min-h-screen grid grid-cols-12 gap-widget-gap mr-[320px]">
+<!-- Header Section -->
+<div class="col-span-12 mb-4 flex justify-between items-end">
+<div>
+<nav class="flex items-center gap-2 mb-2 text-body-sm text-on-surface-variant/60">
+<span>Infrastructure</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-on-surface-variant">Intelligent Reports</span>
+</nav>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Report Engine</h2>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 rounded-lg border border-outline-variant text-body-sm flex items-center gap-2 hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[18px]">filter_list</span>
+                    Filter
+                </button>
+<button class="px-4 py-2 rounded-lg bg-primary-container text-on-primary-container text-body-sm font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">publish</span>
+                    Export All
+                </button>
+</div>
+</div>
+<!-- Global Insights Bar -->
+<div class="col-span-12 grid grid-cols-4 gap-widget-gap mb-4">
+<div class="glass-panel p-4 rounded-xl flex flex-col gap-1">
+<span class="text-label-caps font-label-caps text-on-surface-variant/70 uppercase">Average Security Score</span>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-md font-display text-primary">84/100</span>
+<span class="text-body-sm text-tertiary-fixed">+2.4%</span>
+</div>
+<div class="w-full bg-outline-variant/30 h-1 rounded-full mt-2 overflow-hidden">
+<div class="bg-primary h-full w-[84%]"></div>
+</div>
+</div>
+<div class="glass-panel p-4 rounded-xl flex flex-col gap-1">
+<span class="text-label-caps font-label-caps text-on-surface-variant/70 uppercase">Total Critical Risks</span>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-md font-display text-error">12</span>
+<span class="text-body-sm text-on-surface-variant/60">Down from 18</span>
+</div>
+<div class="flex gap-1 mt-2">
+<div class="h-1 flex-1 bg-error rounded-full"></div>
+<div class="h-1 flex-1 bg-error rounded-full"></div>
+<div class="h-1 flex-1 bg-error rounded-full"></div>
+<div class="h-1 flex-1 bg-outline-variant/30 rounded-full"></div>
+</div>
+</div>
+<div class="glass-panel p-4 rounded-xl flex flex-col gap-1">
+<span class="text-label-caps font-label-caps text-on-surface-variant/70 uppercase">Compliance Status</span>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-md font-display text-secondary">92%</span>
+<span class="text-body-sm text-secondary-fixed">Target: 95%</span>
+</div>
+<div class="w-full bg-outline-variant/30 h-1 rounded-full mt-2 overflow-hidden">
+<div class="bg-secondary h-full w-[92%]"></div>
+</div>
+</div>
+<div class="glass-panel p-4 rounded-xl flex flex-col gap-1">
+<span class="text-label-caps font-label-caps text-on-surface-variant/70 uppercase">Engine Status</span>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
+<span class="text-headline-md font-display text-on-surface">Active</span>
+</div>
+<p class="text-body-sm text-on-surface-variant/60 mt-1">Live streaming telemetry...</p>
+</div>
+</div>
+<!-- Bento Grid Reports -->
+<!-- Executive Report (Primary) -->
+<div class="col-span-8 glass-panel p-6 rounded-xl relative overflow-hidden group internal-glow cursor-pointer">
+<div class="flex justify-between items-start mb-6">
+<div>
+<span class="status-badge bg-primary/10 text-primary mb-2 inline-block">High Priority</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Executive Report</h3>
+<p class="text-body-md text-on-surface-variant/80 mt-1">Strategic overview of infrastructure health and resource allocation.</p>
+</div>
+<div class="p-3 bg-surface-container-highest rounded-lg">
+<span class="material-symbols-outlined text-primary text-[32px]">assessment</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-6 mb-8">
+<div class="space-y-4">
+<div class="flex items-center justify-between border-b border-outline-variant pb-2">
+<span class="text-body-sm text-on-surface-variant">Infrastructure Cost</span>
+<span class="font-code-md text-code-md text-secondary-fixed">$42.8k <span class="text-error">↑ 8%</span></span>
+</div>
+<div class="flex items-center justify-between border-b border-outline-variant pb-2">
+<span class="text-body-sm text-on-surface-variant">Uptime SLA</span>
+<span class="font-code-md text-code-md text-primary">99.992%</span>
+</div>
+<div class="flex items-center justify-between border-b border-outline-variant pb-2">
+<span class="text-body-sm text-on-surface-variant">Deployment Velocity</span>
+<span class="font-code-md text-code-md">14.2 / day</span>
+</div>
+</div>
+<div class="bg-surface-container-low rounded-lg p-3 flex flex-col justify-center">
+<span class="text-label-caps font-label-caps text-on-surface-variant mb-2">RISK SUMMARY</span>
+<p class="text-body-sm leading-relaxed text-on-surface/90">Critical vulnerability detected in Legacy API Node B-12. Immediate patching required to maintain PCI compliance.</p>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="flex-1 py-3 bg-secondary-container text-on-secondary-container rounded-lg font-semibold flex items-center justify-center gap-2 hover:brightness-110 transition-all">
+<span class="material-symbols-outlined text-[20px]">bolt</span>
+                    Fix with Hansen IT
+                </button>
+<button class="px-6 py-3 border border-outline-variant rounded-lg hover:bg-surface-variant transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">download</span>
+                    PDF
+                </button>
+</div>
+</div>
+<!-- Technical Report -->
+<div class="col-span-4 glass-panel p-6 rounded-xl internal-glow cursor-pointer flex flex-col">
+<div class="mb-4">
+<span class="status-badge bg-tertiary/10 text-tertiary mb-2 inline-block">Daily</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Technical Report</h3>
+</div>
+<div class="flex-1 space-y-4">
+<div class="p-3 bg-surface-container rounded-lg">
+<div class="flex items-center justify-between mb-2">
+<span class="text-label-caps font-label-caps text-on-surface-variant">CPU LOAD</span>
+<span class="text-code-md text-primary">42%</span>
+</div>
+<div class="h-8 flex items-end gap-1">
+<div class="w-full bg-primary/20 h-2 rounded-t-sm"></div>
+<div class="w-full bg-primary/40 h-4 rounded-t-sm"></div>
+<div class="w-full bg-primary/60 h-6 rounded-t-sm"></div>
+<div class="w-full bg-primary/30 h-3 rounded-t-sm"></div>
+<div class="w-full bg-primary h-8 rounded-t-sm"></div>
+<div class="w-full bg-primary/50 h-5 rounded-t-sm"></div>
+</div>
+</div>
+<ul class="space-y-2 text-body-sm text-on-surface-variant">
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span> Memory leak in Auth-V2</li>
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span> Database connection latency +5ms</li>
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span> 4 node restarts in last 24h</li>
+</ul>
+</div>
+<button class="mt-6 w-full py-2 border border-outline-variant rounded-lg text-body-sm hover:bg-surface-variant transition-colors">View Deep Analysis</button>
+</div>
+<!-- Compliance Report -->
+<div class="col-span-4 glass-panel p-6 rounded-xl internal-glow cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<h3 class="font-headline-md text-headline-md text-on-surface">Compliance Report</h3>
+<span class="material-symbols-outlined text-secondary">verified_user</span>
+</div>
+<div class="space-y-4">
+<div class="flex items-center gap-4">
+<div class="relative w-12 h-12 flex items-center justify-center">
+<svg class="absolute inset-0 w-full h-full -rotate-90">
+<circle class="text-outline-variant/30" cx="24" cy="24" fill="transparent" r="20" stroke="currentColor" stroke-width="4"></circle>
+<circle class="text-secondary" cx="24" cy="24" fill="transparent" r="20" stroke="currentColor" stroke-dasharray="125.6" stroke-dashoffset="12.5" stroke-width="4"></circle>
+</svg>
+<span class="text-label-caps font-bold">90%</span>
+</div>
+<div>
+<p class="text-body-sm font-semibold">ISO 27001 Status</p>
+<p class="text-label-caps text-on-surface-variant">Compliant with 4 warnings</p>
+</div>
+</div>
+<div class="p-3 bg-surface-container rounded-lg border-l-4 border-secondary">
+<p class="text-body-sm italic">"Review of key management protocols required by Friday."</p>
+</div>
+</div>
+</div>
+<!-- Board Report -->
+<div class="col-span-4 glass-panel p-6 rounded-xl internal-glow cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<h3 class="font-headline-md text-headline-md text-on-surface">Board Report</h3>
+<span class="material-symbols-outlined text-tertiary">summarize</span>
+</div>
+<p class="text-body-md text-on-surface-variant mb-4">Quarterly summary for stakeholders. Visualized growth and efficiency metrics.</p>
+<div class="flex gap-2">
+<span class="px-2 py-1 bg-surface-variant rounded text-label-caps">Q3 2023</span>
+<span class="px-2 py-1 bg-surface-variant rounded text-label-caps">Strategic</span>
+</div>
+<button class="mt-4 w-full py-2 bg-surface-container-high rounded-lg text-body-sm border border-outline-variant hover:border-on-surface-variant transition-all">Open Dashboard</button>
+</div>
+<!-- Monthly Report + Security PDF -->
+<div class="col-span-4 space-y-widget-gap">
+<div class="glass-panel p-5 rounded-xl internal-glow cursor-pointer flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">calendar_month</span>
+</div>
+<div>
+<p class="text-body-md font-semibold">Monthly Report</p>
+<p class="text-label-caps text-on-surface-variant">Generated 2 days ago</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</div>
+<div class="glass-panel p-5 rounded-xl internal-glow cursor-pointer border border-error/30 bg-error/5 flex flex-col gap-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-error/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-error">picture_as_pdf</span>
+</div>
+<div>
+<p class="text-body-md font-semibold text-error">Security Assessment PDF</p>
+<p class="text-label-caps text-error/70">URGENT: CRITICAL FINDINGS</p>
+</div>
+</div>
+<button class="w-full py-2 bg-error text-on-error font-bold rounded-lg text-label-caps flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+                    RUN REMEDIATION SCRIPT
+                </button>
+</div>
+</div>
+</main>
+<!-- AI Assistant Sidebar -->
+<aside class="fixed right-0 top-16 bottom-0 w-[320px] bg-surface-dim border-l border-outline-variant z-30 flex flex-col">
+<div class="p-6 border-b border-outline-variant">
+<div class="flex items-center gap-2 mb-1">
+<span class="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(173,198,255,0.8)]"></span>
+<h4 class="font-headline-md text-body-lg font-bold text-on-surface">Phoenix AI</h4>
+</div>
+<p class="text-body-sm text-on-surface-variant">Intelligence Layer Active</p>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+<!-- AI Message -->
+<div class="bg-primary/5 rounded-xl p-4 border border-primary/20">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-primary text-[18px]">auto_awesome</span>
+<span class="text-label-caps font-bold text-primary">INSIGHT</span>
+</div>
+<p class="text-body-sm leading-relaxed">I've detected a correlation between the <span class="text-primary font-semibold">Technical Report</span> CPU spikes and the <span class="text-secondary font-semibold">Executive Report</span> cost increases. It appears an unoptimized query in the analytics module is burning 14% more compute than last month.</p>
+<button class="mt-3 text-primary text-body-sm font-semibold flex items-center gap-1 hover:underline">
+                    Fix with Hansen IT
+                    <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</button>
+</div>
+<!-- Priority Actions List -->
+<div class="space-y-3">
+<span class="text-label-caps font-label-caps text-on-surface-variant uppercase tracking-wider">Priority Actions</span>
+<div class="flex gap-3 p-3 rounded-lg hover:bg-surface-variant transition-colors cursor-pointer group">
+<div class="mt-1 w-2 h-2 rounded-full bg-error"></div>
+<div>
+<p class="text-body-sm font-semibold">Patch API Node B-12</p>
+<p class="text-body-sm text-on-surface-variant opacity-70">Security Vulnerability Fix</p>
+</div>
+</div>
+<div class="flex gap-3 p-3 rounded-lg hover:bg-surface-variant transition-colors cursor-pointer">
+<div class="mt-1 w-2 h-2 rounded-full bg-tertiary"></div>
+<div>
+<p class="text-body-sm font-semibold">Review Key Management</p>
+<p class="text-body-sm text-on-surface-variant opacity-70">ISO 27001 Compliance</p>
+</div>
+</div>
+<div class="flex gap-3 p-3 rounded-lg hover:bg-surface-variant transition-colors cursor-pointer">
+<div class="mt-1 w-2 h-2 rounded-full bg-secondary"></div>
+<div>
+<p class="text-body-sm font-semibold">Optimize Storage Tier</p>
+<p class="text-body-sm text-on-surface-variant opacity-70">Cost Management Action</p>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 border-t border-outline-variant bg-surface-container-low">
+<div class="relative">
+<input class="w-full bg-surface border border-outline-variant rounded-xl py-3 pl-4 pr-12 text-body-sm focus:ring-1 focus:ring-primary outline-none" placeholder="Ask about reports..." type="text"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-primary text-on-primary rounded-lg">
+<span class="material-symbols-outlined text-[18px]">send</span>
+</button>
+</div>
+</div>
+</aside>
+<!-- Floating Command Hint -->
+<div class="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 px-6 py-3 glass-panel rounded-full z-50 pointer-events-none">
+<div class="flex items-center gap-1.5">
+<kbd class="px-2 py-0.5 bg-surface-variant border border-outline-variant rounded text-[10px] font-code-md">⌘</kbd>
+<kbd class="px-2 py-0.5 bg-surface-variant border border-outline-variant rounded text-[10px] font-code-md">K</kbd>
+<span class="text-label-caps ml-2">Quick Search</span>
+</div>
+<div class="w-px h-4 bg-outline-variant"></div>
+<div class="flex items-center gap-1.5">
+<kbd class="px-2 py-0.5 bg-surface-variant border border-outline-variant rounded text-[10px] font-code-md">?</kbd>
+<span class="text-label-caps ml-2">Help</span>
+</div>
+</div>
+<script>
+        // Micro-interactions
+        document.querySelectorAll('.glass-panel').forEach(panel => {
+            panel.addEventListener('mousemove', (e) => {
+                const rect = panel.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                panel.style.setProperty('--mouse-x', `${x}px`);
+                panel.style.setProperty('--mouse-y', `${y}px`);
+            });
+        });
+    </script>
+</body></html>

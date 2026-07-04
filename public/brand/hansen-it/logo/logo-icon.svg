@@ -1,0 +1,20 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Hansen IT ikon</title>
+  <desc>H-monogram i sirkel, kvadratisk ikon</desc>
+  <defs>
+    <linearGradient id="hgi" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1B2A52"/>
+      <stop offset="100%" stop-color="#1455C9"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="236" fill="none" stroke="#1B2A52" stroke-width="17" stroke-dasharray="1045 440" stroke-linecap="round" transform="rotate(-100 256 256)"/>
+  <circle cx="256" cy="256" r="236" fill="none" stroke="#1D6FE0" stroke-width="17" stroke-dasharray="95 1390" stroke-linecap="round" transform="rotate(72 256 256)"/>
+  <g transform="translate(153,124)">
+    <path d="M0 0 H68 V105 H138 V0 H206 V264 H138 V142 H68 V264 H0 Z" fill="url(#hgi)"/>
+  </g>
+  <g fill="#1D6FE0">
+    <rect x="382" y="150" width="21" height="21" rx="4"/>
+    <rect x="412" y="177" width="16" height="16" rx="3" opacity="0.8"/>
+    <rect x="437" y="203" width="12" height="12" rx="3" opacity="0.6"/>
+  </g>
+</svg>

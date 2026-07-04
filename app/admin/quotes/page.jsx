@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Plus } from "lucide-react";
 import { EmptyState, Field, formatDate, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SelectInput, StatusBadge, TextArea, TextInput } from "@/components/phoenix/PhoenixUi";
 
-const blankQuote = { company: "", name: "", email: "", phone: "", message: "", status: "Ny", priority: "normal" };
+const blankQuote = { company: "", name: "", email: "", phone: "", message: "", status: "kladd", priority: "normal", customer_id: "", contact_id: "", lead_id: "", source_request_id: "" };
 
 export default function QuotesPage() {
   const [quotes, setQuotes] = useState([]);
@@ -13,6 +13,9 @@ export default function QuotesPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(blankQuote);
+  const [customers, setCustomers] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [requests, setRequests] = useState([]);
 
   const loadQuotes = async () => {
     setLoading(true);
@@ -24,6 +27,27 @@ export default function QuotesPage() {
   };
 
   useEffect(() => { loadQuotes(); }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRelations() {
+      const [customerRes, leadRes, requestRes] = await Promise.all([
+        fetch("/api/admin/customers", { cache: "no-store" }),
+        fetch("/api/admin/leads", { cache: "no-store" }),
+        fetch("/api/admin/requests", { cache: "no-store" })
+      ]);
+      const [customerJson, leadJson, requestJson] = await Promise.all([customerRes.json(), leadRes.json(), requestRes.json()]);
+      if (cancelled) return;
+      setCustomers(customerJson.data || []);
+      setLeads(leadJson.data || []);
+      setRequests(requestJson.data || []);
+    }
+    loadRelations().catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const selectedCustomer = customers.find((customer) => customer.id === form.customer_id);
+  const contacts = selectedCustomer?.contacts || [];
 
   const filtered = useMemo(() => quotes.filter((quote) => `${quote.name || ""} ${quote.company || ""} ${quote.customer_name || ""} ${quote.email || ""} ${quote.message || ""}`.toLowerCase().includes(query.toLowerCase())), [quotes, query]);
 
@@ -52,7 +76,15 @@ export default function QuotesPage() {
             </div>
             <Field label="Beskrivelse"><TextArea value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} /></Field>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Status"><SelectInput value={form.status} options={["Ny", "pågår", "sendt", "godkjent", "avslått"]} onChange={(event) => setForm({ ...form, status: event.target.value })} /></Field>
+              <Field label="Koble kunde"><SelectInput value={form.customer_id} options={[{ value: "", label: "Ingen valgt" }, ...customers.map((customer) => ({ value: customer.id, label: customer.company_name || customer.email || customer.id }))]} onChange={(event) => setForm({ ...form, customer_id: event.target.value, contact_id: "" })} /></Field>
+              <Field label="Koble kontakt"><SelectInput value={form.contact_id} options={[{ value: "", label: "Ingen valgt" }, ...contacts.map((contact) => ({ value: contact.id, label: contact.name || contact.email || contact.id }))]} onChange={(event) => setForm({ ...form, contact_id: event.target.value })} /></Field>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Koble lead"><SelectInput value={form.lead_id} options={[{ value: "", label: "Ingen valgt" }, ...leads.map((lead) => ({ value: lead.id, label: lead.title || lead.customer?.company_name || lead.id }))]} onChange={(event) => setForm({ ...form, lead_id: event.target.value })} /></Field>
+              <Field label="Koble request"><SelectInput value={form.source_request_id} options={[{ value: "", label: "Ingen valgt" }, ...requests.map((request) => ({ value: request.id, label: request.company || request.name || request.email || request.id }))]} onChange={(event) => setForm({ ...form, source_request_id: event.target.value })} /></Field>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Status"><SelectInput value={form.status} options={["kladd", "Ny", "pågår", "sendt", "godkjent", "avslått"]} onChange={(event) => setForm({ ...form, status: event.target.value })} /></Field>
               <Field label="Prioritet"><SelectInput value={form.priority} options={["normal", "hast"]} onChange={(event) => setForm({ ...form, priority: event.target.value })} /></Field>
             </div>
             <PrimaryButton type="submit"><Plus size={16} />Opprett tilbud</PrimaryButton>

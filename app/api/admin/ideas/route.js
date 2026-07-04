@@ -20,7 +20,7 @@ export async function POST(request) {
   const body = await request.json();
   const { data, error } = await supabaseAdmin
     .from("phoenix_ideas")
-    .insert({ title: body.title, description: body.description || null, category: body.category || null, status: body.status || "parkert" })
+    .insert({ title: body.title, description: body.description || null, category: body.category || null, status: body.status || "parked", priority: body.priority || "normal" })
     .select("*")
     .single();
 
