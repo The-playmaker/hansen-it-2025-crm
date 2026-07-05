@@ -73,6 +73,15 @@ Første runner-versjon kjøres server-side fra VPS/scanner-node:
 npm run scanner:run
 ```
 
+Produksjonsnoden er dokumentert i `docs/runbooks/phoenix-scanner-node.md`:
+
+- host: `phoenix-scan01`
+- internal IP: `10.200.1.20`
+- runner path: `/opt/phoenix-scanner/app/scanner-runner.mjs`
+- service: `phoenix-scanner.service`
+- env file: `/opt/phoenix-scanner/.env`
+- mode: `passive`
+
 Påkrevd server-side env:
 
 - `SUPABASE_URL`

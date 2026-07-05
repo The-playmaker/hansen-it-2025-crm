@@ -168,6 +168,9 @@ queued -> running -> completed / failed
 Runner MVP:
 
 - kjøres med `npm run scanner:run`
+- kan deployes som systemd service på `phoenix-scan01`
+- runner path på scanner-node: `/opt/phoenix-scanner/app/scanner-runner.mjs`
+- service: `phoenix-scanner.service`
 - bruker `SUPABASE_URL` og `SUPABASE_SERVICE_ROLE_KEY` server-side
 - henter eldste `scan_jobs` med `status='queued'`
 - verifiserer at tilhørende `scan_authorizations.status='signed'`
@@ -197,6 +200,10 @@ Aktiv ekstern scanning skal senere kjøres fra kontrollert Hansen IT scanner-nod
 - ikke tilfeldig hjemmenett
 
 Kunden kan få oppgitt scanner source IP for whitelist. Domener skal løses til A/AAAA før aktiv scan. MX-, Microsoft-, Google-, CDN- og tredjeparts-IP-er skal ikke aktivt skannes uten eksplisitt godkjenning. Internal scan krever agent eller avtalt VPN/tilgang hos kunde.
+
+Deploy-runbook:
+
+- `docs/runbooks/phoenix-scanner-node.md`
 
 ## Reports
 
