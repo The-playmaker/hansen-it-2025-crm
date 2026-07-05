@@ -77,6 +77,9 @@ Produksjonsnoden er dokumentert i `docs/runbooks/phoenix-scanner-node.md`:
 
 - host: `phoenix-scan01`
 - internal IP: `10.200.1.20`
+- egress IP: `185.243.217.163`
+- egress type: `shared_proxmox_nat`
+- dedicated scanner IP: `false`
 - runner path: `/opt/phoenix-scanner/app/scanner-runner.mjs`
 - service: `phoenix-scanner.service`
 - env file: `/opt/phoenix-scanner/.env`
@@ -90,6 +93,8 @@ Påkrevd server-side env:
 Valgfri env for aktiv scanning senere:
 
 - `SCANNER_EGRESS_IP`
+- `SCANNER_EGRESS_DEDICATED`
+- `SCANNER_ALLOW_ACTIVE_SCAN`
 
 `SUPABASE_SERVICE_ROLE_KEY` skal bare finnes på server/scanner-node og aldri i frontend.
 
@@ -101,6 +106,13 @@ Aktiv ekstern scanning skal senere kjøres fra kontrollert Hansen IT scanner-nod
 - statisk offentlig IP
 - ikke Vercel/serverless
 - ikke tilfeldig hjemmenett
+
+Per nå bruker `phoenix-scan01` delt Proxmox/NAT egress IP `185.243.217.163`. Derfor er aktiv scanning deaktivert:
+
+- `SCANNER_EGRESS_DEDICATED=false`
+- `SCANNER_ALLOW_ACTIVE_SCAN=false`
+
+Aktiv scanning krever dedikert scanner-IP eller eksplisitt godkjent egress-IP fra kunden. Shared NAT-egress skal kun brukes til passive kontroller.
 
 Kunden kan få oppgitt scanner source IP for whitelist før avtalt aktiv scan.
 
