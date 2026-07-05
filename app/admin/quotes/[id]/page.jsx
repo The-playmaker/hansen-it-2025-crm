@@ -352,6 +352,10 @@ export default function QuoteDetailsPage() {
   }
 };
 
+  const openDocument = (documentId) => {
+    window.open(`/api/admin/quotes/${quoteId}/documents/${documentId}/download`, "_blank", "noopener,noreferrer");
+  };
+
   // ---- portal link ----
 const handleCreatePortalLink = async () => {
   if (!quoteId) return;
@@ -865,6 +869,13 @@ const handleCreatePortalLink = async () => {
                     <div className="text-brand-500 text-[11px] mt-1">
                       {document.type} · {document.visible_in_portal ? "Synlig i portal" : "Skjult"}
                     </div>
+                    <Button
+                      variant="outline"
+                      className="mt-2 gap-2"
+                      onClick={() => openDocument(document.id)}
+                    >
+                      <Download size={16} /> Åpne
+                    </Button>
                   </div>
                 ))}
               </div>
