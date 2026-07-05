@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Download, FileJson, FileText, Link as LinkIcon, MessageSquarePlus } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, FileJson, FileText, Link as LinkIcon, MessageSquarePlus, PackagePlus } from "lucide-react";
 import { downloadSecurityReportJson, downloadSecurityReportPdf } from "@/lib/securityScan/exportClient";
-import { EmptyState, formatDate, MetricCard, PhoenixPageHeader, PhoenixPanel, SecondaryButton, StatusBadge } from "@/components/phoenix/PhoenixUi";
+import { buildReportRecommendation, standardServicePackages } from "@/lib/securityScan/recommendations";
+import { EmptyState, formatDate, MetricCard, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SecondaryButton, StatusBadge } from "@/components/phoenix/PhoenixUi";
 
 const severityLabels = { critical: "kritisk", high: "høy", medium: "middels", low: "lav", ok: "ok" };
 
@@ -34,6 +35,7 @@ export default function SecurityReportDetailPage({ params }) {
   const [actionBusy, setActionBusy] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [shareUrl, setShareUrl] = useState("");
+  const [servicePackages, setServicePackages] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,8 +44,11 @@ export default function SecurityReportDetailPage({ params }) {
         const response = await fetch(`/api/admin/security/reports/${params.id}`, { cache: "no-store" });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Kunne ikke hente rapport.");
+        const packagesResponse = await fetch("/api/admin/service-packages", { cache: "no-store" }).catch(() => null);
+        const packagesResult = packagesResponse ? await packagesResponse.json().catch(() => ({})) : {};
         if (!cancelled) {
           setRow(result.data);
+          setServicePackages(packagesResult.data || []);
           setState("ready");
         }
       } catch (err) {
@@ -61,6 +66,12 @@ export default function SecurityReportDetailPage({ params }) {
   const counts = useMemo(() => severityCounts(row || {}), [row]);
   const findings = report.findings || [];
   const actions = report.actions || [];
+  const recommendation = useMemo(() => buildReportRecommendation(report), [report]);
+  const recommendedPackages = useMemo(() => {
+    const active = servicePackages.filter((pkg) => pkg.is_active !== false && recommendation.packageSlugs?.includes(pkg.slug));
+    if (active.length) return active;
+    return standardServicePackages.filter((pkg) => recommendation.packageSlugs?.includes(pkg.slug));
+  }, [servicePackages, recommendation]);
 
   const createShareLink = async () => {
     if (!row?.id) return;
@@ -110,6 +121,27 @@ export default function SecurityReportDetailPage({ params }) {
     }
   };
 
+  const createPackageQuote = async (packageIds = []) => {
+    if (!row) return;
+    setActionBusy(packageIds.length === 1 ? `package-${packageIds[0]}` : "packages");
+    setActionMessage("");
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/security/reports/${row.id}/service-package-quote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packageIds })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Kunne ikke lage tilbudskladd fra produktpakker.");
+      setActionMessage(`Tilbudskladd opprettet: ${result.data?.title || result.data?.id}`);
+    } catch (err) {
+      setError(err.message || "Kunne ikke lage tilbudskladd fra produktpakker.");
+    } finally {
+      setActionBusy("");
+    }
+  };
+
   return (
     <div className="space-y-6 p-4 md:p-8">
       <PhoenixPageHeader
@@ -151,6 +183,18 @@ export default function SecurityReportDetailPage({ params }) {
             </div>
           </PhoenixPanel>
 
+          <PhoenixPanel title={recommendation.title} description={recommendation.text}>
+            <div className="grid gap-3 md:grid-cols-3">
+              <MetricCard label="Anbefalt prioritet" value={recommendation.priority} detail={recommendation.firstStep} tone={recommendation.level === "urgent" ? "rose" : recommendation.level === "scope_warning" ? "amber" : "emerald"} />
+              <MetricCard label="Estimert arbeid" value={recommendation.estimate} detail="Basert på toppfunn og tiltak." tone="cyan" />
+              <MetricCard label="Forslag" value={recommendation.suggestions?.length || 0} detail="Neste steg og pakker" tone="emerald" />
+            </div>
+            <div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4 text-sm text-cyan-100">
+              <p className="font-semibold">{recommendation.cta}</p>
+              <p className="mt-1">Fix with Hansen IT betyr kontrollert oppgave- og tilbudsflyt, ikke automatisk teknisk endring.</p>
+            </div>
+          </PhoenixPanel>
+
           <PhoenixPanel title="Score dashboard">
             <div className="grid gap-3 md:grid-cols-5">
               {Object.entries(report.categories || {}).map(([key, category]) => (
@@ -182,6 +226,34 @@ export default function SecurityReportDetailPage({ params }) {
                 </article>
               )) : <EmptyState text="Ingen prioriterte tiltak." />}
             </div>
+          </PhoenixPanel>
+
+          <PhoenixPanel title="Anbefalte produktpakker" description="Pakker foreslås fra rapportfunn. Tilbud sendes ikke automatisk.">
+            <div className="space-y-3">
+              {recommendedPackages.length ? recommendedPackages.map((pkg) => (
+                <article key={pkg.id || pkg.slug} className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-white">{pkg.name}</h3>
+                      <p className="mt-1 text-sm text-slate-300">{pkg.short_description || "Anbefalt produktpakke basert på rapportfunn."}</p>
+                    </div>
+                    <StatusBadge>{pkg.category}</StatusBadge>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {pkg.id ? <SecondaryButton disabled={Boolean(actionBusy)} onClick={() => createPackageQuote([pkg.id])}><PackagePlus size={15} />Legg anbefalt pakke til tilbud</SecondaryButton> : null}
+                    {pkg.id ? <Link href={`/admin/service-packages/${pkg.id}`} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">Åpne pakke</Link> : null}
+                    {!pkg.id ? <StatusBadge>Migration/seed kreves</StatusBadge> : null}
+                  </div>
+                </article>
+              )) : <EmptyState text="Ingen pakker foreslått for denne rapporten." />}
+            </div>
+            {recommendedPackages.some((pkg) => pkg.id) ? (
+              <div className="mt-4">
+                <PrimaryButton type="button" disabled={Boolean(actionBusy)} onClick={() => createPackageQuote(recommendedPackages.filter((pkg) => pkg.id).map((pkg) => pkg.id))}>
+                  <PackagePlus size={16} />Lag quote draft fra anbefalte pakker
+                </PrimaryButton>
+              </div>
+            ) : null}
           </PhoenixPanel>
 
           <PhoenixPanel title="Technical appendix">
