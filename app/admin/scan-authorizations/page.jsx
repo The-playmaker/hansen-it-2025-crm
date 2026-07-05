@@ -7,8 +7,8 @@ import { EmptyState, Field, formatDate, PhoenixPageHeader, PhoenixPanel, Primary
 
 const scanTypes = [
   { value: "passive", label: "Passiv OSINT/DNS/HTTP" },
-  { value: "external_active", label: "Ekstern aktiv scan (senere)" },
-  { value: "internal_agent", label: "Intern agent/VPN (senere)" }
+  { value: "external_active", label: "Ekstern aktiv scan (deaktivert)" },
+  { value: "internal_agent", label: "Intern agent/VPN (deaktivert)" }
 ];
 
 const initialForm = {
@@ -66,6 +66,16 @@ export default function ScanAuthorizationsPage() {
 
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
+  const updateScanType = (value) => {
+    if (value !== "passive") {
+      setError("Active scanning disabled – shared egress IP. Velg passiv scan.");
+      setForm((current) => ({ ...current, scan_type: "passive" }));
+      return;
+    }
+    setError("");
+    setForm((current) => ({ ...current, scan_type: value }));
+  };
+
   const createAuthorization = async (event) => {
     event.preventDefault();
     setSaving(true);
@@ -95,6 +105,17 @@ export default function ScanAuthorizationsPage() {
         description="Send sikker token-lenke til kunde for autorisert skanning. Signering oppretter scan_job med status queued, som venter paa scanner runner."
       />
 
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+          <p className="font-semibold">Passive scan runner active</p>
+          <p className="mt-1">phoenix-scan01 kjører passiv DNS/HTTP/TLS/header/e-postkontroll.</p>
+        </div>
+        <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+          <p className="font-semibold">Active scanning disabled – shared egress IP</p>
+          <p className="mt-1">Egress IP 185.243.217.163 er delt Proxmox/NAT. external_active, Nmap og vuln scan er blokkert.</p>
+        </div>
+      </div>
+
       {!configured ? <PhoenixPanel title="Ikke konfigurert" description="Supabase maa konfigureres for scan-autorisasjoner kan brukes." /> : null}
       {error ? <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</div> : null}
 
@@ -111,7 +132,7 @@ export default function ScanAuthorizationsPage() {
           <Field label="E-post til signatar"><TextInput type="email" value={form.signer_email} onChange={(event) => update("signer_email", event.target.value)} required /></Field>
           <Field label="Navn signatar"><TextInput value={form.signer_name} onChange={(event) => update("signer_name", event.target.value)} /></Field>
           <Field label="Rolle"><TextInput value={form.signer_role} onChange={(event) => update("signer_role", event.target.value)} placeholder="Daglig leder / IT-ansvarlig" /></Field>
-          <Field label="Scan-type"><SelectInput value={form.scan_type} onChange={(event) => update("scan_type", event.target.value)} options={scanTypes} /></Field>
+          <Field label="Scan-type"><SelectInput value={form.scan_type} onChange={(event) => updateScanType(event.target.value)} options={scanTypes} /></Field>
           <Field label="Domener"><TextArea value={form.domains} onChange={(event) => update("domains", event.target.value)} placeholder={"hansen-it.com\nkunde.no"} /></Field>
           <Field label="IP-er i scope"><TextArea value={form.ip_addresses} onChange={(event) => update("ip_addresses", event.target.value)} placeholder={"Kun IP-er kunden eier/har samtykke til\n203.0.113.10"} /></Field>
           <Field label="Notater / begrensninger"><TextArea value={form.notes} onChange={(event) => update("notes", event.target.value)} /></Field>
