@@ -1,5 +1,5 @@
 ﻿import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +18,7 @@ export async function OPTIONS() {
 }
 
 function getSupabaseConfig() {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  return { url, key };
+  return { configured: hasSupabaseAdminConfig };
 }
 
 function normalizePayload(body) {
@@ -95,8 +93,8 @@ export async function POST(request) {
     return json({ status: "error", message: "Navn, e-post og melding er påkrevd." }, { status: 400 });
   }
 
-  const { url, key } = getSupabaseConfig();
-  if (!url || !key) {
+  const { configured } = getSupabaseConfig();
+  if (!configured) {
     return json(
       { status: "error", message: "CRM er ikke koblet til database ennå. Prøv igjen senere eller kontakt post@hansen-it.com." },
       { status: 503 }
@@ -111,8 +109,7 @@ export async function POST(request) {
     payload.message
   ].filter((line) => line !== null).join("\n");
 
-  const supabase = createClient(url, key, { auth: { persistSession: false } });
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("requests")
     .insert({
       name: payload.name,
