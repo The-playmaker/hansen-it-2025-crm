@@ -14,7 +14,13 @@ export async function GET(req, { params }) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ data });
+  const { data: documents } = await supabaseAdmin
+    .from("quote_documents")
+    .select("*")
+    .eq("quote_id", params.id)
+    .order("created_at", { ascending: false });
+
+  return NextResponse.json({ data, documents: documents || [] });
 }
 
 export async function POST(req, { params }) {
@@ -49,5 +55,35 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ data });
+  let document = null;
+  if ((file.type || "").includes("pdf") || file.name.toLowerCase().endsWith(".pdf")) {
+    const { data: quote } = await supabaseAdmin
+      .from("requests")
+      .select("id, customer_id")
+      .eq("id", params.id)
+      .maybeSingle();
+
+    const { data: documentData, error: documentError } = await supabaseAdmin
+      .from("quote_documents")
+      .insert({
+        quote_id: params.id,
+        request_id: quote?.id || params.id,
+        customer_id: quote?.customer_id || null,
+        type: file.name.toLowerCase().includes("security") ? "security_report_pdf" : "quote_pdf",
+        filename: file.name,
+        mime_type: file.type || "application/pdf",
+        storage_path: uploadData.path,
+        visible_in_portal: true
+      })
+      .select("*")
+      .single();
+
+    if (documentError) {
+      console.error("quote document registration failed:", documentError);
+      return NextResponse.json({ error: "PDF ble lastet opp, men dokumentregistrering feilet. Kjor siste database-migration og prov igjen." }, { status: 500 });
+    }
+    document = documentData;
+  }
+
+  return NextResponse.json({ data, document });
 }

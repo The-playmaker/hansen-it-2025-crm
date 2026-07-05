@@ -33,6 +33,7 @@ export default function QuoteDetailsPage() {
   const [notes, setNotes] = useState([]);
   const [timeEntries, setTimeEntries] = useState([]);
   const [attachments, setAttachments] = useState([]);
+  const [documents, setDocuments] = useState([]);
 
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingText, setEditingText] = useState("");
@@ -55,6 +56,9 @@ export default function QuoteDetailsPage() {
   const [busyPortal, setBusyPortal] = useState(false);
   const [busyPdf, setBusyPdf] = useState(false);
   const [busyUpload, setBusyUpload] = useState(false);
+  const [busyInvoice, setBusyInvoice] = useState(false);
+  const [pdfStatus, setPdfStatus] = useState("");
+  const [invoiceMessage, setInvoiceMessage] = useState("");
 
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -117,6 +121,7 @@ export default function QuoteDetailsPage() {
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error || "Failed attachments");
     setAttachments(json.data || []);
+    setDocuments(json.documents || []);
   };
 
   const loadMessages = async () => {
@@ -301,6 +306,8 @@ export default function QuoteDetailsPage() {
     if (!res.ok) throw new Error(json?.error || "Upload failed");
 
     setAttachments((prev) => [json.data, ...prev]);
+    if (json.document) setDocuments((prev) => [json.document, ...prev]);
+    return json;
   };
 
   const handleUpload = async () => {
@@ -418,12 +425,32 @@ const handleCreatePortalLink = async () => {
 
       // Upload via API
       const pdfFile = new File([blob], fileName, { type: "application/pdf" });
-      await uploadViaApi(pdfFile, fileName);
+      const uploaded = await uploadViaApi(pdfFile, fileName);
+      if (!uploaded.document) throw new Error("PDF ble lastet opp, men ble ikke registrert som portaldokument.");
+      setPdfStatus("PDF generert, lagret og synlig i portal.");
     } catch (e) {
       console.error(e);
-      alert(e.message || "Could not generate/upload PDF");
+      setPdfStatus(e.message || "PDF-generering eller lagring feilet.");
+      alert(e.message || "Kunne ikke generere eller lagre PDF.");
     } finally {
       setBusyPdf(false);
+    }
+  };
+
+  const handleCreateInvoiceDraft = async () => {
+    try {
+      setBusyInvoice(true);
+      setInvoiceMessage("");
+      const res = await fetch(`/api/admin/quotes/${quoteId}/invoice-draft`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke lage fakturautkast.");
+      setInvoiceMessage(json.reused ? "Eksisterende fakturautkast funnet." : "Fakturautkast opprettet.");
+      router.push(`/admin/invoices/${json.data.id}`);
+    } catch (e) {
+      console.error(e);
+      setInvoiceMessage(e.message || "Kunne ikke lage fakturautkast.");
+    } finally {
+      setBusyInvoice(false);
     }
   };
 
@@ -462,12 +489,17 @@ const handleCreatePortalLink = async () => {
             disabled={busyPdf}
           >
             <FileText size={16} />
-            {busyPdf ? "Working…" : "Generate PDF"}
+            {busyPdf ? "Jobber..." : "Generer PDF"}
           </Button>
 
           <Button onClick={handleCreatePortalLink} className="gap-2" disabled={busyPortal}>
             <LinkIcon size={16} />
-            {busyPortal ? "Creating…" : "Create portal link"}
+            {busyPortal ? "Oppretter..." : "Lag portal-lenke"}
+          </Button>
+
+          <Button variant="outline" onClick={handleCreateInvoiceDraft} className="gap-2" disabled={busyInvoice}>
+            <FileText size={16} />
+            {busyInvoice ? "Lager..." : "Lag fakturautkast"}
           </Button>
         </div>
       </div>
@@ -476,15 +508,36 @@ const handleCreatePortalLink = async () => {
         <Card>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <div className="text-white font-semibold">Customer portal link</div>
+              <div className="text-white font-semibold">Kundeportal-lenke</div>
               <div className="text-brand-300 text-sm break-all">{portalUrl}</div>
             </div>
             <Button variant="outline" onClick={() => navigator.clipboard.writeText(portalUrl)}>
-              Copy
+              Kopier
             </Button>
           </div>
         </Card>
       ) : null}
+
+      <Card>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div>
+            <div className="text-xs uppercase text-brand-400">Tilbudsstatus</div>
+            <div className="mt-1 text-white font-semibold">{quote.portal_status || quote.status || "Ny"}</div>
+          </div>
+          <div>
+            <div className="text-xs uppercase text-brand-400">Dokumentstatus</div>
+            <div className="mt-1 text-white font-semibold">
+              {documents.length ? "PDF lagret og synlig i portal" : "PDF mangler eller er ikke registrert"}
+            </div>
+            {pdfStatus ? <div className="mt-1 text-xs text-brand-300">{pdfStatus}</div> : null}
+          </div>
+          <div>
+            <div className="text-xs uppercase text-brand-400">Faktura</div>
+            <div className="mt-1 text-white font-semibold">Utkast kan lages fra godkjent tilbud</div>
+            {invoiceMessage ? <div className="mt-1 text-xs text-brand-300">{invoiceMessage}</div> : null}
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left */}
@@ -528,6 +581,9 @@ const handleCreatePortalLink = async () => {
                     <option value="Ny">Ny</option>
                     <option value="Pågår">Pågår</option>
                     <option value="Fullført">Fullført</option>
+                    <option value="sendt">Sendt</option>
+                    <option value="godkjent">Godkjent</option>
+                    <option value="endringer ønsket">Endringer ønsket</option>
                   </select>
                 </div>
               </div>
@@ -671,13 +727,13 @@ const handleCreatePortalLink = async () => {
               <Input value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Rate (e.g. 100)" />
               <Input value={timeDescription} onChange={(e) => setTimeDescription(e.target.value)} placeholder="Description (optional)" />
               <Button type="submit" className="gap-2">
-                <Plus size={16} /> Add time
+                <Plus size={16} /> Legg til tid
               </Button>
             </form>
 
             <div className="mt-4 space-y-2">
               {timeEntries.length === 0 ? (
-                <div className="text-brand-400 text-sm">No time entries.</div>
+                <div className="text-brand-400 text-sm">Ingen timeføringer ennå.</div>
               ) : (
                 timeEntries.map((t) => (
                   <div key={t.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
@@ -697,21 +753,43 @@ const handleCreatePortalLink = async () => {
           <Card>
             <div className="flex items-center justify-between">
               <div className="text-white font-semibold flex items-center gap-2">
-                <Paperclip size={16} /> Attachments
+                <Paperclip size={16} /> Dokumenter og vedlegg
               </div>
-              <div className="text-xs text-brand-400">{attachments.length}</div>
+              <div className="text-xs text-brand-400">{documents.length} dokumenter · {attachments.length} vedlegg</div>
             </div>
+
+            <div className="mt-4 rounded-xl border border-brand-700 bg-brand-900/40 p-3 text-sm">
+              <div className="text-white font-semibold">Portal-dokumentstatus</div>
+              <div className="mt-1 text-brand-300">
+                {documents.length ? "PDF er registrert og synlig i kundeportalen." : "Ingen PDF er registrert som portaldokument ennå."}
+              </div>
+            </div>
+
+            {documents.length ? (
+              <div className="mt-4 space-y-2">
+                {documents.map((document) => (
+                  <div key={document.id} className="rounded-lg border border-brand-800 bg-brand-900/30 p-3">
+                    <div className="text-white text-sm font-medium flex items-center gap-2">
+                      <FileText size={14} /> {document.filename}
+                    </div>
+                    <div className="text-brand-500 text-[11px] mt-1">
+                      {document.type} · {document.visible_in_portal ? "Synlig i portal" : "Skjult"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             <div className="mt-4 space-y-3">
               <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
               <Button onClick={handleUpload} disabled={busyUpload || !file} className="gap-2">
-                <Plus size={16} /> {busyUpload ? "Uploading…" : "Upload"}
+                <Plus size={16} /> {busyUpload ? "Laster opp..." : "Last opp"}
               </Button>
             </div>
 
             <div className="mt-4 space-y-2">
               {attachments.length === 0 ? (
-                <div className="text-brand-400 text-sm">No attachments.</div>
+                <div className="text-brand-400 text-sm">Ingen vedlegg.</div>
               ) : (
                 attachments.map((a) => (
                   <div key={a.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
@@ -726,7 +804,7 @@ const handleCreatePortalLink = async () => {
                       className="mt-2 gap-2"
                       onClick={() => downloadAttachment(a.file_path)}
                     >
-                      <Download size={16} /> Open
+                      <Download size={16} /> Åpne
                     </Button>
                   </div>
                 ))

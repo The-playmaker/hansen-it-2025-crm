@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, KanbanSquare, Users, Settings, LogOut, ChevronLeft, FileText, Lightbulb, Inbox, Globe2, ShieldCheck, SearchCheck, ClipboardList, BookOpen } from "lucide-react";
+import { LayoutGrid, KanbanSquare, Users, Settings, LogOut, ChevronLeft, FileText, Lightbulb, Inbox, Globe2, ShieldCheck, SearchCheck, ClipboardList, BookOpen, ReceiptText } from "lucide-react";
 import { useMe } from "@/app/admin/useMe";
 
 const baseNav = [
@@ -13,6 +13,7 @@ const baseNav = [
   { href: "/admin/customers", label: "Kunder", icon: Users },
   { href: "/admin/kanban", label: "Oppgaver", icon: KanbanSquare },
   { href: "/admin/quotes", label: "Tilbud", icon: FileText },
+  { href: "/admin/invoices", label: "Faktura", icon: ReceiptText },
   { href: "/admin/ideas", label: "Idebank", icon: Lightbulb },
   { href: "/admin/site-content", label: "Nettside", icon: Globe2 },
   { href: "/admin/docs", label: "Developer Portal", icon: BookOpen },

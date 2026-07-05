@@ -17,6 +17,7 @@ Viktige migrations:
 - `supabase/migrations/20260704210000_crm_flow_cleanup.sql`
 - `supabase/migrations/20260704223000_scan_authorization_flow.sql`
 - `supabase/migrations/20260704231500_security_scan_report_sharing.sql`
+- `supabase/migrations/20260705113000_customer_portal_documents_invoices.sql`
 
 ## Core-tabeller
 
@@ -113,6 +114,44 @@ CRM flow cleanup sikrer:
 - `phoenix_site_content`
 
 Requests konverteres til leads/customers/contacts, men original request slettes ikke.
+
+## Quote documents
+
+Customer Portal v2 bruker `quote_documents` som dokumentregister for PDF-er som skal vises i kundeportalen.
+
+Minimumsfelter:
+
+```sql
+id uuid primary key,
+quote_id uuid references requests(id),
+customer_id uuid references customers(id),
+request_id uuid references requests(id),
+type text,
+filename text,
+mime_type text,
+storage_path text,
+visible_in_portal boolean default true,
+created_at timestamptz default now()
+```
+
+Selve filene ligger i Supabase Storage bucket `quote-attachments`. Portal-nedlasting går via server-side API som validerer portal-token før signed URL genereres.
+
+## Invoice foundation
+
+Faktura foundation bruker:
+
+- `invoices`
+- `invoice_items`
+
+Dette er kun utkastgrunnlag. Det finnes ingen automatisk utsending eller regnskapsintegrasjon ennå.
+
+Statusverdier for `invoices`:
+
+- `draft`
+- `sent`
+- `paid`
+- `overdue`
+- `cancelled`
 
 ## CMS
 

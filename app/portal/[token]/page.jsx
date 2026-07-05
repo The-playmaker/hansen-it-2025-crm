@@ -1,22 +1,52 @@
 "use client";
 export const dynamic = "force-dynamic";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { Card } from "@/components/ui/Card";
+import { AlertTriangle, Calendar, CheckCircle2, Clock, Download, FileText, MessageSquare, Paperclip, Send, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { Textarea } from "@/components/ui/Textarea";
-import {
-  AlertTriangle,
-  Calendar,
-  MapPin,
-  User,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Paperclip,
-  Download,
-} from "lucide-react";
+
+const vatRate = 0.25;
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(Number(value || 0));
+}
+
+function formatDate(value) {
+  return value ? new Date(value).toLocaleDateString("nb-NO") : "Ikke avtalt";
+}
+
+function quoteReference(quote) {
+  return `Tilbud ${String(quote?.id || "").slice(0, 8).toUpperCase()}`;
+}
+
+function normalizeStatus(status, portalStatus) {
+  if (portalStatus === "approved" || status === "godkjent") return "Godkjent";
+  if (portalStatus === "changes_requested" || status === "endringer ønsket") return "Endringer ønsket";
+  if (status === "Fullført" || status === "ferdig") return "Ferdig";
+  if (status === "Pågår" || status === "pågår") return "Arbeid pågår";
+  if (status === "sendt") return "Tilbud sendt";
+  return "Avventer godkjenning";
+}
+
+function statusBadge(status, portalStatus) {
+  const label = normalizeStatus(status, portalStatus);
+  const classes = label === "Godkjent"
+    ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100"
+    : label === "Endringer ønsket"
+      ? "border-amber-400/40 bg-amber-500/10 text-amber-100"
+      : "border-[#3FA1FF]/40 bg-[#1D6FE0]/10 text-sky-100";
+  return <span className={`inline-flex rounded-full border px-3 py-1 text-sm ${classes}`}>{label}</span>;
+}
+
+function documentLabel(document) {
+  if (document.type === "security_report_pdf") return "Security report PDF";
+  if (document.type === "quote_pdf") return "Tilbud PDF";
+  return document.filename || "Dokument";
+}
 
 export default function QuotePortal() {
   const { token } = useParams();
@@ -24,184 +54,136 @@ export default function QuotePortal() {
 
   const [data, setData] = useState(null);
   const [attachments, setAttachments] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [timeEntries, setTimeEntries] = useState([]);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [invalid, setInvalid] = useState(false);
-
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
+  const [receipt, setReceipt] = useState("");
 
-  const totalHours = useMemo(
-    () => timeEntries.reduce((sum, t) => sum + Number(t.hours || 0), 0),
-    [timeEntries]
-  );
+  const totals = useMemo(() => {
+    const hours = timeEntries.reduce((sum, entry) => sum + Number(entry.hours || 0), 0);
+    const subtotal = timeEntries.reduce((sum, entry) => sum + Number(entry.hours || 0) * Number(entry.rate || 0), 0);
+    const vat = subtotal * vatRate;
+    return { hours, subtotal, vat, total: subtotal + vat, averageRate: hours ? subtotal / hours : 0 };
+  }, [timeEntries]);
+
+  const load = async () => {
+    if (!tokenStr) return;
+    try {
+      setLoading(true);
+      setInvalid(false);
+      const response = await fetch(`/api/portal/${encodeURIComponent(tokenStr)}`, { cache: "no-store" });
+      const json = await response.json();
+      if (!response.ok) {
+        setInvalid(true);
+        return;
+      }
+      setTimeEntries(json.timeEntries || []);
+      setAttachments(json.attachments || []);
+      setDocuments(json.documents || []);
+      setData({ quote: json.quote, employee: json.employee, token: json.token });
+
+      const messagesResponse = await fetch(`/api/portal/${encodeURIComponent(tokenStr)}/messages`, { cache: "no-store" });
+      const messagesJson = await messagesResponse.json();
+      if (messagesResponse.ok) setMessages(messagesJson.data || []);
+    } catch (error) {
+      console.error(error);
+      setInvalid(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!tokenStr) return;
-
-    const load = async () => {
-      try {
-        setLoading(true);
-        setInvalid(false);
-
-        const res = await fetch(`/api/portal/${encodeURIComponent(tokenStr)}`, {
-          cache: "no-store",
-        });
-
-        const json = await res.json();
-        if (!res.ok) {
-          console.error("Portal load error:", json);
-          setInvalid(true);
-          return;
-        }
-
-        setTimeEntries(json.timeEntries || []);
-        setAttachments(json.attachments || []);
-        setData({ quote: json.quote, employee: json.employee, token: json.token });
-
-        const messagesRes = await fetch(`/api/portal/${encodeURIComponent(tokenStr)}/messages`, {
-          cache: "no-store",
-        });
-
-        const messagesJson = await messagesRes.json();
-        if (messagesRes.ok) {
-          setMessages(messagesJson.data || []);
-        }
-      } catch (e) {
-        console.error(e);
-        setInvalid(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tokenStr]);
 
-  const statusLabel = (status) => {
-    switch (status) {
-      case "Ny":
-        return "New – we have received your request";
-      case "Pågår":
-        return "In progress – we are working on your project";
-      case "Fullført":
-        return "Completed";
-      default:
-        return status || "Unknown";
-    }
-  };
-
-  const statusChip = (status) => {
-    const base = "inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs border";
-    if (status === "Ny")
-      return <span className={`${base} border-blue-500/40 bg-blue-500/10 text-blue-200`}>New</span>;
-    if (status === "Pågår")
-      return (
-        <span className={`${base} border-yellow-500/40 bg-yellow-500/10 text-yellow-200`}>
-          In progress
-        </span>
-      );
-    if (status === "Fullført")
-      return (
-        <span className={`${base} border-emerald-500/40 bg-emerald-500/10 text-emerald-200`}>
-          Completed
-        </span>
-      );
-    return (
-      <span className={`${base} border-brand-700 bg-brand-900/40 text-brand-200`}>
-        {status || "Unknown"}
-      </span>
-    );
-  };
-
-  const downloadAttachment = async (file_path) => {
-    try {
-      const res = await fetch("/api/portal/attachments/sign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: tokenStr, file_path }),
-      });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Failed to sign URL");
-
-      window.open(json.url, "_blank", "noopener,noreferrer");
-    } catch (e) {
-      console.error(e);
-      alert("Could not download the file. Please try again.");
-    }
-  };
-
-  // (Foreløpig) messages/actions: lagres som notes via API (ikke client supabase)
   const postPortalMessage = async () => {
-    if (!data?.quote?.id || !message.trim()) return;
-
+    if (!message.trim()) return;
     try {
       setSending(true);
-
-      const res = await fetch(`/api/portal/${encodeURIComponent(tokenStr)}/messages`, {
+      const response = await fetch(`/api/portal/${encodeURIComponent(tokenStr)}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: message.trim() }),
+        body: JSON.stringify({ message: message.trim() })
       });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Failed");
-
-      setMessages((prev) => [json.data, ...prev]);
+      const json = await response.json();
+      if (!response.ok) throw new Error(json?.error || "Kunne ikke sende melding.");
+      setMessages((current) => [json.data, ...current]);
       setMessage("");
-    } catch (e) {
-      console.error(e);
-      alert("Could not send message.");
+    } catch (error) {
+      console.error(error);
+      alert("Kunne ikke sende melding. Prøv igjen eller kontakt Hansen IT.");
     } finally {
       setSending(false);
     }
   };
 
   const portalAction = async (type) => {
-    if (!data?.quote?.id) return;
+    if (type === "changes_requested" && !message.trim()) {
+      alert("Skriv kort hva du ønsker endret før du sender.");
+      return;
+    }
 
     try {
       setActionBusy(true);
-
-      const res = await fetch("/api/portal/action", {
+      const response = await fetch("/api/portal/action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: tokenStr, type }),
+        body: JSON.stringify({ token: tokenStr, type, message: message.trim() })
       });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Failed");
-
-      alert(type === "approved" ? "Thanks! We received your approval." : "Thanks! We received your request.");
-    } catch (e) {
-      console.error(e);
-      alert("Could not update status.");
+      const json = await response.json();
+      if (!response.ok) throw new Error(json?.error || "Kunne ikke oppdatere status.");
+      setReceipt(type === "approved"
+        ? "Tilbudet er godkjent. Hansen IT tar kontakt for videre fremdrift."
+        : "Endringsønsket er sendt. Hansen IT følger opp tilbudet.");
+      setMessage("");
+      await load();
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke oppdatere status.");
     } finally {
       setActionBusy(false);
     }
   };
 
+  const downloadAttachment = async (filePath) => {
+    try {
+      const response = await fetch("/api/portal/attachments/sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: tokenStr, file_path: filePath })
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json?.error || "Kunne ikke laste ned.");
+      window.open(json.url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.error(error);
+      alert("Kunne ikke laste ned dokumentet.");
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-brand-950 flex items-center justify-center">
-        <div className="w-10 h-10 rounded-full border-2 border-accent-blue border-t-transparent animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-[#152149]">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#3FA1FF] border-t-transparent" />
       </div>
     );
   }
 
   if (invalid || !data) {
     return (
-      <div className="min-h-screen bg-brand-950 flex items-center justify-center px-4">
-        <Card className="max-w-md text-center border-red-500 bg-red-500/10">
+      <div className="flex min-h-screen items-center justify-center bg-[#152149] px-4">
+        <Card className="max-w-md border-red-500 bg-red-500/10 text-center">
           <div className="flex flex-col items-center gap-3">
-            <AlertTriangle className="w-8 h-8 text-red-400" />
-            <h1 className="text-xl font-bold text-white">Link not valid</h1>
-            <p className="text-sm text-red-200">
-              This access link is invalid or has expired. Please contact us for an updated link.
-            </p>
+            <AlertTriangle className="h-8 w-8 text-red-300" />
+            <h1 className="text-xl font-bold text-white">Lenken er ikke gyldig</h1>
+            <p className="text-sm text-red-100">Portal-lenken er ugyldig eller utløpt. Kontakt Hansen IT for ny lenke.</p>
           </div>
         </Card>
       </div>
@@ -209,213 +191,173 @@ export default function QuotePortal() {
   }
 
   const { quote, employee } = data;
-
-  const offerPdf =
-    attachments.find(
-      (a) =>
-        (a.file_name || "").toLowerCase().includes("offer") &&
-        (a.file_name || "").toLowerCase().endsWith(".pdf")
-    ) ||
-    attachments.find((a) => (a.file_name || "").toLowerCase().endsWith(".pdf")) ||
-    null;
+  const timeline = [
+    { label: "Henvendelse mottatt", done: true },
+    { label: "Tilbud sendt", done: true },
+    { label: "Avventer godkjenning", done: !["approved"].includes(quote.portal_status) },
+    { label: "Godkjent", done: quote.portal_status === "approved" },
+    { label: "Arbeid pågår", done: normalizeStatus(quote.status, quote.portal_status) === "Arbeid pågår" },
+    { label: "Ferdig", done: normalizeStatus(quote.status, quote.portal_status) === "Ferdig" }
+  ];
 
   return (
-    <div className="min-h-screen bg-brand-950">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-14 space-y-6">
-        <Card className="border-accent-blue/50 bg-brand-900/70">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div className="min-h-screen bg-[#152149] text-white">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <Image src="/brand/hansen-it/logo/logo-horizontal-dark.svg" alt="Hansen IT" width={220} height={70} priority />
+          <div className="text-right text-sm text-slate-300">
+            <p>{quoteReference(quote)}</p>
+            <p>post@hansen-it.com</p>
+          </div>
+        </header>
+
+        <Card className="border-[#3FA1FF]/30 bg-[#1B2A52]/90">
+          <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
             <div>
-              <h1 className="text-2xl font-bold text-white mb-1">Your project with Hansen IT</h1>
-              <p className="text-brand-300 text-sm">Track status, view the offer, and communicate with us here.</p>
-              <div className="mt-3 flex items-center gap-2 flex-wrap">
-                {statusChip(quote.status)}
-                <span className="text-[11px] text-brand-500 font-mono">Project ID: {quote.id}</span>
+              <p className="mb-2 text-sm uppercase tracking-[0.18em] text-[#3FA1FF]">Hansen IT kundeportal</p>
+              <h1 className="text-3xl font-bold">Ditt tilbud fra Hansen IT</h1>
+              <p className="mt-3 max-w-3xl text-slate-200">
+                Her kan du se tilbudet, laste ned dokumenter, stille spørsmål og godkjenne eller be om endringer.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                {statusBadge(quote.status, quote.portal_status)}
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-200">{quoteReference(quote)}</span>
               </div>
             </div>
-
-            <div className="flex gap-2">
-              <Button onClick={() => portalAction("approved")} disabled={actionBusy} className="gap-2">
-                <CheckCircle2 size={16} /> Approve
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => portalAction("changes_requested")}
-                disabled={actionBusy}
-                className="gap-2"
-              >
-                <XCircle size={16} /> Request changes
-              </Button>
+            <div className="rounded-2xl border border-white/10 bg-[#152149]/80 p-4 text-sm text-slate-200">
+              <p className="font-semibold text-white">Kontakt hos Hansen IT</p>
+              <p className="mt-1">{employee?.name || "Ikke tildelt ennå"}</p>
+              {employee?.email ? <p>{employee.email}</p> : null}
+              {employee?.phone ? <p>{employee.phone}</p> : null}
             </div>
           </div>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <div className="space-y-3">
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <User className="w-4 h-4" /> Your details
-                </h2>
+        {receipt ? (
+          <div className="mt-6 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-emerald-100">{receipt}</div>
+        ) : null}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-brand-300">
-                  <div>
-                    <div className="text-xs text-brand-500 uppercase">Name</div>
-                    <div className="text-white">{quote.name}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-brand-500 uppercase">Email</div>
-                    <div className="text-white">{quote.email}</div>
-                  </div>
-                  {quote.phone ? (
-                    <div>
-                      <div className="text-xs text-brand-500 uppercase">Phone</div>
-                      <div className="text-white">{quote.phone}</div>
-                    </div>
-                  ) : null}
-                  {quote.address ? (
-                    <div>
-                      <div className="text-xs text-brand-500 uppercase flex items-center gap-1">
-                        <MapPin className="w-4 h-4" /> Address
-                      </div>
-                      <div className="text-white">{quote.address}</div>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="space-y-3">
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Calendar className="w-4 h-4" /> Project status & schedule
-                </h2>
-
-                <p className="text-sm text-brand-300">
-                  <span className="font-medium text-white">Status:</span> {statusLabel(quote.status)}
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-brand-300">
-                  <div>
-                    <p className="font-medium text-white text-xs uppercase">Inspection</p>
-                    <p>
-                      {quote.inspection_date
-                        ? new Date(quote.inspection_date).toLocaleString()
-                        : "Not scheduled yet"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-white text-xs uppercase">Start</p>
-                    <p>{quote.start_date ? new Date(quote.start_date).toLocaleDateString() : "Not scheduled yet"}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-white text-xs uppercase">Due</p>
-                    <p>{quote.due_date ? new Date(quote.due_date).toLocaleDateString() : "Not defined yet"}</p>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-brand-800 mt-2 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="text-sm text-brand-300 flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    <span>
-                      <span className="font-medium text-white">Logged hours:</span> {totalHours.toFixed(2)}h
-                    </span>
-                  </div>
-
-                  {employee ? (
-                    <div className="text-sm text-brand-300">
-                      <span className="font-medium text-white">Assigned contact:</span> {employee.name}
-                      {employee.phone ? ` · ${employee.phone}` : ""}
-                      {employee.email ? ` · ${employee.email}` : ""}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-brand-500">No assigned contact yet.</div>
-                  )}
-                </div>
-              </div>
-            </Card>
-
-            <Card>
-              <h2 className="text-lg font-semibold text-white mb-3">Your request</h2>
-              <p className="text-sm text-brand-300 whitespace-pre-wrap">{quote.message}</p>
-            </Card>
-
-            <Card>
-              <h2 className="text-lg font-semibold text-white mb-2">Messages</h2>
-              <div className="space-y-3">
-                {messages.map((m) => (
-                  <div key={m.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
-                    <div className="text-brand-200 text-sm whitespace-pre-wrap">{m.message}</div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <div className="text-xs text-brand-500">
-                        {m.created_at ? new Date(m.created_at).toLocaleString() : ""}
-                      </div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+          <main className="space-y-6">
+            <Card className="bg-[#1B2A52]/75">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><Calendar className="h-4 w-4 text-[#3FA1FF]" />Status og plan</h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {timeline.map((step) => (
+                  <div key={step.label} className={`rounded-xl border p-3 ${step.done ? "border-[#3FA1FF]/40 bg-[#1D6FE0]/10" : "border-white/10 bg-white/5"}`}>
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 className={`h-4 w-4 ${step.done ? "text-[#3FA1FF]" : "text-slate-500"}`} />
+                      <span>{step.label}</span>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="mt-4">
-                <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Write your message…" />
-                <div className="mt-3">
-                  <Button onClick={postPortalMessage} disabled={sending || !message.trim()}>
-                    {sending ? "Sending…" : "Send"}
-                  </Button>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div><p className="text-xs uppercase text-slate-400">Befaring</p><p>{formatDate(quote.inspection_date)}</p></div>
+                <div><p className="text-xs uppercase text-slate-400">Planlagt start</p><p>{formatDate(quote.start_date)}</p></div>
+                <div><p className="text-xs uppercase text-slate-400">Frist</p><p>{formatDate(quote.due_date)}</p></div>
+              </div>
+            </Card>
+
+            <Card className="bg-[#1B2A52]/75">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><FileText className="h-4 w-4 text-[#3FA1FF]" />Tilbudsoppsummering</h2>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-slate-400">Tittel</p>
+                  <p className="text-lg font-semibold">{quote.title || quote.category || "Tilbud fra Hansen IT"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-400">Beskrivelse</p>
+                  <p className="whitespace-pre-wrap text-slate-100">{quote.description || quote.message || "Tilbudet er basert på dialogen med Hansen IT."}</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-xl bg-white/5 p-3"><p className="text-xs text-slate-400">Estimert tid</p><p className="text-lg font-semibold">{totals.hours.toFixed(1)} timer</p></div>
+                  <div className="rounded-xl bg-white/5 p-3"><p className="text-xs text-slate-400">Timepris</p><p className="text-lg font-semibold">{totals.averageRate ? formatCurrency(totals.averageRate) : "Etter avtale"}</p></div>
+                  <div className="rounded-xl bg-white/5 p-3"><p className="text-xs text-slate-400">Subtotal</p><p className="text-lg font-semibold">{formatCurrency(totals.subtotal)}</p></div>
+                  <div className="rounded-xl bg-white/5 p-3"><p className="text-xs text-slate-400">Total inkl. mva</p><p className="text-lg font-semibold">{formatCurrency(totals.total)}</p></div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-300">
+                  MVA: {formatCurrency(totals.vat)}. Endelig fakturagrunnlag avklares før eventuell fakturering.
                 </div>
               </div>
             </Card>
-          </div>
 
-          <div className="space-y-6">
-            <Card>
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-white font-semibold flex items-center gap-2">
-                  <Paperclip className="w-4 h-4" /> Documents
-                </div>
+            <Card className="bg-[#1B2A52]/75">
+              <h2 className="mb-3 text-lg font-semibold">Din henvendelse</h2>
+              <p className="whitespace-pre-wrap text-slate-200">{quote.message || "Ingen henvendelsestekst registrert."}</p>
+            </Card>
+
+            <Card className="bg-[#1B2A52]/75">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><MessageSquare className="h-4 w-4 text-[#3FA1FF]" />Meldinger</h2>
+              <Textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Skriv melding eller endringsønske..." />
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button onClick={postPortalMessage} disabled={sending || !message.trim()}><Send size={16} />{sending ? "Sender..." : "Send melding"}</Button>
               </div>
+              <div className="mt-5 space-y-3">
+                {messages.length ? messages.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-white/10 bg-[#152149]/70 p-3">
+                    <div className="flex flex-wrap justify-between gap-2 text-xs text-slate-400">
+                      <span>{item.author_type === "customer" ? "Kunde" : item.author_name || "Hansen IT"}</span>
+                      <span>{item.created_at ? new Date(item.created_at).toLocaleString("nb-NO") : ""}</span>
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-slate-100">{item.message}</p>
+                  </div>
+                )) : <p className="text-sm text-slate-400">Ingen meldinger ennå.</p>}
+              </div>
+            </Card>
+          </main>
 
-              {offerPdf ? (
-                <div className="mt-3 space-y-2">
-                  <div className="text-sm text-white">{offerPdf.file_name}</div>
-                  <Button variant="outline" className="gap-2" onClick={() => downloadAttachment(offerPdf.file_path)}>
-                    <Download size={16} /> Download
-                  </Button>
-                </div>
-              ) : (
-                <div className="mt-3 text-sm text-brand-400">No offer document available yet.</div>
-              )}
+          <aside className="space-y-6">
+            <Card className="bg-[#1B2A52]/75">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><Paperclip className="h-4 w-4 text-[#3FA1FF]" />Dokumenter</h2>
+              <div className="space-y-3">
+                {documents.length ? documents.map((document) => (
+                  <a
+                    key={document.id}
+                    href={`/api/portal/quote/${encodeURIComponent(tokenStr)}/documents/${document.id}/download`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3 text-left hover:border-[#3FA1FF]/50"
+                  >
+                    <span>
+                      <span className="block text-sm font-semibold">{documentLabel(document)}</span>
+                      <span className="block text-xs text-slate-400">{document.filename}</span>
+                    </span>
+                    <Download className="h-4 w-4 text-[#3FA1FF]" />
+                  </a>
+                )) : <p className="text-sm text-slate-400">Ingen portal-dokumenter er publisert ennå.</p>}
 
-              {attachments.length > 1 ? (
-                <div className="mt-4 pt-4 border-t border-brand-800">
-                  <div className="text-xs text-brand-500 uppercase mb-2">All attachments</div>
-                  <div className="space-y-2">
-                    {attachments.map((a) => (
-                      <button
-                        key={a.id}
-                        onClick={() => downloadAttachment(a.file_path)}
-                        className="w-full text-left border border-brand-800 rounded-lg p-2 hover:bg-brand-900/40"
-                      >
-                        <div className="text-sm text-white flex items-center gap-2">
-                          <Paperclip className="w-4 h-4" /> {a.file_name}
-                        </div>
-                        <div className="text-[11px] text-brand-500">
-                          {a.created_at ? new Date(a.created_at).toLocaleString() : ""}
-                        </div>
+                {!documents.length && attachments.length ? (
+                  <div className="border-t border-white/10 pt-3">
+                    <p className="mb-2 text-xs uppercase text-slate-400">Vedlegg</p>
+                    {attachments.map((attachment) => (
+                      <button key={attachment.id} type="button" onClick={() => downloadAttachment(attachment.file_path)} className="mb-2 w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left text-sm hover:border-[#3FA1FF]/50">
+                        {attachment.file_name}
                       </button>
                     ))}
                   </div>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </Card>
 
-            <Card>
-              <h2 className="text-lg font-semibold text-white mb-2">Need changes?</h2>
-              <p className="text-sm text-brand-300">
-                If you want to change details or add information, use the message box or contact us and refer to:
-              </p>
-              <p className="text-sm text-accent-blue font-mono mt-2">Project ID: #{quote.id}</p>
+            <Card className="border-[#3FA1FF]/30 bg-[#1B2A52]/90">
+              <h2 className="mb-2 text-lg font-semibold">Neste steg</h2>
+              <p className="text-sm text-slate-200">Godkjenn tilbudet hvis alt ser riktig ut, eller skriv en melding og be om endringer.</p>
+              <div className="mt-4 space-y-2">
+                <Button onClick={() => portalAction("approved")} disabled={actionBusy} className="w-full"><CheckCircle2 size={16} />Godkjenn tilbud</Button>
+                <Button variant="outline" onClick={() => portalAction("changes_requested")} disabled={actionBusy} className="w-full"><XCircle size={16} />Be om endringer</Button>
+              </div>
             </Card>
 
-            <div className="text-center text-[11px] text-brand-500">Hansen IT – powered by CRM</div>
-          </div>
+            <Card className="bg-[#1B2A52]/75">
+              <h2 className="mb-2 text-lg font-semibold">Dine opplysninger</h2>
+              <div className="space-y-2 text-sm text-slate-200">
+                <p><span className="text-slate-400">Navn:</span> {quote.name || "-"}</p>
+                <p><span className="text-slate-400">E-post:</span> {quote.email || "-"}</p>
+                <p><span className="text-slate-400">Telefon:</span> {quote.phone || "-"}</p>
+                <p><span className="text-slate-400">Adresse:</span> {quote.address || "-"}</p>
+              </div>
+            </Card>
+
+            <div className="text-center text-xs text-slate-400">Infrastruktur · Nettverk · Support · Cybersikkerhet</div>
+          </aside>
         </div>
       </div>
     </div>

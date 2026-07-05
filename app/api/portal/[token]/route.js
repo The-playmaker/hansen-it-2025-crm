@@ -62,6 +62,14 @@ export async function GET(_req, { params }) {
     .eq("quote_id", quote.id)
     .order("created_at", { ascending: false });
 
+  // 6) portal documents
+  const { data: documents } = await supabase
+    .from("quote_documents")
+    .select("*")
+    .eq("quote_id", quote.id)
+    .eq("visible_in_portal", true)
+    .order("created_at", { ascending: false });
+
   return NextResponse.json({
     token: {
       quote_id: tokenRow.quote_id,
@@ -71,5 +79,6 @@ export async function GET(_req, { params }) {
     employee,
     timeEntries: timeEntries || [],
     attachments: attachments || [],
+    documents: documents || [],
   });
 }
