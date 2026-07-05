@@ -23,6 +23,14 @@ function quoteReference(quote) {
   return `Tilbud ${String(quote?.id || "").slice(0, 8).toUpperCase()}`;
 }
 
+function moneyValue(...values) {
+  for (const value of values) {
+    const number = Number(value || 0);
+    if (Number.isFinite(number) && number > 0) return number;
+  }
+  return 0;
+}
+
 function normalizeStatus(status, portalStatus) {
   if (portalStatus === "approved" || status === "godkjent") return "Godkjent";
   if (portalStatus === "changes_requested" || status === "endringer ønsket") return "Endringer ønsket";
@@ -43,7 +51,7 @@ function statusBadge(status, portalStatus) {
 }
 
 function documentLabel(document) {
-  if (document.type === "security_report_pdf") return "Security report PDF";
+  if (document.type === "security_report_pdf") return "Sikkerhetsrapport PDF";
   if (document.type === "quote_pdf") return "Tilbud PDF";
   return document.filename || "Dokument";
 }
@@ -66,10 +74,36 @@ export default function QuotePortal() {
 
   const totals = useMemo(() => {
     const hours = timeEntries.reduce((sum, entry) => sum + Number(entry.hours || 0), 0);
-    const subtotal = timeEntries.reduce((sum, entry) => sum + Number(entry.hours || 0) * Number(entry.rate || 0), 0);
-    const vat = subtotal * vatRate;
-    return { hours, subtotal, vat, total: subtotal + vat, averageRate: hours ? subtotal / hours : 0 };
-  }, [timeEntries]);
+    const timeSubtotal = timeEntries.reduce((sum, entry) => sum + Number(entry.hours || 0) * Number(entry.rate || 0), 0);
+    const quote = data?.quote || {};
+    const subtotal = moneyValue(timeSubtotal, quote.total_ex_vat, quote.subtotal, quote.price_ex_vat, quote.price);
+    const vat = moneyValue(quote.total_vat, quote.vat_amount, subtotal * vatRate);
+    const total = moneyValue(quote.total_inc_vat, quote.total, subtotal + vat);
+    return { hours, subtotal, vat, total, averageRate: hours ? subtotal / hours : 0 };
+  }, [timeEntries, data]);
+
+  const quoteLines = useMemo(() => {
+    if (timeEntries.length) {
+      return timeEntries.map((entry) => ({
+        id: entry.id,
+        description: entry.description || "Arbeid etter avtale",
+        quantity: Number(entry.hours || 0),
+        unit: "timer",
+        unitPrice: Number(entry.rate || 0),
+        total: Number(entry.hours || 0) * Number(entry.rate || 0)
+      }));
+    }
+    const quote = data?.quote || {};
+    const subtotal = totals.subtotal || Number(quote.total_ex_vat || quote.subtotal || quote.price || 0);
+    return subtotal ? [{
+      id: "quote-summary",
+      description: quote.title || quote.category || "Tilbud fra Hansen IT",
+      quantity: 1,
+      unit: "pakke",
+      unitPrice: subtotal,
+      total: subtotal
+    }] : [];
+  }, [timeEntries, data, totals.subtotal]);
 
   const load = async () => {
     if (!tokenStr) return;
@@ -274,6 +308,30 @@ export default function QuotePortal() {
                   <div className="rounded-xl bg-white/5 p-3"><p className="text-xs text-slate-400">Timepris</p><p className="text-lg font-semibold">{totals.averageRate ? formatCurrency(totals.averageRate) : "Etter avtale"}</p></div>
                   <div className="rounded-xl bg-white/5 p-3"><p className="text-xs text-slate-400">Subtotal</p><p className="text-lg font-semibold">{formatCurrency(totals.subtotal)}</p></div>
                   <div className="rounded-xl bg-white/5 p-3"><p className="text-xs text-slate-400">Total inkl. mva</p><p className="text-lg font-semibold">{formatCurrency(totals.total)}</p></div>
+                </div>
+                <div className="overflow-x-auto rounded-xl border border-white/10">
+                  <table className="w-full text-sm">
+                    <thead className="bg-white/5 text-left text-slate-300">
+                      <tr>
+                        <th className="px-3 py-2">Tilbudslinje</th>
+                        <th className="px-3 py-2">Timer/antall</th>
+                        <th className="px-3 py-2">Pris</th>
+                        <th className="px-3 py-2 text-right">Sum</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {quoteLines.length ? quoteLines.map((line) => (
+                        <tr key={line.id} className="border-t border-white/10">
+                          <td className="px-3 py-2">{line.description}</td>
+                          <td className="px-3 py-2">{line.quantity} {line.unit}</td>
+                          <td className="px-3 py-2">{line.unitPrice ? formatCurrency(line.unitPrice) : "Etter avtale"}</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(line.total)}</td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan={4} className="px-3 py-4 text-slate-400">Ingen tilbudslinjer er publisert ennå.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-300">
                   MVA: {formatCurrency(totals.vat)}. Endelig fakturagrunnlag avklares før eventuell fakturering.

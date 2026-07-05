@@ -63,12 +63,24 @@ export async function GET(_req, { params }) {
     .order("created_at", { ascending: false });
 
   // 6) portal documents
-  const { data: documents } = await supabase
+  let documents = [];
+  const { data: visibleDocuments, error: visibleDocumentsError } = await supabase
     .from("quote_documents")
     .select("*")
     .eq("quote_id", quote.id)
-    .eq("visible_in_portal", true)
+    .eq("is_portal_visible", true)
     .order("created_at", { ascending: false });
+  if (visibleDocumentsError) {
+    const { data: fallbackDocuments } = await supabase
+      .from("quote_documents")
+      .select("*")
+      .eq("quote_id", quote.id)
+      .eq("visible_in_portal", true)
+      .order("created_at", { ascending: false });
+    documents = fallbackDocuments || [];
+  } else {
+    documents = visibleDocuments || [];
+  }
 
   return NextResponse.json({
     token: {
@@ -79,6 +91,6 @@ export async function GET(_req, { params }) {
     employee,
     timeEntries: timeEntries || [],
     attachments: attachments || [],
-    documents: documents || [],
+    documents,
   });
 }

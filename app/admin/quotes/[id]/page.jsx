@@ -74,6 +74,8 @@ export default function QuoteDetailsPage() {
     [timeEntries]
   );
 
+  const quoteNumber = useMemo(() => `Tilbud ${String(quoteId || "").slice(0, 8).toUpperCase()}`, [quoteId]);
+
   // ---- load me ----
   useEffect(() => {
     fetch("/api/me", { cache: "no-store" })
@@ -124,6 +126,14 @@ export default function QuoteDetailsPage() {
     setDocuments(json.documents || []);
   };
 
+  const loadPortalLink = async () => {
+    const res = await fetch(`/api/admin/quotes/${quoteId}/portal-link`, { cache: "no-store" });
+    const json = await res.json();
+    if (res.ok && json.data?.token && typeof window !== "undefined") {
+      setPortalUrl(`${window.location.origin}/portal/${json.data.token}`);
+    }
+  };
+
   const loadMessages = async () => {
     const res = await fetch(`/api/admin/quotes/${quoteId}/messages`, { cache: "no-store" });
     const json = await res.json();
@@ -138,7 +148,7 @@ export default function QuoteDetailsPage() {
       setLoading(true);
       try {
         await Promise.all([loadEmployees(), loadQuote()]);
-        await Promise.all([loadNotes(), loadTime(), loadAttachments(), loadMessages()]);
+        await Promise.all([loadNotes(), loadTime(), loadAttachments(), loadMessages(), loadPortalLink()]);
       } catch (e) {
         console.error(e);
         router.push("/admin/quotes");
@@ -176,7 +186,7 @@ export default function QuoteDetailsPage() {
       setQuote(json.data);
     } catch (e) {
       console.error(e);
-      alert(e.message || "Could not save");
+      alert(e.message || "Kunne ikke lagre.");
     } finally {
       setSaving(false);
     }
@@ -217,7 +227,7 @@ export default function QuoteDetailsPage() {
       setNewNote("");
     } catch (err) {
       console.error(err);
-      alert(err.message || "Could not add note");
+      alert(err.message || "Kunne ikke legge til notat.");
     }
   };
 
@@ -288,7 +298,7 @@ export default function QuoteDetailsPage() {
       setTimeDescription("");
     } catch (e) {
       console.error(e);
-      alert(e.message || "Could not add time entry");
+      alert(e.message || "Kunne ikke legge til timeføring.");
     }
   };
 
@@ -303,7 +313,7 @@ export default function QuoteDetailsPage() {
     });
 
     const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || "Upload failed");
+    if (!res.ok) throw new Error(json?.error || "Opplasting feilet");
 
     setAttachments((prev) => [json.data, ...prev]);
     if (json.document) setDocuments((prev) => [json.document, ...prev]);
@@ -318,7 +328,7 @@ export default function QuoteDetailsPage() {
       setFile(null);
     } catch (e) {
       console.error(e);
-      alert(e.message || "Upload failed");
+      alert(e.message || "Opplasting feilet");
     } finally {
       setBusyUpload(false);
     }
@@ -333,12 +343,12 @@ export default function QuoteDetailsPage() {
     });
 
     const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || "Failed to sign URL");
+    if (!res.ok) throw new Error(json?.error || "Kunne ikke lage nedlastingslenke");
 
     window.open(json.url, "_blank", "noopener,noreferrer");
   } catch (e) {
     console.error(e);
-    alert("Could not download.");
+    alert("Kunne ikke laste ned.");
   }
 };
 
@@ -370,7 +380,7 @@ const handleCreatePortalLink = async () => {
       const res = await fetch(`/api/admin/quotes/${quoteId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: newMessage.trim(), author_id: authorId }),
+        body: JSON.stringify({ message: newMessage.trim(), author_id: authorId, author_type: "admin", author_name: me?.name || me?.email || "Hansen IT" }),
       });
 
       const json = await res.json();
@@ -391,37 +401,81 @@ const handleCreatePortalLink = async () => {
       setBusyPdf(true);
 
       const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.text("Offer / Project Summary", 20, 20);
+      const margin = 18;
+      let y = 22;
+      const totalHours = timeEntries.reduce((sum, t) => sum + Number(t.hours || 0), 0);
+      const subtotal = totalCost || Number(quote.total_ex_vat || quote.subtotal || quote.price || 0);
+      const vat = Number(quote.total_vat || Math.round(subtotal * 0.25));
+      const total = Number(quote.total_inc_vat || quote.total || subtotal + vat);
 
-      doc.setFontSize(11);
-      let y = 30;
-
-      const addLine = (t) => {
-        doc.text(String(t), 20, y);
-        y += 6;
+      const addWrapped = (text, x = margin, width = 174, lineHeight = 5.5) => {
+        const lines = doc.splitTextToSize(String(text || ""), width);
+        doc.text(lines, x, y);
+        y += lines.length * lineHeight;
+      };
+      const addLabel = (label, value) => {
+        doc.setFont(undefined, "bold");
+        doc.text(label, margin, y);
+        doc.setFont(undefined, "normal");
+        doc.text(String(value || "-"), 68, y);
+        y += 7;
       };
 
-      addLine(`Project ID: ${quote.id}`);
-      addLine(`Customer: ${quote.name || ""}`);
-      if (quote.email) addLine(`Email: ${quote.email}`);
-      if (quote.phone) addLine(`Phone: ${quote.phone}`);
-      if (quote.address) addLine(`Address: ${quote.address}`);
+      doc.setFillColor(21, 33, 73);
+      doc.rect(0, 0, 210, 42, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont(undefined, "bold");
+      doc.text("Hansen IT", margin, 18);
+      doc.setFontSize(12);
+      doc.setFont(undefined, "normal");
+      doc.text("Infrastruktur · Nettverk · Support · Cybersikkerhet", margin, 29);
+
+      y = 58;
+      doc.setTextColor(21, 33, 73);
+      doc.setFontSize(22);
+      doc.setFont(undefined, "bold");
+      doc.text("Tilbud fra Hansen IT", margin, y);
+      y += 10;
+      doc.setFontSize(11);
+      doc.setFont(undefined, "normal");
+      addLabel("Tilbudsnummer", quoteNumber);
+      addLabel("Kunde", quote.customer_name || quote.company || quote.name || "Ristesund AS");
+      addLabel("Kontakt", quote.name || "-");
+      addLabel("E-post", quote.email || "-");
+      addLabel("Telefon", quote.phone || "-");
+      addLabel("Status", quote.status || "kladd");
 
       y += 4;
-      addLine(`Status: ${quote.status || "Ny"}`);
-      const totalHours = timeEntries.reduce((sum, t) => sum + Number(t.hours || 0), 0);
-      addLine(`Logged hours: ${totalHours.toFixed(2)}h`);
+      doc.setFont(undefined, "bold");
+      doc.setFontSize(14);
+      doc.text(quote.title || quote.category || "Tilbudssammendrag", margin, y);
+      y += 8;
+      doc.setFont(undefined, "normal");
+      doc.setFontSize(10);
+      addWrapped(quote.description || quote.message || "Tilbudet er basert på henvendelse og dialog med Hansen IT.");
 
-      y += 4;
-      addLine("---");
-      addLine("Customer message:");
-      const msg = quote.message || "";
-      const split = doc.splitTextToSize(msg, 170);
-      doc.text(split, 20, y);
+      y += 6;
+      doc.setDrawColor(218, 226, 240);
+      doc.line(margin, y, 192, y);
+      y += 9;
+      addLabel("Estimert tid", totalHours ? `${totalHours.toFixed(1)} timer` : "Etter avtale");
+      addLabel("Subtotal eks. mva", `${subtotal.toLocaleString("nb-NO")} kr`);
+      addLabel("MVA", `${vat.toLocaleString("nb-NO")} kr`);
+      addLabel("Total inkl. mva", `${total.toLocaleString("nb-NO")} kr`);
+
+      y += 6;
+      doc.setFillColor(245, 248, 253);
+      doc.roundedRect(margin, y, 174, 28, 3, 3, "F");
+      y += 9;
+      doc.setFont(undefined, "bold");
+      doc.text("Neste steg", margin + 6, y);
+      y += 6;
+      doc.setFont(undefined, "normal");
+      addWrapped("Kunden kan lese tilbudet, laste ned dokumenter, sende melding og godkjenne eller be om endringer i kundeportalen.", margin + 6, 160, 5);
 
       const blob = doc.output("blob");
-      const fileName = `offer_quote_${quote.id}.pdf`;
+      const fileName = `tilbud-${String(quote.id).slice(0, 8)}.pdf`;
 
       // Upload via API
       const pdfFile = new File([blob], fileName, { type: "application/pdf" });
@@ -461,6 +515,22 @@ const handleCreatePortalLink = async () => {
       </div>
     );
   }
+
+  const visibleDocuments = documents.filter((document) => document.is_portal_visible !== false && document.visible_in_portal !== false);
+  const hasQuotePdf = visibleDocuments.some((document) => document.type === "quote_pdf" || /tilbud|quote|offer/i.test(document.filename || ""));
+  const hasScanPdf = visibleDocuments.some((document) => document.type === "security_report_pdf" || /scan|security|sikkerhet/i.test(document.filename || ""));
+  const quoteTotal = Number(quote.total_inc_vat || quote.total || quote.total_ex_vat || totalCost || 0);
+  const readiness = [
+    { label: "Quote har minst én linje/timeføring", ok: timeEntries.length > 0 || quoteTotal > 0 },
+    { label: "Quote total er større enn 0", ok: quoteTotal > 0 },
+    { label: "Portal token finnes", ok: Boolean(portalUrl) },
+    { label: "Quote PDF finnes", ok: hasQuotePdf },
+    { label: "Scan PDF finnes hvis scan er koblet", ok: hasScanPdf || !quote.security_report_id },
+    { label: "Dokumenter er synlige i portal", ok: visibleDocuments.length > 0 },
+    { label: "Approval actions er tilgjengelig", ok: Boolean(portalUrl) },
+    { label: "Meldingsskjema er tilgjengelig", ok: Boolean(portalUrl) }
+  ];
+  const portalReady = readiness.every((item) => item.ok);
 
   return (
     <div className="p-6 space-y-6">
@@ -517,6 +587,26 @@ const handleCreatePortalLink = async () => {
           </div>
         </Card>
       ) : null}
+
+      <Card className={portalReady ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="text-white font-semibold">Klar for kundeinvitasjon</div>
+            <div className={portalReady ? "mt-1 text-sm text-emerald-100" : "mt-1 text-sm text-amber-100"}>
+              {portalReady ? "Portalen ser klar ut for kunde." : "Portalen er ikke klar for kunde ennå."}
+            </div>
+          </div>
+          <div className="text-sm text-white">{readiness.filter((item) => item.ok).length}/{readiness.length}</div>
+        </div>
+        <div className="mt-4 grid gap-2 md:grid-cols-2">
+          {readiness.map((item) => (
+            <div key={item.label} className="flex items-center gap-2 rounded-xl border border-white/10 bg-brand-950/40 px-3 py-2 text-sm">
+              <span className={item.ok ? "text-emerald-300" : "text-amber-300"}>{item.ok ? "✓" : "!"}</span>
+              <span className="text-brand-100">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <Card>
         <div className="grid gap-4 md:grid-cols-3">

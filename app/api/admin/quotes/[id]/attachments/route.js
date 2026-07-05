@@ -63,7 +63,7 @@ export async function POST(req, { params }) {
       .eq("id", params.id)
       .maybeSingle();
 
-    const { data: documentData, error: documentError } = await supabaseAdmin
+    let { data: documentData, error: documentError } = await supabaseAdmin
       .from("quote_documents")
       .insert({
         quote_id: params.id,
@@ -73,10 +73,30 @@ export async function POST(req, { params }) {
         filename: file.name,
         mime_type: file.type || "application/pdf",
         storage_path: uploadData.path,
-        visible_in_portal: true
+        visible_in_portal: true,
+        is_portal_visible: true
       })
       .select("*")
       .single();
+
+    if (documentError) {
+      const fallback = await supabaseAdmin
+        .from("quote_documents")
+        .insert({
+          quote_id: params.id,
+          request_id: quote?.id || params.id,
+          customer_id: quote?.customer_id || null,
+          type: file.name.toLowerCase().includes("security") ? "security_report_pdf" : "quote_pdf",
+          filename: file.name,
+          mime_type: file.type || "application/pdf",
+          storage_path: uploadData.path,
+          visible_in_portal: true
+        })
+        .select("*")
+        .single();
+      documentData = fallback.data;
+      documentError = fallback.error;
+    }
 
     if (documentError) {
       console.error("quote document registration failed:", documentError);

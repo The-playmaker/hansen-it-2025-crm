@@ -19,9 +19,18 @@ export async function GET(req, { params }) {
 
 export async function POST(req, { params }) {
   const body = await req.json();
+  const message = String(body.message || "").trim();
+  if (!message) return NextResponse.json({ error: "Melding mangler." }, { status: 400 });
+
   const { data, error } = await supabaseAdmin
     .from("quote_messages")
-    .insert([{ ...body, quote_id: params.id }])
+    .insert([{
+      quote_id: params.id,
+      author_id: body.author_id || null,
+      author_type: body.author_type || "admin",
+      author_name: body.author_name || "Hansen IT",
+      message
+    }])
     .select()
     .single();
 

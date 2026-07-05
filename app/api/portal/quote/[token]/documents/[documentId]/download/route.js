@@ -28,17 +28,28 @@ export async function GET(_request, { params }) {
     return NextResponse.json({ error: "Portal-lenken er utløpt." }, { status: 410 });
   }
 
-  const { data: document, error: documentError } = await supabaseAdmin
+  let { data: document, error: documentError } = await supabaseAdmin
     .from("quote_documents")
-    .select("id, quote_id, request_id, customer_id, filename, storage_path, visible_in_portal")
+    .select("id, quote_id, request_id, customer_id, filename, storage_path, visible_in_portal, is_portal_visible")
     .eq("id", documentId)
     .maybeSingle();
+
+  if (documentError) {
+    const fallback = await supabaseAdmin
+      .from("quote_documents")
+      .select("id, quote_id, request_id, customer_id, filename, storage_path, visible_in_portal")
+      .eq("id", documentId)
+      .maybeSingle();
+    document = fallback.data;
+    documentError = fallback.error;
+  }
 
   if (documentError || !document) {
     return NextResponse.json({ error: "Dokumentet ble ikke funnet." }, { status: 404 });
   }
 
-  if (!document.visible_in_portal || String(document.quote_id) !== String(tokenRow.quote_id)) {
+  const visible = document.is_portal_visible !== false && document.visible_in_portal !== false;
+  if (!visible || String(document.quote_id) !== String(tokenRow.quote_id)) {
     return NextResponse.json({ error: "Du har ikke tilgang til dette dokumentet." }, { status: 403 });
   }
 
