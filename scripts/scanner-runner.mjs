@@ -14,10 +14,23 @@ if (!supabaseUrl || !serviceRoleKey) {
   process.exit(1);
 }
 
+function envFlag(name, defaultValue = false) {
+  const value = process.env[name];
+  if (value == null || value === "") return defaultValue;
+  return ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
+}
+
+const egressDedicated = envFlag("SCANNER_EGRESS_DEDICATED", false);
+const allowActiveScan = envFlag("SCANNER_ALLOW_ACTIVE_SCAN", false);
+const egressType = process.env.SCANNER_EGRESS_TYPE || "shared_proxmox_nat";
+
 const runner = {
   name: process.env.SCANNER_NODE_NAME || os.hostname() || "phoenix-scan01",
   internalIp: process.env.SCANNER_INTERNAL_IP || "10.200.1.20",
-  egressIp: process.env.SCANNER_EGRESS_IP || null,
+  egressIp: process.env.SCANNER_EGRESS_IP || "185.243.217.163",
+  egressType,
+  egressDedicated,
+  allowActiveScan,
   mode: process.env.SCANNER_MODE || "passive",
   version: "phoenix-scanner-runner-v1",
   path: process.argv[1] || "/opt/phoenix-scanner/app/scanner-runner.mjs"
@@ -286,11 +299,16 @@ function buildReport(domain, checks) {
 }
 
 async function claimOldestQueuedJob() {
-  const { data: queued, error } = await supabase
+  const query = supabase
     .from("scan_jobs")
     .select("*")
-    .eq("status", "queued")
-    .eq("scan_type", "passive")
+    .eq("status", "queued");
+
+  if (!runner.egressDedicated || !runner.allowActiveScan || runner.mode === "passive") {
+    query.eq("scan_type", "passive");
+  }
+
+  const { data: queued, error } = await query
     .order("queued_at", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -447,8 +465,20 @@ process.on("SIGTERM", () => {
 
 log("runner started", { pollIntervalMs, runOnce });
 
-if (runner.mode !== "passive") {
-  console.error(`[phoenix-scanner] Unsupported SCANNER_MODE '${runner.mode}'. Only passive is enabled in v1.`);
+if (!runner.egressDedicated) {
+  log("active scanning disabled - shared egress IP", { egressType: runner.egressType });
+}
+
+if (!runner.allowActiveScan) {
+  log("external_active, nmap and vuln scan disabled by SCANNER_ALLOW_ACTIVE_SCAN=false");
+}
+
+if (runner.mode !== "passive" || !runner.egressDedicated || !runner.allowActiveScan) {
+  runner.mode = "passive";
+}
+
+if (process.env.SCANNER_MODE && process.env.SCANNER_MODE !== "passive" && (!egressDedicated || !allowActiveScan)) {
+  console.error("[phoenix-scanner] Active scanner mode blocked. Shared egress or SCANNER_ALLOW_ACTIVE_SCAN=false only permits passive scans.");
   process.exit(1);
 }
 
