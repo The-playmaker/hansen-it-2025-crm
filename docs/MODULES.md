@@ -171,6 +171,7 @@ Runner MVP:
 - kan deployes som systemd service på `phoenix-scan01`
 - runner path på scanner-node: `/opt/phoenix-scanner/app/scanner-runner.mjs`
 - service: `phoenix-scanner.service`
+- egress IP `185.243.217.163` er delt Proxmox/NAT, derfor er runneren passive-only
 - bruker `SUPABASE_URL` og `SUPABASE_SERVICE_ROLE_KEY` server-side
 - henter eldste `scan_jobs` med `status='queued'`
 - verifiserer at tilhørende `scan_authorizations.status='signed'`
