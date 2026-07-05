@@ -187,6 +187,17 @@ export default function SecurityScanPage() {
         action={<Link href="/admin/security/reports" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"><FileText size={16} />Reports</Link>}
       />
 
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+          <p className="font-semibold">Passive scan runner active</p>
+          <p className="mt-1">Tillatte passive checks: DNS, HTTP/HTTPS, TLS, security headers og MX/SPF/DKIM/DMARC.</p>
+        </div>
+        <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+          <p className="font-semibold">Active scanning disabled – shared egress IP</p>
+          <p className="mt-1">phoenix-scan01 bruker delt Proxmox/NAT egress IP 185.243.217.163. Nmap, vuln scan og external_active er deaktivert.</p>
+        </div>
+      </div>
+
       <PhoenixPanel title="Ny skanning" description="Passive oppslag: DNS, RDAP, TLS, HTTPS og sikkerhetsheadere. Ingen aktiv angrepstesting.">
         {!crmConfigured ? <div className="mb-4 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">Demo mode: CRM-valg er ikke koblet fordi Supabase mangler eller ikke svarer. Scan kan fortsatt kjøres, men blir ikke lagret.</div> : null}
         <form onSubmit={runScan} className="space-y-4">
