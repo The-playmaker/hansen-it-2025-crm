@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { parseDomainList, validateScanDomains } from "@/lib/scanAuthorizationValidation";
 
 export const dynamic = "force-dynamic";
 
@@ -69,12 +70,21 @@ export async function POST(request, { params }) {
   const scope = authorization.scan_scopes?.[0];
   if (!scope) return NextResponse.json({ error: "Mangler scan-scope." }, { status: 400 });
 
-  const domains = list(body.domains).length ? list(body.domains) : scope.domains || [];
+  const bodyDomains = parseDomainList(body.domains);
+  const domains = bodyDomains.length ? bodyDomains : scope.domains || [];
   const ipAddresses = list(body.ip_addresses).length ? list(body.ip_addresses) : scope.ip_addresses || [];
   const scanType = body.scan_type || scope.scan_type || "passive";
 
   if (!domains.length && !ipAddresses.length) {
     return NextResponse.json({ error: "Minst ett domene eller én IP må være med i scope." }, { status: 400 });
+  }
+
+  const preflight = await validateScanDomains(domains);
+  if (preflight.invalid.length) {
+    return NextResponse.json({ error: "Ett eller flere domener har ugyldig format.", preflight }, { status: 400 });
+  }
+  if (preflight.requiresOverride && !body.confirm_dns_warnings) {
+    return NextResponse.json({ error: "Fant ingen DNS records for ett eller flere domener. Sjekk skrivefeil før du signerer, eller bekreft overstyring.", preflight, requiresOverride: true }, { status: 409 });
   }
 
   const now = new Date().toISOString();
@@ -88,7 +98,7 @@ export async function POST(request, { params }) {
     signer_role: signerRole,
     signed_ip: ip,
     signed_at: now,
-    scope: { domains, ip_addresses: ipAddresses, scan_type: scanType },
+    scope: { domains, ip_addresses: ipAddresses, scan_type: scanType, preflight },
     user_agent: request.headers.get("user-agent") || null
   };
 

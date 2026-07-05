@@ -22,6 +22,43 @@ const initialForm = {
   notes: ""
 };
 
+const knownTlds = new Set(["agency", "app", "as", "biz", "cloud", "co", "com", "dev", "digital", "dk", "io", "it", "net", "no", "org", "se", "tech"]);
+const domainPattern = /^(?!-)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/i;
+
+function domainList(value) {
+  return String(value || "").split(/[\n,;]/).map((item) => item.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0].split(":")[0]).filter(Boolean);
+}
+
+function distance(a, b) {
+  const matrix = Array.from({ length: a.length + 1 }, (_, index) => [index]);
+  for (let j = 1; j <= b.length; j += 1) matrix[0][j] = j;
+  for (let i = 1; i <= a.length; i += 1) {
+    for (let j = 1; j <= b.length; j += 1) {
+      matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+  }
+  return matrix[a.length][b.length];
+}
+
+function localDomainWarnings(value) {
+  return domainList(value).flatMap((domain) => {
+    const warnings = [];
+    if (!domainPattern.test(domain)) warnings.push({ domain, message: "Ugyldig domeneformat." });
+    const parts = domain.split(".");
+    const tld = parts.at(-1) || "";
+    const sld = parts.slice(0, -1).join(".");
+    if (domainPattern.test(domain) && !knownTlds.has(tld)) {
+      let best = null;
+      for (const known of knownTlds) {
+        const score = distance(tld, known);
+        if (!best || score < best.score) best = { tld: known, score };
+      }
+      warnings.push({ domain, message: best?.score <= 2 ? `TLD ser mistenkelig ut. Mener du ${sld}.${best.tld}?` : "TLD ser ukjent eller mistenkelig ut." });
+    }
+    return warnings;
+  });
+}
+
 const jobStatusText = (job) => {
   if (!job) return "";
   if (job.status === "queued") return "Queued - waiting for scanner runner";
@@ -39,6 +76,8 @@ export default function ScanAuthorizationsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState(initialForm);
+  const [preflight, setPreflight] = useState(null);
+  const [confirmDnsWarnings, setConfirmDnsWarnings] = useState(false);
 
   const pendingCount = useMemo(() => items.filter((item) => item.status === "pending").length, [items]);
   const signedCount = useMemo(() => items.filter((item) => item.status === "signed").length, [items]);
@@ -64,7 +103,13 @@ export default function ScanAuthorizationsPage() {
     load();
   }, []);
 
-  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const domainWarnings = useMemo(() => localDomainWarnings(form.domains), [form.domains]);
+
+  const update = (key, value) => {
+    setPreflight(null);
+    setConfirmDnsWarnings(false);
+    setForm((current) => ({ ...current, [key]: value }));
+  };
 
   const updateScanType = (value) => {
     if (value !== "passive") {
@@ -81,15 +126,23 @@ export default function ScanAuthorizationsPage() {
     setSaving(true);
     setError("");
     try {
+      if (domainWarnings.some((warning) => warning.message.includes("Ugyldig"))) {
+        throw new Error("Rett ugyldige domener før autorisasjonen opprettes.");
+      }
       const response = await fetch("/api/admin/scan-authorizations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, confirm_dns_warnings: confirmDnsWarnings })
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Kunne ikke opprette autorisasjon.");
+      if (!response.ok) {
+        if (result.preflight) setPreflight(result.preflight);
+        throw new Error(result.error || "Kunne ikke opprette autorisasjon.");
+      }
       setItems((current) => [result.data, ...current]);
       setForm(initialForm);
+      setPreflight(null);
+      setConfirmDnsWarnings(false);
     } catch (err) {
       setError(err.message || "Kunne ikke opprette autorisasjon.");
     } finally {
@@ -136,6 +189,27 @@ export default function ScanAuthorizationsPage() {
           <Field label="Domener"><TextArea value={form.domains} onChange={(event) => update("domains", event.target.value)} placeholder={"hansen-it.com\nkunde.no"} /></Field>
           <Field label="IP-er i scope"><TextArea value={form.ip_addresses} onChange={(event) => update("ip_addresses", event.target.value)} placeholder={"Kun IP-er kunden eier/har samtykke til\n203.0.113.10"} /></Field>
           <Field label="Notater / begrensninger"><TextArea value={form.notes} onChange={(event) => update("notes", event.target.value)} /></Field>
+          {(domainWarnings.length || preflight?.warnings?.length) ? (
+            <div className="lg:col-span-2 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+              <p className="font-semibold">Domain validation / DNS preflight</p>
+              <div className="mt-2 space-y-2">
+                {domainWarnings.map((warning) => <p key={`${warning.domain}-${warning.message}`}>{warning.domain}: {warning.message}</p>)}
+                {preflight?.warnings?.map((item) => (
+                  <div key={item.domain}>
+                    <p className="font-semibold">{item.domain}</p>
+                    {item.warnings.map((warning) => <p key={warning}>- {warning}</p>)}
+                    {item.dns ? <p className="text-xs text-amber-200">DNS: A {item.dns.a?.length || 0}, AAAA {item.dns.aaaa?.length || 0}, MX {item.dns.mx?.length || 0}, NS {item.dns.ns?.length || 0}</p> : null}
+                  </div>
+                ))}
+              </div>
+              {preflight?.requiresOverride ? (
+                <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
+                  <input type="checkbox" checked={confirmDnsWarnings} onChange={(event) => setConfirmDnsWarnings(event.target.checked)} />
+                  Jeg bekrefter at scope er riktig selv om DNS-records ikke ble funnet.
+                </label>
+              ) : null}
+            </div>
+          ) : null}
           <div className="lg:col-span-2">
             <PrimaryButton disabled={saving || !configured} type="submit"><ShieldCheck size={16} />{saving ? "Oppretter..." : "Opprett token-lenke"}</PrimaryButton>
           </div>
