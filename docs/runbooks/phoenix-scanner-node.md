@@ -6,6 +6,9 @@ Dette er deploy-instruks for den passive Phoenix Scanner Runner som kjører på 
 
 - Host: `phoenix-scan01`
 - Internal IP: `10.200.1.20`
+- Egress IP: `185.243.217.163`
+- Egress type: `shared_proxmox_nat`
+- Dedicated scanner IP: `false`
 - Runner path: `/opt/phoenix-scanner/app/scanner-runner.mjs`
 - Service: `phoenix-scanner.service`
 - Env file: `/opt/phoenix-scanner/.env`
@@ -13,7 +16,7 @@ Dette er deploy-instruks for den passive Phoenix Scanner Runner som kjører på 
 
 Runneren poller `scan_jobs` med `status='queued'`, verifiserer at tilhørende `scan_authorization` er `signed`, setter jobben til `running`, kjører passive DNS/HTTP/TLS/header/e-post-kontroller og lagrer `scan_results`, `scan_findings` og `scan_reports`.
 
-Aktiv Nmap/full vuln-scan er ikke aktivert i denne versjonen.
+Aktiv Nmap/full vuln-scan er ikke aktivert i denne versjonen. Siden egress IP er delt Proxmox/NAT skal runneren kun kjøre passive scan-typer.
 
 ## Påkrevd env
 
@@ -26,7 +29,10 @@ SUPABASE_SERVICE_ROLE_KEY=...
 SCANNER_MODE=passive
 SCANNER_NODE_NAME=phoenix-scan01
 SCANNER_INTERNAL_IP=10.200.1.20
-SCANNER_EGRESS_IP=
+SCANNER_EGRESS_IP=185.243.217.163
+SCANNER_EGRESS_TYPE=shared_proxmox_nat
+SCANNER_EGRESS_DEDICATED=false
+SCANNER_ALLOW_ACTIVE_SCAN=false
 SCANNER_POLL_INTERVAL_MS=15000
 SCANNER_DNS_SERVERS=1.1.1.1,8.8.8.8
 SCANNER_DKIM_SELECTORS=selector1,selector2,google,default,mail,smtp
@@ -134,6 +140,9 @@ Runneren legger disse feltene i `scan_jobs.metadata`, `scan_results.raw_result.r
 - scanner node name
 - internal IP
 - egress IP hvis konfigurert
+- egress type
+- dedicated scanner IP flag
+- active scan allow flag
 - mode
 - runner version
 - runner path
@@ -159,3 +168,12 @@ Passiv scan gjør ikke:
 - brute force
 
 `external_active` og `internal_agent` er kun struktur for senere. De skal ikke kjøres før scope er eksplisitt godkjent, scanner egress IP er kjent, og aktiv scan-policy er på plass.
+
+For `phoenix-scan01` er egress IP delt (`shared_proxmox_nat`). Aktiv scanning krever dedikert scanner-IP eller eksplisitt godkjent egress-IP fra kunden. Med:
+
+```bash
+SCANNER_EGRESS_DEDICATED=false
+SCANNER_ALLOW_ACTIVE_SCAN=false
+```
+
+skal runneren kun plukke opp `scan_type='passive'`. `external_active`, Nmap og vuln scan skal ikke kjøres.
