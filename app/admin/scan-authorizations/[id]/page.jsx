@@ -94,6 +94,17 @@ export default function ScanAuthorizationDetailsPage() {
 
       {item ? (
         <>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+              <p className="font-semibold">Passive scan runner active</p>
+              <p className="mt-1">phoenix-scan01 kjører kun passiv scan for denne noden.</p>
+            </div>
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+              <p className="font-semibold">Active scanning disabled – shared egress IP</p>
+              <p className="mt-1">Egress IP 185.243.217.163 er delt Proxmox/NAT. external_active, Nmap og vuln scan er blokkert.</p>
+            </div>
+          </div>
+
           <PhoenixPanel title={item.customer_name} description={`Signatar: ${item.signer_name || "-"} - ${item.signer_email}`}>
             <div className="flex flex-wrap gap-2">
               <StatusBadge>{item.status}</StatusBadge>
