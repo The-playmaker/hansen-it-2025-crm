@@ -43,7 +43,7 @@ export async function POST(req, { params }) {
   }
 
   const isPdf = (file.type || "").includes("pdf") || file.name.toLowerCase().endsWith(".pdf");
-  const bucket = isPdf ? "phoenix-documents" : "quote-attachments";
+  const bucket = "quote-attachments";
   let quote = null;
   try {
     quote = await resolveQuoteId(params.id);
@@ -84,7 +84,7 @@ export async function POST(req, { params }) {
         quote_id: quote.id,
         request_id: quote.source_request_id || null,
         customer_id: quote?.customer_id || null,
-        type: file.name.toLowerCase().includes("security") ? "security_report_pdf" : "quote_pdf",
+        type: file.name.toLowerCase().includes("security") ? "scan_combined_pdf" : "quote_pdf",
         title: file.name.toLowerCase().includes("security") ? "Samlet sikkerhetsrapport" : "Tilbud PDF",
         filename: file.name,
         mime_type: file.type || "application/pdf",
