@@ -1275,6 +1275,11 @@ const handleCreatePortalLink = async () => {
                     <div className="text-brand-500 text-[11px] mt-1">
                       {a.created_at ? new Date(a.created_at).toLocaleString() : ""}
                     </div>
+                    {documentStoragePaths.has(a.file_path) ? (
+                      <div className="mt-2 inline-flex rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-100">
+                        Allerede koblet til portal
+                      </div>
+                    ) : null}
                     <Button
                       variant="outline"
                       className="mt-2 gap-2"

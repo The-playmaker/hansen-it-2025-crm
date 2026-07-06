@@ -35,6 +35,60 @@ async function loadQuoteItems(quote) {
   return data || [];
 }
 
+async function normalizeQuoteItems(quote) {
+  const items = await loadQuoteItems(quote);
+  const packageIds = [...new Set(items.map((item) => item.service_package_id).filter(Boolean))];
+  let packages = [];
+  if (packageIds.length) {
+    const packageResult = await supabaseAdmin
+      .from("service_packages")
+      .select("id, name, short_description")
+      .in("id", packageIds);
+    packages = packageResult.data || [];
+  }
+  const packageMap = new Map(packages.map((pkg) => [String(pkg.id), pkg]));
+
+  for (const item of items) {
+    const pkg = item.service_package_id ? packageMap.get(String(item.service_package_id)) : null;
+    const quantity = Number(item.quantity || 1);
+    const unitPrice = Number(item.unit_price || 0);
+    const discount = Number(item.discount || 0);
+    const vatRate = Number(item.vat_rate ?? 25);
+    const lineTotalExVat = Math.max(0, Math.round(quantity * unitPrice - discount));
+    const lineTotal = Math.round(lineTotalExVat * (1 + vatRate / 100));
+    const patch = {
+      item_type: item.service_package_id ? "package" : item.item_type || "custom",
+      title: item.title || pkg?.name || item.description || "Tilbudslinje",
+      description: item.description || pkg?.short_description || null,
+      line_total_ex_vat: lineTotalExVat,
+      line_total: lineTotal,
+    };
+
+    await supabaseAdmin
+      .from("quote_items")
+      .update(patch)
+      .eq("id", item.id);
+  }
+
+  const normalized = await loadQuoteItems(quote);
+  const subtotal = normalized.reduce((sum, item) => sum + Number(item.line_total_ex_vat || 0), 0);
+  const vat = normalized.reduce((sum, item) => {
+    const exVat = Number(item.line_total_ex_vat || 0);
+    const vatRate = Number(item.vat_rate ?? 25);
+    return sum + Math.round(exVat * (vatRate / 100));
+  }, 0);
+  const total = subtotal + vat;
+
+  const { data: updatedQuote } = await supabaseAdmin
+    .from("quotes")
+    .update({ total_ex_vat: subtotal, total_vat: vat, total_inc_vat: total, updated_at: new Date().toISOString() })
+    .eq("id", quote.id)
+    .select("*")
+    .maybeSingle();
+
+  return { items: normalized, subtotal, vat, total, quote: updatedQuote || quote };
+}
+
 async function connectLegacyAttachments(quote) {
   const ids = [quote.id, quote.source_request_id].filter(Boolean);
   const { data: attachments, error } = await supabaseAdmin
@@ -86,6 +140,7 @@ export async function POST(request, { params }) {
   const checks = [];
   let portalToken = null;
   let quoteItems = [];
+  let totals = { subtotal: 0, vat: 0, total: 0 };
   let documents = [];
 
   try {
@@ -98,13 +153,20 @@ export async function POST(request, { params }) {
   }
 
   try {
-    quoteItems = await loadQuoteItems(quote);
+    const normalized = await normalizeQuoteItems(quote);
+    quoteItems = normalized.items;
+    totals = { subtotal: normalized.subtotal, vat: normalized.vat, total: normalized.total };
+    quote = normalized.quote;
     checks.push(quoteItems.length
       ? ok("quote_items", "Tilbudslinjer", `${quoteItems.length} linjer funnet.`)
       : fail("quote_items", "Tilbudslinjer", "Ingen produktpakker eller tilbudslinjer funnet."));
+    checks.push(totals.total > 0
+      ? ok("quote_total", "Tilbudssum", `${totals.subtotal.toLocaleString("nb-NO")} kr eks. mva / ${totals.total.toLocaleString("nb-NO")} kr inkl. mva.`)
+      : fail("quote_total", "Tilbudssum", "Tilbudet mangler total."));
   } catch (error) {
     console.error("prepare portal quote items failed:", { inputId: params.id, quoteId: quote.id, error });
     checks.push(fail("quote_items", "Tilbudslinjer", error.message || "Kunne ikke hente tilbudslinjer."));
+    checks.push(fail("quote_total", "Tilbudssum", "Kunne ikke beregne total."));
   }
 
   try {
