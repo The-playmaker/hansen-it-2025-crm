@@ -1,56 +1,31 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabaseServer";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { PortalTokenError, resolveQuotePortalToken } from "@/lib/portal/resolveQuotePortalToken";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_req, { params }) {
   const token = String(params?.token || "");
   if (!token) {
-    return NextResponse.json({ error: "Missing token" }, { status: 400 });
+    return NextResponse.json({ error: "Mangler portal-token." }, { status: 400 });
   }
 
-  const supabase = getSupabaseServer();
-
-  // 1) validate token
-  const { data: tokenRow, error: tokenErr } = await supabase
-    .from("quote_portal_tokens")
-    .select("*")
-    .eq("token", token)
-    .maybeSingle();
-
-  if (tokenErr || !tokenRow) {
-    return NextResponse.json({ error: "Invalid token" }, { status: 404 });
+  let resolved;
+  try {
+    resolved = await resolveQuotePortalToken(token);
+  } catch (error) {
+    if (error instanceof PortalTokenError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    console.error("quote portal resolve failed:", error);
+    return NextResponse.json({ error: "Kunne ikke apne kundeportalen." }, { status: 500 });
   }
 
-  if (tokenRow.expires_at && new Date(tokenRow.expires_at) < new Date()) {
-    return NextResponse.json({ error: "Expired token" }, { status: 410 });
-  }
+  const { quote, tokenRow, tokenSource } = resolved;
 
-  // 2) load quote
-  let { data: quote, error: quoteErr } = await supabase
-    .from("requests")
-    .select("*")
-    .eq("id", tokenRow.quote_id)
-    .maybeSingle();
-
-  if (quoteErr || !quote) {
-    const fallback = await supabase
-      .from("quotes")
-      .select("*")
-      .eq("id", tokenRow.quote_id)
-      .maybeSingle();
-    quote = fallback.data;
-    quoteErr = fallback.error;
-  }
-
-  if (quoteErr || !quote) {
-    return NextResponse.json({ error: "Quote not found" }, { status: 404 });
-  }
-
-  // 3) employee (optional)
   let employee = null;
   if (quote.employee_id) {
-    const { data: emp } = await supabase
+    const { data: emp } = await supabaseAdmin
       .from("employees")
       .select("*")
       .eq("id", quote.employee_id)
@@ -58,19 +33,22 @@ export async function GET(_req, { params }) {
     employee = emp ?? null;
   }
 
-  // 4) time entries
-  const { data: timeEntries } = await supabase
+  const { data: timeEntries } = await supabaseAdmin
     .from("quote_time_entries")
     .select("*")
     .eq("quote_id", quote.id)
     .order("created_at", { ascending: false });
 
-  // 4b) quote items / service packages
   let quoteItems = [];
-  const { data: itemsData, error: itemsError } = await supabase
+  const quoteItemIds = [quote.id, quote.source_request_id].filter(Boolean);
+  const quoteItemFilter = quoteItemIds
+    .flatMap((id) => [`quote_id.eq.${id}`, `request_id.eq.${id}`])
+    .join(",");
+
+  const { data: itemsData, error: itemsError } = await supabaseAdmin
     .from("quote_items")
     .select("*")
-    .or(`quote_id.eq.${quote.id},request_id.eq.${quote.id}`)
+    .or(quoteItemFilter)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -78,7 +56,7 @@ export async function GET(_req, { params }) {
     const packageIds = [...new Set(itemsData.map((item) => item.service_package_id).filter(Boolean))];
     let packages = [];
     if (packageIds.length) {
-      const packageResult = await supabase
+      const packageResult = await supabaseAdmin
         .from("service_packages")
         .select("*, service_package_items(*)")
         .in("id", packageIds);
@@ -91,8 +69,7 @@ export async function GET(_req, { params }) {
     }));
   }
 
-  // 5) portal documents. quote_documents is source of truth.
-  const { data: documents } = await supabase
+  const { data: documents } = await supabaseAdmin
     .from("quote_documents")
     .select("*")
     .eq("quote_id", quote.id)
@@ -102,6 +79,7 @@ export async function GET(_req, { params }) {
   return NextResponse.json({
     token: {
       quote_id: tokenRow.quote_id,
+      token_source: tokenSource,
       expires_at: tokenRow.expires_at,
     },
     quote,
