@@ -108,6 +108,11 @@ export default function QuoteDetailsPage() {
     [quoteItemsSubtotal, totalCost]
   );
 
+  const documentStoragePaths = useMemo(
+    () => new Set(documents.map((document) => document.storage_path).filter(Boolean)),
+    [documents]
+  );
+
   const quoteNumber = useMemo(() => `Tilbud ${String(quoteId || "").slice(0, 8).toUpperCase()}`, [quoteId]);
 
   // ---- load me ----
@@ -424,10 +429,10 @@ export default function QuoteDetailsPage() {
     if (!selectedPackageId) return;
     try {
       setBusyPackage(true);
-      const res = await fetch(`/api/admin/quotes/${quoteId}/items`, {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/add-service-package`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service_package_id: selectedPackageId }),
+        body: JSON.stringify({ service_package_id: selectedPackageId, source: "quote_admin" }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || "Kunne ikke legge pakken til tilbudet.");
@@ -450,6 +455,45 @@ export default function QuoteDetailsPage() {
     } catch (error) {
       console.error(error);
       alert(error.message || "Kunne ikke slette tilbudslinjen.");
+    }
+  };
+
+  const handleToggleDocumentVisibility = async (documentId, visible) => {
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/documents/${documentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_portal_visible: visible }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke oppdatere dokumentet.");
+      setDocuments((prev) => prev.map((document) => (
+        document.id === documentId
+          ? { ...document, ...json.data, is_portal_visible: visible, visible_in_portal: visible }
+          : document
+      )));
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke oppdatere dokumentet.");
+    }
+  };
+
+  const handleLinkAttachmentToPortal = async (attachmentId, visible = false) => {
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/attachments/${attachmentId}/portal-document`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_portal_visible: visible }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke koble vedlegget til portalen.");
+      setDocuments((prev) => {
+        const exists = prev.some((document) => document.id === json.data.id);
+        return exists ? prev.map((document) => (document.id === json.data.id ? json.data : document)) : [json.data, ...prev];
+      });
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke koble vedlegget til portalen.");
     }
   };
 
@@ -618,7 +662,7 @@ const handleCreatePortalLink = async () => {
       const pdfFile = new File([blob], fileName, { type: "application/pdf" });
       const uploaded = await uploadViaApi(pdfFile, fileName);
       if (!uploaded.document) throw new Error("PDF ble lastet opp, men ble ikke registrert som portaldokument.");
-      setPdfStatus("PDF generert, lagret og synlig i portal.");
+      setPdfStatus("PDF generert og lagret. Gjør dokumentet synlig i portal når det er klart for kunde.");
     } catch (e) {
       console.error(e);
       setPdfStatus(e.message || "PDF-generering eller lagring feilet.");
@@ -885,7 +929,11 @@ const handleCreatePortalLink = async () => {
             <div className="mt-5 space-y-3">
               {quoteItems.length ? quoteItems.map((item) => {
                 const pkg = item.service_package || {};
-                const included = Array.isArray(pkg.service_package_items) ? pkg.service_package_items.slice(0, 5) : [];
+                const included = Array.isArray(pkg.service_package_items)
+                  ? pkg.service_package_items.slice(0, 5)
+                  : Array.isArray(item.metadata?.included_items)
+                    ? item.metadata.included_items.slice(0, 5)
+                    : [];
                 return (
                   <div key={item.id} className="rounded-xl border border-brand-800 bg-brand-900/30 p-4">
                     <div className="flex items-start justify-between gap-3">
@@ -1085,12 +1133,60 @@ const handleCreatePortalLink = async () => {
               </div>
             ) : null}
 
+            {documents.length ? (
+              <div className="mt-4 rounded-xl border border-brand-700 bg-brand-950/40 p-3">
+                <div className="text-white font-semibold">Dokumentkontroll</div>
+                <div className="mt-3 space-y-2">
+                  {documents.map((document) => (
+                    <div key={`control-${document.id}`} className="rounded-lg border border-brand-800 bg-brand-900/40 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-white">{document.title || document.filename}</div>
+                          <div className="mt-1 text-xs text-brand-400">{document.type || "attachment"} · {document.storage_path ? "storage OK" : document.external_url ? "external URL" : "mangler fil/URL"}</div>
+                          <div className="mt-1 text-xs text-brand-400">{document.is_portal_visible !== false && document.visible_in_portal !== false ? "Synlig i portal" : "Skjult i portal"}</div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" className="gap-2" onClick={() => openDocument(document.id)}>
+                            Test download
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => handleToggleDocumentVisibility(document.id, !(document.is_portal_visible !== false && document.visible_in_portal !== false))}
+                          >
+                            {document.is_portal_visible !== false && document.visible_in_portal !== false ? "Skjul i portal" : "Gjør synlig i portal"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="mt-4 space-y-3">
               <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
               <Button onClick={handleUpload} disabled={busyUpload || !file} className="gap-2">
                 <Plus size={16} /> {busyUpload ? "Laster opp..." : "Last opp"}
               </Button>
             </div>
+
+            {attachments.some((attachment) => !documentStoragePaths.has(attachment.file_path)) ? (
+              <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+                <div className="font-semibold">Vedlegg mangler portal-kobling</div>
+                <div className="mt-1">Disse ligger i gammel attachment-tabell. Koble dem til quote_documents for kundeportalen.</div>
+                <div className="mt-3 space-y-2">
+                  {attachments.filter((attachment) => !documentStoragePaths.has(attachment.file_path)).map((attachment) => (
+                    <div key={`legacy-${attachment.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/20 bg-brand-950/40 p-2">
+                      <span>{attachment.file_name}</span>
+                      <Button variant="outline" className="gap-2" onClick={() => handleLinkAttachmentToPortal(attachment.id, false)}>
+                        Koble til portal
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-4 space-y-2">
               {attachments.length === 0 ? (

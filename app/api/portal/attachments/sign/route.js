@@ -3,7 +3,7 @@ import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-const storageBuckets = ["quote-attachments", "quote-documents", "documents"];
+const storageBuckets = ["phoenix-documents", "quote-attachments", "quote-documents"];
 
 async function createSignedUrl(filePath) {
   let lastError = null;

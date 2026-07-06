@@ -57,6 +57,9 @@ function statusBadge(status, portalStatus) {
 }
 
 function documentLabel(document) {
+  if (document.title) return document.title;
+  if (document.type === "scan_combined_pdf") return "Samlet sikkerhetsrapport";
+  if (document.type === "scan_domain_pdf") return "Teknisk rapport per domene";
   if (document.type === "security_report_pdf") return "Sikkerhetsrapport PDF";
   if (document.type === "quote_pdf") return "Tilbud PDF";
   return document.filename || "Dokument";
@@ -96,7 +99,11 @@ export default function QuotePortal() {
         id: item.id,
         title: item.title || item.service_package?.name || item.description || "Tilbudslinje",
         description: item.description || item.service_package?.short_description || "Produktpakke fra Hansen IT",
-        included: Array.isArray(item.service_package?.service_package_items) ? item.service_package.service_package_items.slice(0, 6) : [],
+        included: Array.isArray(item.service_package?.service_package_items)
+          ? item.service_package.service_package_items.slice(0, 6)
+          : Array.isArray(item.metadata?.included_items)
+            ? item.metadata.included_items.slice(0, 6)
+            : [],
         quantity: Number(item.quantity || 1),
         unit: item.unit || "pakke",
         unitPrice: Number(item.unit_price || 0),
@@ -418,7 +425,7 @@ export default function QuotePortal() {
                     </span>
                     <Download className="h-4 w-4 text-[#3FA1FF]" />
                   </a>
-                )) : <p className="text-sm text-slate-400">Ingen portal-dokumenter er publisert ennå.</p>}
+                )) : <p className="text-sm text-slate-400">Dokumenter blir tilgjengelige her når de er klargjort av Hansen IT.</p>}
 
                 {!documents.length && attachments.length ? (
                   <div className="border-t border-white/10 pt-3">

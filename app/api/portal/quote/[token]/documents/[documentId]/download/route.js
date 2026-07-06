@@ -3,7 +3,7 @@ import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-const storageBuckets = ["quote-attachments", "quote-documents", "documents"];
+const storageBuckets = ["phoenix-documents", "quote-attachments", "quote-documents"];
 
 async function createSignedDocumentUrl(document) {
   let lastError = null;
@@ -42,38 +42,45 @@ export async function GET(request, { params }) {
     return NextResponse.json({ error: "Portal-lenken er utløpt." }, { status: 410 });
   }
 
-  let { data: document, error: documentError } = await supabaseAdmin
+  const { data: document, error: documentError } = await supabaseAdmin
     .from("quote_documents")
-    .select("id, quote_id, request_id, customer_id, filename, storage_path, visible_in_portal, is_portal_visible")
+    .select("id, quote_id, filename, storage_path, external_url, is_portal_visible")
     .eq("id", documentId)
     .maybeSingle();
-
-  if (documentError) {
-    const fallback = await supabaseAdmin
-      .from("quote_documents")
-      .select("id, quote_id, request_id, customer_id, filename, storage_path, visible_in_portal")
-      .eq("id", documentId)
-      .maybeSingle();
-    document = fallback.data;
-    documentError = fallback.error;
-  }
 
   if (documentError || !document) {
     return NextResponse.json({ error: "Dokumentet ble ikke funnet." }, { status: 404 });
   }
 
-  const visible = document.is_portal_visible !== false && document.visible_in_portal !== false;
-  const belongsToQuote = [document.quote_id, document.request_id].some((value) => String(value || "") === String(tokenRow.quote_id));
-  if (!visible || !belongsToQuote) {
+  if (String(document.quote_id) !== String(tokenRow.quote_id) || document.is_portal_visible !== true) {
     return NextResponse.json({ error: "Du har ikke tilgang til dette dokumentet." }, { status: 403 });
+  }
+
+  const wantsJson = new URL(request.url).searchParams.get("json") === "1";
+  if (document.external_url) {
+    let external = null;
+    try {
+      external = new URL(document.external_url);
+    } catch {
+      return NextResponse.json({ error: "Dokumentlenken er ugyldig." }, { status: 400 });
+    }
+    if (!["http:", "https:"].includes(external.protocol)) {
+      return NextResponse.json({ error: "Dokumentlenken er ikke tillatt." }, { status: 403 });
+    }
+    if (wantsJson) return NextResponse.json({ url: document.external_url });
+    return NextResponse.redirect(document.external_url, 302);
+  }
+
+  if (!document.storage_path) {
+    return NextResponse.json({ error: "Dokumentet er ikke gjort tilgjengelig ennå." }, { status: 404 });
   }
 
   try {
     const signedUrl = await createSignedDocumentUrl(document);
-    if (new URL(request.url).searchParams.get("json") === "1") return NextResponse.json({ url: signedUrl });
+    if (wantsJson) return NextResponse.json({ url: signedUrl });
     return NextResponse.redirect(signedUrl, 302);
   } catch (error) {
     console.error("portal document signed url failed:", error);
-    return NextResponse.json({ error: "Kunne ikke klargjøre nedlasting." }, { status: 500 });
+    return NextResponse.json({ error: "Dokumentet kunne ikke åpnes akkurat nå. Kontakt Hansen IT." }, { status: 500 });
   }
 }

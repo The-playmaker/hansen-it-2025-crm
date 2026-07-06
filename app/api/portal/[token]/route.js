@@ -27,11 +27,21 @@ export async function GET(_req, { params }) {
   }
 
   // 2) load quote
-  const { data: quote, error: quoteErr } = await supabase
+  let { data: quote, error: quoteErr } = await supabase
     .from("requests")
     .select("*")
     .eq("id", tokenRow.quote_id)
     .maybeSingle();
+
+  if (quoteErr || !quote) {
+    const fallback = await supabase
+      .from("quotes")
+      .select("*")
+      .eq("id", tokenRow.quote_id)
+      .maybeSingle();
+    quote = fallback.data;
+    quoteErr = fallback.error;
+  }
 
   if (quoteErr || !quote) {
     return NextResponse.json({ error: "Quote not found" }, { status: 404 });
@@ -88,25 +98,13 @@ export async function GET(_req, { params }) {
     .eq("quote_id", quote.id)
     .order("created_at", { ascending: false });
 
-  // 6) portal documents
-  let documents = [];
-  const { data: visibleDocuments, error: visibleDocumentsError } = await supabase
+  // 6) portal documents. quote_documents is source of truth.
+  const { data: documents } = await supabase
     .from("quote_documents")
     .select("*")
     .eq("quote_id", quote.id)
     .eq("is_portal_visible", true)
     .order("created_at", { ascending: false });
-  if (visibleDocumentsError) {
-    const { data: fallbackDocuments } = await supabase
-      .from("quote_documents")
-      .select("*")
-      .eq("quote_id", quote.id)
-      .eq("visible_in_portal", true)
-      .order("created_at", { ascending: false });
-    documents = fallbackDocuments || [];
-  } else {
-    documents = visibleDocuments || [];
-  }
 
   return NextResponse.json({
     token: {

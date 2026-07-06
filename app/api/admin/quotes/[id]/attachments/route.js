@@ -4,10 +4,17 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export const dynamic = "force-dynamic";
 
 export async function GET(req, { params }) {
+  const quoteLookup = await supabaseAdmin
+    .from("quotes")
+    .select("id, source_request_id")
+    .eq("id", params.id)
+    .maybeSingle();
+  const attachmentQuoteIds = [params.id, quoteLookup.data?.source_request_id].filter(Boolean);
+
   const { data, error } = await supabaseAdmin
     .from("quote_attachments")
     .select("*")
-    .eq("quote_id", params.id)
+    .in("quote_id", attachmentQuoteIds)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -31,9 +38,11 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
+  const isPdf = (file.type || "").includes("pdf") || file.name.toLowerCase().endsWith(".pdf");
+  const bucket = isPdf ? "phoenix-documents" : "quote-attachments";
   const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-    .from("quote-attachments")
-    .upload(`${params.id}/${file.name}`, file);
+    .from(bucket)
+    .upload(`${params.id}/${Date.now()}-${file.name}`, file);
 
   if (uploadError) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
@@ -56,47 +65,38 @@ export async function POST(req, { params }) {
   }
 
   let document = null;
-  if ((file.type || "").includes("pdf") || file.name.toLowerCase().endsWith(".pdf")) {
-    const { data: quote } = await supabaseAdmin
+  if (isPdf) {
+    let { data: quote } = await supabaseAdmin
       .from("requests")
-      .select("id, customer_id")
+      .select("id, customer_id, source_request_id")
       .eq("id", params.id)
       .maybeSingle();
 
-    let { data: documentData, error: documentError } = await supabaseAdmin
+    if (!quote) {
+      const fallback = await supabaseAdmin
+        .from("quotes")
+        .select("id, customer_id, source_request_id")
+        .eq("id", params.id)
+        .maybeSingle();
+      quote = fallback.data;
+    }
+
+    const { data: documentData, error: documentError } = await supabaseAdmin
       .from("quote_documents")
       .insert({
         quote_id: params.id,
-        request_id: quote?.id || params.id,
+        request_id: quote?.source_request_id || (quote?.id !== params.id ? quote?.id : null),
         customer_id: quote?.customer_id || null,
         type: file.name.toLowerCase().includes("security") ? "security_report_pdf" : "quote_pdf",
+        title: file.name.toLowerCase().includes("security") ? "Samlet sikkerhetsrapport" : "Tilbud PDF",
         filename: file.name,
         mime_type: file.type || "application/pdf",
         storage_path: uploadData.path,
-        visible_in_portal: true,
-        is_portal_visible: true
+        is_portal_visible: false,
+        visible_in_portal: false
       })
       .select("*")
       .single();
-
-    if (documentError) {
-      const fallback = await supabaseAdmin
-        .from("quote_documents")
-        .insert({
-          quote_id: params.id,
-          request_id: quote?.id || params.id,
-          customer_id: quote?.customer_id || null,
-          type: file.name.toLowerCase().includes("security") ? "security_report_pdf" : "quote_pdf",
-          filename: file.name,
-          mime_type: file.type || "application/pdf",
-          storage_path: uploadData.path,
-          visible_in_portal: true
-        })
-        .select("*")
-        .single();
-      documentData = fallback.data;
-      documentError = fallback.error;
-    }
 
     if (documentError) {
       console.error("quote document registration failed:", documentError);

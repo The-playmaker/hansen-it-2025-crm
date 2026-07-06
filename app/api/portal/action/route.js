@@ -28,14 +28,21 @@ export async function POST(req) {
     const requestStatus = isApproved ? "godkjent" : type === "declined" ? "avslått" : "endringer ønsket";
     const timestampColumn = isApproved ? { approved_at: new Date().toISOString() } : isChangesRequested ? { changes_requested_at: new Date().toISOString() } : {};
 
-    const { error: updateError } = await supabaseAdmin
+    let { error: updateError } = await supabaseAdmin
       .from("requests")
       .update({ portal_status: portalStatus, status: requestStatus, ...timestampColumn })
       .eq("id", tokenRow.quote_id);
 
     if (updateError) {
-      console.error("portal quote status update failed:", updateError);
-      await supabaseAdmin.from("quote_notes").insert({ quote_id: tokenRow.quote_id, author_id: null, note: `[PORTAL ACTION] ${portalStatus}` });
+      const fallback = await supabaseAdmin
+        .from("quotes")
+        .update({ status: requestStatus, updated_at: new Date().toISOString() })
+        .eq("id", tokenRow.quote_id);
+      updateError = fallback.error;
+      if (updateError) {
+        console.error("portal quote status update failed:", updateError);
+        await supabaseAdmin.from("quote_notes").insert({ quote_id: tokenRow.quote_id, author_id: null, note: `[PORTAL ACTION] ${portalStatus}` });
+      }
     }
 
     const portalMessage = isApproved
