@@ -59,33 +59,44 @@ export async function POST(request, { params }) {
   ].filter(Boolean).join("\n\n");
 
   let quote = null;
-  let quoteUsesQuotesTable = false;
-  if (row.request_id) {
-    const existingQuote = await supabaseAdmin.from("quotes").select("*").eq("source_request_id", row.request_id).maybeSingle();
-    if (existingQuote.data) {
-      quote = existingQuote.data;
-      quoteUsesQuotesTable = true;
-    } else {
-      const existing = await supabaseAdmin.from("requests").select("*").eq("id", row.request_id).maybeSingle();
-      quote = existing.data || null;
-    }
+  const existingByReport = await supabaseAdmin.from("quotes").select("*").eq("security_report_id", row.id).maybeSingle();
+  if (existingByReport.data) quote = existingByReport.data;
+
+  if (!quote && row.request_id) {
+    const existingByRequest = await supabaseAdmin
+      .from("quotes")
+      .select("*")
+      .eq("source_request_id", row.request_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existingByRequest.data) quote = existingByRequest.data;
+  }
+
+  if (!quote && row.customer_id) {
+    const existingByCustomer = await supabaseAdmin
+      .from("quotes")
+      .select("*")
+      .eq("customer_id", row.customer_id)
+      .ilike("title", `%${report.domain || row.domain || "Security"}%`)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existingByCustomer.data) quote = existingByCustomer.data;
   }
 
   if (!quote) {
     const { data, error } = await supabaseAdmin
-      .from("requests")
+      .from("quotes")
       .insert({
-        name: customerLabel(row),
-        customer_name: customerLabel(row),
-        company: row.company || row.customer_name || null,
-        email: row.email || null,
+        title,
         customer_id: row.customer_id || null,
         lead_id: row.lead_id || null,
         source_request_id: row.request_id || null,
-        category: "Sikkerhetstiltak",
+        security_report_id: row.id,
         status: "kladd",
-        priority: recommendation.level === "urgent" ? "hast" : "normal",
-        message: `${title}\n\n${message}\n\nEstimert subtotal fra anbefalte pakker: ${subtotal.toLocaleString("nb-NO")} kr eks. mva.`,
+        description: `${message}\n\nEstimert subtotal fra anbefalte pakker: ${subtotal.toLocaleString("nb-NO")} kr eks. mva.`,
+        internal_notes: `Opprettet fra sikkerhetsrapport ${row.id}`,
       })
       .select("*")
       .single();
@@ -95,17 +106,22 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: "Kunne ikke opprette tilbudskladd." }, { status: 500 });
     }
     quote = data;
-    quoteUsesQuotesTable = false;
   }
 
-  const items = packages.map((pkg, index) => {
+  const { data: existingItems } = await supabaseAdmin
+    .from("quote_items")
+    .select("service_package_id")
+    .eq("quote_id", quote.id);
+  const existingPackageIds = new Set((existingItems || []).map((item) => String(item.service_package_id)).filter(Boolean));
+
+  const items = packages.filter((pkg) => !existingPackageIds.has(String(pkg.id))).map((pkg, index) => {
     const price = priceOf(pkg);
     const includedItems = [...(pkg.service_package_items || [])]
       .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
       .map((item) => ({ title: item.title, description: item.description }));
 
     return {
-      ...(quoteUsesQuotesTable ? { quote_id: quote.id } : { request_id: quote.id }),
+      quote_id: quote.id,
       service_package_id: pkg.id,
       item_type: "package",
       title: pkg.name,
@@ -136,5 +152,5 @@ export async function POST(request, { params }) {
     }
   }
 
-  return NextResponse.json({ data: quote, packages });
+  return NextResponse.json({ data: quote, packages, added: items.length, url: `/admin/quotes/${quote.id}` });
 }

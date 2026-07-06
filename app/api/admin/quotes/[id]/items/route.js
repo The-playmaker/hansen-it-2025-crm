@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireMe } from "@/lib/requireMe";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { quoteResolveResponse, resolveQuoteId } from "@/lib/quotes/resolveQuoteId";
 
 export const dynamic = "force-dynamic";
 
@@ -37,10 +38,18 @@ export async function GET(_request, { params }) {
   if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
   if (!hasSupabaseAdminConfig) return NextResponse.json({ error: "Supabase er ikke konfigurert." }, { status: 503 });
 
+  let quote = null;
+  try {
+    quote = await resolveQuoteId(params.id);
+  } catch (error) {
+    const response = quoteResolveResponse(error);
+    return NextResponse.json({ error: response.error }, { status: response.status });
+  }
+
   const { data: items, error } = await supabaseAdmin
     .from("quote_items")
     .select("*")
-    .or(`quote_id.eq.${params.id},request_id.eq.${params.id}`)
+    .or([quote.id, quote.source_request_id].filter(Boolean).flatMap((id) => [`quote_id.eq.${id}`, `request_id.eq.${id}`]).join(","))
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -68,6 +77,14 @@ export async function POST(request, { params }) {
   if (!hasSupabaseAdminConfig) return NextResponse.json({ error: "Supabase er ikke konfigurert." }, { status: 503 });
 
   const body = await request.json().catch(() => ({}));
+  let quote = null;
+  try {
+    quote = await resolveQuoteId(params.id);
+  } catch (error) {
+    const response = quoteResolveResponse(error);
+    return NextResponse.json({ error: response.error }, { status: response.status });
+  }
+
   const packageId = String(body.service_package_id || body.packageId || "").trim();
   const pkg = await loadPackage(packageId);
   if (!pkg) return NextResponse.json({ error: "Produktpakken ble ikke funnet." }, { status: 404 });
@@ -79,7 +96,7 @@ export async function POST(request, { params }) {
   const lineTotal = Math.round(lineTotalExVat * (1 + vatRate / 100));
 
   const payload = {
-    request_id: params.id,
+    quote_id: quote.id,
     service_package_id: pkg.id,
     item_type: "package",
     title: pkg.name,

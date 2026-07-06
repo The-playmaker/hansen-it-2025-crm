@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireMe } from "@/lib/requireMe";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { quoteResolveResponse, resolveQuoteId } from "@/lib/quotes/resolveQuoteId";
 
 export const dynamic = "force-dynamic";
 
@@ -22,25 +23,13 @@ export async function POST(request, { params }) {
   const packageId = String(body.service_package_id || "").trim();
   if (!packageId) return NextResponse.json({ error: "service_package_id er påkrevd." }, { status: 400 });
 
-  let quoteUsesQuotesTable = false;
-  let { data: quote, error: quoteError } = await supabaseAdmin
-    .from("requests")
-    .select("id, customer_id")
-    .eq("id", params.id)
-    .maybeSingle();
-
-  if (!quote) {
-    const fallback = await supabaseAdmin
-      .from("quotes")
-      .select("id, customer_id, source_request_id")
-      .eq("id", params.id)
-      .maybeSingle();
-    quote = fallback.data;
-    quoteError = fallback.error;
-    quoteUsesQuotesTable = Boolean(quote);
+  let quote = null;
+  try {
+    quote = await resolveQuoteId(params.id);
+  } catch (error) {
+    const response = quoteResolveResponse(error);
+    return NextResponse.json({ error: response.error }, { status: response.status });
   }
-
-  if (quoteError || !quote) return NextResponse.json({ error: "Fant ikke tilbudet." }, { status: 404 });
 
   const { data: pkg, error: packageError } = await supabaseAdmin
     .from("service_packages")
@@ -53,7 +42,7 @@ export async function POST(request, { params }) {
   const { data: existingItem } = await supabaseAdmin
     .from("quote_items")
     .select("id")
-    .eq(quoteUsesQuotesTable ? "quote_id" : "request_id", quote.id)
+    .eq("quote_id", quote.id)
     .eq("service_package_id", pkg.id)
     .maybeSingle();
 
@@ -67,7 +56,7 @@ export async function POST(request, { params }) {
     .map((item) => ({ title: item.title, description: item.description }));
 
   const payload = {
-    ...(quoteUsesQuotesTable ? { quote_id: quote.id } : { request_id: quote.id }),
+    quote_id: quote.id,
     service_package_id: pkg.id,
     item_type: "package",
     title: pkg.name,
