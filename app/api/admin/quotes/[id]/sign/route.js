@@ -4,6 +4,20 @@ import { getSessionServer } from "@/lib/getSessionServer";
 
 export const dynamic = "force-dynamic";
 
+const storageBuckets = ["phoenix-documents", "quote-attachments", "quote-documents"];
+
+async function createSignedUrl(filePath) {
+  let lastError = null;
+  for (const bucket of storageBuckets) {
+    const { data, error } = await supabaseAdmin.storage
+      .from(bucket)
+      .createSignedUrl(filePath, 60);
+    if (data?.signedUrl) return data.signedUrl;
+    lastError = error;
+  }
+  throw lastError || new Error("Kunne ikke signere dokument.");
+}
+
 export async function POST(req, { params }) {
   const session = await getSessionServer();
   if (!session) {
@@ -16,13 +30,9 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "No file path provided" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseAdmin.storage
-    .from("quote-attachments")
-    .createSignedUrl(file_path, 60);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    return NextResponse.json({ url: await createSignedUrl(file_path) });
+  } catch (error) {
+    return NextResponse.json({ error: error.message || "Kunne ikke lage nedlastingslenke." }, { status: 500 });
   }
-
-  return NextResponse.json({ url: data.signedUrl });
 }

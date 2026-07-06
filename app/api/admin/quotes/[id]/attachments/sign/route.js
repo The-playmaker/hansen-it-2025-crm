@@ -3,6 +3,20 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
+const storageBuckets = ["phoenix-documents", "quote-attachments", "quote-documents"];
+
+async function createSignedUrl(filePath) {
+  let lastError = null;
+  for (const bucket of storageBuckets) {
+    const { data, error } = await supabaseAdmin.storage
+      .from(bucket)
+      .createSignedUrl(filePath, 60 * 10);
+    if (data?.signedUrl) return data.signedUrl;
+    lastError = error;
+  }
+  throw lastError || new Error("Kunne ikke signere dokument.");
+}
+
 export async function POST(req, ctx) {
   const { id } = ctx.params;
   const body = await req.json().catch(() => ({}));
@@ -23,11 +37,9 @@ export async function POST(req, ctx) {
   if (attErr) return NextResponse.json({ error: attErr.message }, { status: 500 });
   if (!att) return NextResponse.json({ error: "Not found / not allowed" }, { status: 404 });
 
-  const { data, error } = await supabaseAdmin.storage
-    .from("quote-attachments")
-    .createSignedUrl(file_path, 60 * 10);
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  return NextResponse.json({ url: data.signedUrl });
+  try {
+    return NextResponse.json({ url: await createSignedUrl(file_path) });
+  } catch (error) {
+    return NextResponse.json({ error: error.message || "Kunne ikke lage nedlastingslenke." }, { status: 500 });
+  }
 }

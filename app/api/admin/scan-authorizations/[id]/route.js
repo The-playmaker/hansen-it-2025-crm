@@ -19,7 +19,23 @@ export async function GET(_request, { params }) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-  return NextResponse.json({ configured: true, data });
+
+  const jobIds = (data.scan_jobs || []).map((job) => job.id);
+  const [resultsResponse, findingsResponse, reportsResponse] = jobIds.length ? await Promise.all([
+    supabaseAdmin.from("scan_results").select("*").in("job_id", jobIds).order("created_at", { ascending: false }),
+    supabaseAdmin.from("scan_findings").select("*").in("job_id", jobIds).order("created_at", { ascending: false }),
+    supabaseAdmin.from("scan_reports").select("*").in("job_id", jobIds).order("created_at", { ascending: false })
+  ]) : [{ data: [] }, { data: [] }, { data: [] }];
+
+  return NextResponse.json({
+    configured: true,
+    data: {
+      ...data,
+      scan_results: resultsResponse.data || [],
+      scan_findings: findingsResponse.data || [],
+      scan_reports: reportsResponse.data || []
+    }
+  });
 }
 
 export async function PATCH(request, { params }) {

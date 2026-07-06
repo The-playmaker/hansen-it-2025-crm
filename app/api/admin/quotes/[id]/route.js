@@ -4,14 +4,24 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export const dynamic = "force-dynamic";
 
 export async function GET(req, { params }) {
-  const { data, error } = await supabaseAdmin
+  let { data, error } = await supabaseAdmin
     .from("requests")
     .select("*")
     .eq("id", params.id)
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) {
+    const fallback = await supabaseAdmin
+      .from("quotes")
+      .select("*")
+      .eq("id", params.id)
+      .maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
+  }
+
+  if (error || !data) {
+    return NextResponse.json({ error: error?.message || "Fant ikke tilbud." }, { status: error ? 500 : 404 });
   }
 
   return NextResponse.json({ data });
@@ -19,15 +29,26 @@ export async function GET(req, { params }) {
 
 export async function PATCH(req, { params }) {
   const body = await req.json();
-  const { data, error } = await supabaseAdmin
+  let { data, error } = await supabaseAdmin
     .from("requests")
     .update(body)
     .eq("id", params.id)
     .select()
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) {
+    const fallback = await supabaseAdmin
+      .from("quotes")
+      .update(body)
+      .eq("id", params.id)
+      .select()
+      .maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
+  }
+
+  if (error || !data) {
+    return NextResponse.json({ error: error?.message || "Fant ikke tilbud." }, { status: error ? 500 : 404 });
   }
 
   return NextResponse.json({ data });

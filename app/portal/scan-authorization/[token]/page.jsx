@@ -16,6 +16,8 @@ export default function ScanAuthorizationPortalPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [signed, setSigned] = useState(null);
+  const [preflight, setPreflight] = useState(null);
+  const [confirmDnsWarnings, setConfirmDnsWarnings] = useState(false);
   const [form, setForm] = useState({
     signer_name: "",
     signer_email: "",
@@ -60,7 +62,11 @@ export default function ScanAuthorizationPortalPage() {
     return () => { cancelled = true; };
   }, [token]);
 
-  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const update = (key, value) => {
+    setPreflight(null);
+    setConfirmDnsWarnings(false);
+    setForm((current) => ({ ...current, [key]: value }));
+  };
 
   const sign = async (event) => {
     event.preventDefault();
@@ -70,10 +76,13 @@ export default function ScanAuthorizationPortalPage() {
       const response = await fetch(`/api/portal/scan-authorization/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, confirm_dns_warnings: confirmDnsWarnings })
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Signering feilet.");
+      if (!response.ok) {
+        if (result.preflight) setPreflight(result.preflight);
+        throw new Error(result.error || "Signering feilet.");
+      }
       setSigned(result.data);
       setAuthorization(result.data.authorization);
     } catch (err) {
@@ -128,15 +137,38 @@ export default function ScanAuthorizationPortalPage() {
               <h2 className="text-lg font-semibold">Scan-scope</h2>
               <p className="mt-1 text-sm text-slate-400">Bekreft at dette er domener og IP-er dere eier eller har eksplisitt samtykke til å teste.</p>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <label className="text-sm text-slate-200">Scan-type<select className="mt-1 min-h-10 w-full rounded-xl border border-white/10 bg-slate-950/90 px-3 text-white" value={form.scan_type} onChange={(e) => update("scan_type", e.target.value)}>
+                <label className="text-sm text-slate-200">Scan-type<select className="mt-1 min-h-10 w-full rounded-xl border border-white/10 bg-slate-950/90 px-3 text-white" value={form.scan_type} onChange={(e) => update("scan_type", "passive")}>
                   <option value="passive">Passiv OSINT/DNS/HTTP</option>
-                  <option value="standard">Standard autorisert scan</option>
-                  <option value="extended">Utvidet autorisert scan</option>
+                  <option value="external_active" disabled>Ekstern aktiv scan deaktivert</option>
+                  <option value="internal_agent" disabled>Intern agent/VPN deaktivert</option>
                 </select></label>
                 <div className="hidden md:block" />
                 <label className="text-sm text-slate-200">Domener<textarea className="mt-1 min-h-32 w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-white" value={form.domains} onChange={(e) => update("domains", e.target.value)} /></label>
                 <label className="text-sm text-slate-200">IP-er<textarea className="mt-1 min-h-32 w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-white" value={form.ip_addresses} onChange={(e) => update("ip_addresses", e.target.value)} /></label>
               </div>
+              <div className="mt-4 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+                Passive scan runner active. Aktiv scanning er deaktivert for delt egress IP.
+              </div>
+              {preflight?.warnings?.length ? (
+                <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+                  <p className="font-semibold">DNS preflight</p>
+                  <div className="mt-2 space-y-2">
+                    {preflight.warnings.map((item) => (
+                      <div key={item.domain}>
+                        <p className="font-semibold">{item.domain}</p>
+                        {item.warnings.map((warning) => <p key={warning}>- {warning}</p>)}
+                        {item.dns ? <p className="text-xs text-amber-200">DNS: A {item.dns.a?.length || 0}, AAAA {item.dns.aaaa?.length || 0}, MX {item.dns.mx?.length || 0}, NS {item.dns.ns?.length || 0}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                  {preflight.requiresOverride ? (
+                    <label className="mt-3 flex items-center gap-2 font-semibold">
+                      <input type="checkbox" checked={confirmDnsWarnings} onChange={(event) => setConfirmDnsWarnings(event.target.checked)} />
+                      Jeg bekrefter at scope er riktig selv om DNS-records ikke ble funnet.
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
               {scope?.notes ? <p className="mt-4 rounded-2xl border border-white/10 bg-slate-950/45 p-3 text-sm text-slate-300">{scope.notes}</p> : null}
             </section>
 

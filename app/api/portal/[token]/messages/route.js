@@ -40,9 +40,14 @@ export async function POST(req, { params }) {
   try {
     const quoteId = await getQuoteIdFromToken(params.token);
     const body = await req.json();
+    const message = String(body.message || "").trim();
+    if (!message) {
+      return NextResponse.json({ error: "Melding mangler." }, { status: 400 });
+    }
+
     const { data, error } = await supabaseAdmin
       .from("quote_messages")
-      .insert([{ ...body, quote_id: quoteId }])
+      .insert([{ quote_id: quoteId, author_type: "customer", author_name: "Kunde", message }])
       .select()
       .single();
 

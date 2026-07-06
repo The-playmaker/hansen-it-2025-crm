@@ -7,14 +7,26 @@ function clean(value) {
   return String(value || "").trim();
 }
 
+function customerNameFromRequest(request) {
+  return clean(request.company) ||
+    clean(request.customer_name) ||
+    clean(request.name) ||
+    clean(request.email) ||
+    "Ukjent kunde";
+}
+
+function contactNameFromRequest(request) {
+  return clean(request.name) || clean(request.email) || "Ukjent kontakt";
+}
+
 async function findOrCreateCustomer(request) {
-  const company = clean(request.company) || clean(request.customer_name) || clean(request.name) || clean(request.email) || "Ukjent kunde";
+  const customerName = customerNameFromRequest(request);
   const email = clean(request.email);
 
   let query = supabaseAdmin.from("customers").select("*").limit(1);
   if (clean(request.company)) query = query.ilike("company_name", clean(request.company));
   else if (email) query = query.eq("email", email);
-  else query = query.eq("company_name", company);
+  else query = query.eq("company_name", customerName);
 
   const { data: existing, error: findError } = await query.maybeSingle();
   if (findError) throw findError;
@@ -23,7 +35,8 @@ async function findOrCreateCustomer(request) {
   const { data, error } = await supabaseAdmin
     .from("customers")
     .insert({
-      company_name: company,
+      name: customerName,
+      company_name: customerName,
       email: email || null,
       phone: clean(request.phone) || null,
       status: "lead",
@@ -39,7 +52,7 @@ async function findOrCreateCustomer(request) {
 
 async function findOrCreateContact(request, customerId) {
   const email = clean(request.email);
-  const name = clean(request.name) || clean(request.customer_name) || email || "Ukjent kontakt";
+  const name = contactNameFromRequest(request);
 
   let query = supabaseAdmin.from("contacts").select("*").eq("customer_id", customerId).limit(1);
   if (email) query = query.eq("email", email);
@@ -81,7 +94,7 @@ async function findOrCreateLead(request, customerId, contactId) {
       customer_id: customerId,
       contact_id: contactId,
       source_request_id: request.id,
-      title: request.company || request.name || "Ny lead",
+      title: customerNameFromRequest(request),
       description: request.message || request.description || null,
       status: "open",
       source: "requests"
@@ -105,7 +118,8 @@ export async function POST(_request, { params }) {
     .single();
 
   if (requestError || !requestRow) {
-    return NextResponse.json({ error: requestError?.message || "Request ikke funnet." }, { status: 404 });
+    if (requestError) console.error("request conversion lookup error:", requestError);
+    return NextResponse.json({ error: "Henvendelsen ble ikke funnet." }, { status: 404 });
   }
 
   try {
@@ -113,7 +127,7 @@ export async function POST(_request, { params }) {
     const contact = await findOrCreateContact(requestRow, customer.id);
     const lead = await findOrCreateLead(requestRow, customer.id, contact.id);
 
-    const { data: updatedRequest, error: updateError } = await supabaseAdmin
+    let { data: updatedRequest, error: updateError } = await supabaseAdmin
       .from("requests")
       .update({
         customer_id: customer.id,
@@ -127,11 +141,29 @@ export async function POST(_request, { params }) {
       .select("*")
       .single();
 
+    if (updateError) {
+      console.error("request conversion update converted status error:", updateError);
+      const fallback = await supabaseAdmin
+        .from("requests")
+        .update({
+          customer_id: customer.id,
+          contact_id: contact.id,
+          lead_id: lead.id,
+          converted_to_customer: true,
+          converted_at: new Date().toISOString()
+        })
+        .eq("id", requestRow.id)
+        .select("*")
+        .single();
+      updatedRequest = fallback.data;
+      updateError = fallback.error;
+    }
+
     if (updateError) throw updateError;
 
     return NextResponse.json({ customer, contact, lead, request: updatedRequest });
   } catch (error) {
     console.error("request conversion error:", error);
-    return NextResponse.json({ error: error.message || "Kunne ikke konvertere request." }, { status: 500 });
+    return NextResponse.json({ error: "Kunne ikke konvertere henvendelsen til kunde. Sjekk serverloggen for tekniske detaljer." }, { status: 500 });
   }
 }

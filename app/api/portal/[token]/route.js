@@ -27,11 +27,21 @@ export async function GET(_req, { params }) {
   }
 
   // 2) load quote
-  const { data: quote, error: quoteErr } = await supabase
+  let { data: quote, error: quoteErr } = await supabase
     .from("requests")
     .select("*")
     .eq("id", tokenRow.quote_id)
     .maybeSingle();
+
+  if (quoteErr || !quote) {
+    const fallback = await supabase
+      .from("quotes")
+      .select("*")
+      .eq("id", tokenRow.quote_id)
+      .maybeSingle();
+    quote = fallback.data;
+    quoteErr = fallback.error;
+  }
 
   if (quoteErr || !quote) {
     return NextResponse.json({ error: "Quote not found" }, { status: 404 });
@@ -55,11 +65,38 @@ export async function GET(_req, { params }) {
     .eq("quote_id", quote.id)
     .order("created_at", { ascending: false });
 
-  // 5) attachments
-  const { data: attachments } = await supabase
-    .from("quote_attachments")
+  // 4b) quote items / service packages
+  let quoteItems = [];
+  const { data: itemsData, error: itemsError } = await supabase
+    .from("quote_items")
+    .select("*")
+    .or(`quote_id.eq.${quote.id},request_id.eq.${quote.id}`)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (!itemsError && itemsData?.length) {
+    const packageIds = [...new Set(itemsData.map((item) => item.service_package_id).filter(Boolean))];
+    let packages = [];
+    if (packageIds.length) {
+      const packageResult = await supabase
+        .from("service_packages")
+        .select("*, service_package_items(*)")
+        .in("id", packageIds);
+      packages = packageResult.data || [];
+    }
+    const packageMap = new Map(packages.map((pkg) => [String(pkg.id), pkg]));
+    quoteItems = itemsData.map((item) => ({
+      ...item,
+      service_package: item.service_package_id ? packageMap.get(String(item.service_package_id)) || null : null,
+    }));
+  }
+
+  // 5) portal documents. quote_documents is source of truth.
+  const { data: documents } = await supabase
+    .from("quote_documents")
     .select("*")
     .eq("quote_id", quote.id)
+    .eq("is_portal_visible", true)
     .order("created_at", { ascending: false });
 
   return NextResponse.json({
@@ -70,6 +107,7 @@ export async function GET(_req, { params }) {
     quote,
     employee,
     timeEntries: timeEntries || [],
-    attachments: attachments || [],
+    quoteItems,
+    documents: documents || [],
   });
 }

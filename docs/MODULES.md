@@ -89,8 +89,19 @@ Quote portal støtter:
 - meldinger/spørsmål
 - godkjenning eller endringsønske
 - adminvisning av kunde-meldinger
+- sikker dokumentnedlasting via portal-token
 
 Token er lang og random.
+
+Dokumentflyt:
+
+- PDF-er og vedlegg lagres i Supabase Storage bucket `quote-attachments`.
+- PDF-er registreres i `quote_documents`.
+- Kundeportalen laster ned via `GET /api/portal/quote/[token]/documents/[documentId]/download`.
+- API-et validerer portal-token og at dokumentet tilhører riktig quote før signed URL returneres.
+- Dokumenter skal ikke være public-by-default.
+
+Hvis Supabase Storage eller `quote_documents` mangler, skal admin se tydelig feil i stedet for at "Generate PDF" fremstår som vellykket.
 
 ## Site Content / CMS
 
@@ -144,6 +155,57 @@ Begrensninger:
 - Ingen aktiv angrepstesting uten signert authorization.
 - Ingen credential testing eller brute force.
 
+## Scanner Runner
+
+Scan authorization oppretter `scan_jobs` med `status='queued'`. Queued betyr at jobben venter på runner, ikke at scanning allerede kjører.
+
+Statusflyt:
+
+```text
+queued -> running -> completed / failed
+```
+
+Runner MVP:
+
+- kjøres med `npm run scanner:run`
+- kan deployes som systemd service på `phoenix-scan01`
+- runner path på scanner-node: `/opt/phoenix-scanner/app/scanner-runner.mjs`
+- service: `phoenix-scanner.service`
+- egress IP `185.243.217.163` er delt Proxmox/NAT, derfor er runneren passive-only
+- bruker `SUPABASE_URL` og `SUPABASE_SERVICE_ROLE_KEY` server-side
+- henter eldste `scan_jobs` med `status='queued'`
+- verifiserer at tilhørende `scan_authorizations.status='signed'`
+- kjører kun `scan_type='passive'`
+- lagrer `scan_results`, `scan_findings` og `scan_reports`
+- setter jobben til `completed` eller `failed`
+
+Manuell test av én jobb:
+
+```http
+POST /api/admin/scan-jobs/[id]/run-passive
+```
+
+Denne API-ruten kjører samme passive runner-logikk for én valgt jobb og krever admin-session.
+
+Scan-typer:
+
+- `passive`: DNS, HTTP/HTTPS, TLS, security headers og e-post-DNS
+- `external_active`: struktur for senere autorisert ekstern aktiv scan
+- `internal_agent`: struktur for senere intern scan via agent/VPN
+
+Aktiv ekstern scanning skal senere kjøres fra kontrollert Hansen IT scanner-node:
+
+- `scan01.hansen-it.com`
+- statisk offentlig IP
+- ikke Vercel/serverless
+- ikke tilfeldig hjemmenett
+
+Kunden kan få oppgitt scanner source IP for whitelist. Domener skal løses til A/AAAA før aktiv scan. MX-, Microsoft-, Google-, CDN- og tredjeparts-IP-er skal ikke aktivt skannes uten eksplisitt godkjenning. Internal scan krever agent eller avtalt VPN/tilgang hos kunde.
+
+Deploy-runbook:
+
+- `docs/runbooks/phoenix-scanner-node.md`
+
 ## Reports
 
 Lagrede rapporter kan eksporteres og deles:
@@ -165,6 +227,29 @@ Admin API:
 
 Hvis `RESEND_API_KEY` mangler, returnerer send-API kontrollert `503`.
 
+## Invoices
+
+Fakturamodulen er foreløpig foundation, ikke regnskapsintegrasjon.
+
+Admin:
+
+- `/admin/invoices`
+- `/admin/invoices/[id]`
+
+Fra en quote kan admin velge "Lag fakturautkast". Systemet oppretter:
+
+- `invoices`
+- `invoice_items`
+
+Utkastet baseres på quote/time entries og får status `draft`. Faktura sendes ikke automatisk.
+
+Ikke bygget i v1:
+
+- Tripletex/Fiken/PowerOffice-integrasjon
+- automatisk utsending
+- KID/betaling
+- bokføring
+
 ## Scan Authorization
 
 Admin:
@@ -183,6 +268,7 @@ Flyt:
 3. Kunden leser vilkår, bekrefter scope og signerer digitalt.
 4. Systemet logger navn, e-post, rolle, IP-adresse, timestamp, scope, domener, IP-er, scan-type og signaturdata.
 5. Etter signering opprettes `scan_jobs` med `status='queued'`.
+6. Scanner runner plukker opp jobben og kjører passiv scan.
 
 ## Developer Portal
 

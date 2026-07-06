@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "scanner:run": "node scripts/scanner-runner.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^16.5.0",

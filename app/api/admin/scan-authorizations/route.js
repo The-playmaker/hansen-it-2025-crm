@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { requireMe } from "@/lib/requireMe";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { parseDomainList, validateScanDomains } from "@/lib/scanAuthorizationValidation";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,15 @@ export async function POST(request) {
     return NextResponse.json({ error: "Kundenavn og e-post er påkrevd." }, { status: 400 });
   }
 
+  const domains = parseDomainList(body.domains);
+  const preflight = await validateScanDomains(domains);
+  if (preflight.invalid.length) {
+    return NextResponse.json({ error: "Ett eller flere domener har ugyldig format.", preflight }, { status: 400 });
+  }
+  if (preflight.requiresOverride && !body.confirm_dns_warnings) {
+    return NextResponse.json({ error: "Fant domener uten DNS records. Bekreft overstyring hvis scope likevel er riktig.", preflight, requiresOverride: true }, { status: 409 });
+  }
+
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + Number(body.expires_in_days || 14));
 
@@ -77,11 +87,14 @@ export async function POST(request) {
   const scopePayload = {
     authorization_id: authorization.id,
     scan_type: body.scan_type || "passive",
-    domains: list(body.domains),
+    domains,
     ip_addresses: list(body.ip_addresses),
     allowed_checks: body.allowed_checks || ["dns", "http", "tls", "email", "subdomains"],
     exclusions: String(body.exclusions || "").trim() || null,
-    notes: String(body.notes || "").trim() || null
+    notes: [
+      String(body.notes || "").trim(),
+      preflight.warnings.length ? `Preflight warnings: ${preflight.warnings.map((item) => `${item.domain}: ${item.warnings.join(" | ")}`).join("; ")}` : ""
+    ].filter(Boolean).join("\n") || null
   };
 
   const { data: scope, error: scopeError } = await supabaseAdmin

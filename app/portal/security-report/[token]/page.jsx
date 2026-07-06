@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { AlertTriangle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, ShieldCheck } from "lucide-react";
+import { downloadSecurityReportPdf } from "@/lib/securityScan/exportClient";
 
 const severityTone = {
   critical: "border-rose-400/40 bg-rose-500/15 text-rose-100",
@@ -83,6 +84,13 @@ export default function SecurityReportPortalPage() {
               <h2 className="text-lg font-semibold">Sammendrag</h2>
               <p className="mt-2 text-slate-300">{report.summary || "Ingen sammendrag lagret."}</p>
               {report.spoofingRisk?.reason ? <p className="mt-3 text-sm text-amber-200">Spoofing-risk: {report.spoofingRisk.reason}</p> : null}
+              <button
+                type="button"
+                onClick={() => downloadSecurityReportPdf(reportRow, { shareUrl: typeof window !== "undefined" ? window.location.href : "" })}
+                className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-cyan-300"
+              >
+                <Download size={16} />Last ned PDF
+              </button>
             </section>
 
             <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6">
@@ -97,6 +105,11 @@ export default function SecurityReportPortalPage() {
                   </article>
                 )) : <p className="text-sm text-slate-400">Ingen prioriterte tiltak.</p>}
               </div>
+            </section>
+
+            <section className="rounded-3xl border border-cyan-400/30 bg-cyan-500/10 p-6">
+              <h2 className="text-lg font-semibold">Fix with Hansen IT</h2>
+              <p className="mt-2 text-sm text-cyan-100">Hansen IT kan hjelpe med å gjøre funnene om til konkrete oppgaver, tilbud og forbedringer. Svar på rapportlenken du fikk, eller kontakt post@hansen-it.com.</p>
             </section>
 
             {report.subdomains?.length ? (

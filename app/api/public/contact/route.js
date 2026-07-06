@@ -1,5 +1,5 @@
 ﻿import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +18,11 @@ export async function OPTIONS() {
 }
 
 function getSupabaseConfig() {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  return { url, key };
+  return { configured: hasSupabaseAdminConfig };
 }
 
 function normalizePayload(body) {
+  const priority = String(body.priority || "").trim().toLowerCase();
   return {
     name: String(body.name || "").trim(),
     email: String(body.email || "").trim(),
@@ -31,7 +30,8 @@ function normalizePayload(body) {
     company: String(body.company || "").trim(),
     message: String(body.message || "").trim(),
     category: String(body.category || "").trim(),
-    source: String(body.source || "hansen-it-2025").trim()
+    source: String(body.source || "hansen-it-2025").trim(),
+    priority: ["hast", "urgent", "high", "høy", "true"].includes(priority) ? "hast" : "normal"
   };
 }
 
@@ -48,6 +48,7 @@ async function notifySlack(payload, savedTarget, savedId) {
   const phone = payload.phone || "Ikke oppgitt";
   const category = payload.category || "Ikke oppgitt";
   const source = payload.source || "hansen-it-2025";
+  const priority = payload.priority === "hast" ? "Haster" : "Normal";
 
   try {
     const response = await fetch(webhookUrl, {
@@ -65,7 +66,8 @@ async function notifySlack(payload, savedTarget, savedId) {
               { type: "mrkdwn", text: `*E-post:*\n${payload.email}` },
               { type: "mrkdwn", text: `*Telefon:*\n${phone}` },
               { type: "mrkdwn", text: `*Kategori:*\n${category}` },
-              { type: "mrkdwn", text: `*Kilde:*\n${source}` }
+              { type: "mrkdwn", text: `*Kilde:*\n${source}` },
+              { type: "mrkdwn", text: `*Prioritet:*\n${priority}` }
             ]
           },
           { type: "section", text: { type: "mrkdwn", text: `*Melding:*\n${shortMessage(payload.message)}` } },
@@ -95,8 +97,8 @@ export async function POST(request) {
     return json({ status: "error", message: "Navn, e-post og melding er påkrevd." }, { status: 400 });
   }
 
-  const { url, key } = getSupabaseConfig();
-  if (!url || !key) {
+  const { configured } = getSupabaseConfig();
+  if (!configured) {
     return json(
       { status: "error", message: "CRM er ikke koblet til database ennå. Prøv igjen senere eller kontakt post@hansen-it.com." },
       { status: 503 }
@@ -105,14 +107,14 @@ export async function POST(request) {
 
   const description = [
     payload.category ? `Kategori: ${payload.category}` : null,
+    `Prioritet: ${payload.priority === "hast" ? "Haster" : "Normal"}`,
     payload.phone ? `Telefon: ${payload.phone}` : null,
     payload.source ? `Kilde: ${payload.source}` : null,
     "",
     payload.message
   ].filter((line) => line !== null).join("\n");
 
-  const supabase = createClient(url, key, { auth: { persistSession: false } });
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("requests")
     .insert({
       name: payload.name,
@@ -121,7 +123,7 @@ export async function POST(request) {
       company: payload.company || null,
       description,
       message: payload.message,
-      priority: "normal",
+      priority: payload.priority,
       status: "ny"
     })
     .select("id")

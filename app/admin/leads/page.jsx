@@ -15,6 +15,7 @@ export default function LeadsPage() {
   const [status, setStatus] = useState("alle");
   const [priority, setPriority] = useState("alle");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const fetchLeads = async () => {
     setLoading(true);
@@ -46,14 +47,16 @@ export default function LeadsPage() {
 
   const convertLead = async (lead) => {
     setSavingId(lead.id);
+    setError("");
+    setNotice("");
     try {
       const response = await fetch(`/api/admin/requests/${lead.id}/convert`, { method: "POST" });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Kunne ikke konvertere henvendelsen.");
       setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, status: "converted", request: result.request } : item));
-      alert("Henvendelsen er konvertert til kunde.");
+      setNotice("Henvendelsen er konvertert til kunde.");
     } catch (err) {
-      alert(err.message || "Kunne ikke konvertere henvendelsen.");
+      setError(err.message || "Kunne ikke konvertere henvendelsen.");
     } finally {
       setSavingId(null);
     }
@@ -99,6 +102,7 @@ export default function LeadsPage() {
 
         {loading ? <EmptyState text="Henter henvendelser fra Supabase..." /> : null}
         {error ? <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</div> : null}
+        {notice ? <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">{notice}</div> : null}
 
         {!loading && !error ? (
           <div className="grid gap-3 xl:grid-cols-2">

@@ -1,13 +1,19 @@
 ﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Download, FileJson, FileText, Link as LinkIcon, Mail, SearchCheck, ShieldAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, FileJson, FileText, Link as LinkIcon, Mail, MessageSquarePlus, SearchCheck, ShieldAlert } from "lucide-react";
 import { downloadSecurityReportJson, downloadSecurityReportPdf } from "@/lib/securityScan/exportClient";
-import { EmptyState, Field, MetricCard, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SecondaryButton, StatusBadge, TextArea, TextInput } from "@/components/phoenix/PhoenixUi";
+import { EmptyState, Field, MetricCard, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SecondaryButton, SelectInput, StatusBadge, TextArea, TextInput } from "@/components/phoenix/PhoenixUi";
 
 const categoryLabels = { web: "Web", email: "E-post", domain: "Domene" };
 const severityLabels = { critical: "kritisk", high: "høy", medium: "middels", low: "lav", ok: "ok" };
+const crmActionLabels = {
+  lead: "Lead/request opprettet fra funn.",
+  task: "Oppgave opprettet fra funn.",
+  quote: "Tilbudskladd opprettet fra funn.",
+  note: "Kundenotat lagt til fra funn."
+};
 
 function toneForSeverity(severity) {
   if (severity === "critical") return "border-rose-400/40 bg-rose-500/15 text-rose-100";
@@ -19,6 +25,11 @@ function toneForSeverity(severity) {
 
 export default function SecurityScanPage() {
   const [domain, setDomain] = useState("");
+  const [customers, setCustomers] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [links, setLinks] = useState({ customer_id: "", request_id: "", lead_id: "" });
+  const [crmConfigured, setCrmConfigured] = useState(true);
   const [state, setState] = useState("idle");
   const [error, setError] = useState("");
   const [report, setReport] = useState(null);
@@ -29,6 +40,41 @@ export default function SecurityScanPage() {
 
   const problems = useMemo(() => report?.findings?.filter((finding) => finding.status !== "ok") || [], [report]);
   const okFindings = useMemo(() => report?.findings?.filter((finding) => finding.status === "ok") || [], [report]);
+  const selectedCustomer = useMemo(() => customers.find((customer) => customer.id === links.customer_id), [customers, links.customer_id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCrmOptions() {
+      try {
+        const [customersResponse, requestsResponse, leadsResponse] = await Promise.all([
+          fetch("/api/admin/customers", { cache: "no-store" }),
+          fetch("/api/admin/requests", { cache: "no-store" }),
+          fetch("/api/admin/leads", { cache: "no-store" })
+        ]);
+        const [customersResult, requestsResult, leadsResult] = await Promise.all([
+          customersResponse.json(),
+          requestsResponse.json(),
+          leadsResponse.json()
+        ]);
+        if (cancelled) return;
+        setCustomers(customersResult.data || []);
+        setRequests(requestsResult.data || []);
+        setLeads(leadsResult.data || []);
+        setCrmConfigured(customersResult.configured !== false && requestsResult.configured !== false && leadsResult.configured !== false);
+      } catch {
+        if (!cancelled) setCrmConfigured(false);
+      }
+    }
+    loadCrmOptions();
+    return () => { cancelled = true; };
+  }, []);
+
+  const useCustomerDomain = () => {
+    if (!selectedCustomer) return;
+    const source = selectedCustomer.website || selectedCustomer.email || "";
+    const nextDomain = String(source).replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0].split("@").pop();
+    if (nextDomain) setDomain(nextDomain);
+  };
 
   const runScan = async (event) => {
     event.preventDefault();
@@ -43,7 +89,7 @@ export default function SecurityScanPage() {
       const response = await fetch("/api/admin/security/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domain })
+        body: JSON.stringify({ domain, ...links })
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Skanningen feilet.");
@@ -112,11 +158,19 @@ export default function SecurityScanPage() {
       const response = await fetch("/api/admin/security/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, domain: report.domain, reportId: report.reportId, finding })
+        body: JSON.stringify({
+          type,
+          domain: report.domain,
+          reportId: report.reportId,
+          customer_id: report.customer_id || links.customer_id,
+          request_id: report.request_id || links.request_id,
+          lead_id: report.lead_id || links.lead_id,
+          finding
+        })
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Kunne ikke opprette CRM-element.");
-      setActionResult(type === "lead" ? "Lead/request opprettet fra funn." : "Oppgave opprettet fra funn.");
+      setActionResult(crmActionLabels[type] || "CRM-element opprettet fra funn.");
     } catch (err) {
       setError(err.message || "Kunne ikke opprette CRM-element.");
     } finally {
@@ -133,10 +187,48 @@ export default function SecurityScanPage() {
         action={<Link href="/admin/security/reports" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"><FileText size={16} />Reports</Link>}
       />
 
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+          <p className="font-semibold">Passive scan runner active</p>
+          <p className="mt-1">Tillatte passive checks: DNS, HTTP/HTTPS, TLS, security headers og MX/SPF/DKIM/DMARC.</p>
+        </div>
+        <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+          <p className="font-semibold">Active scanning disabled – shared egress IP</p>
+          <p className="mt-1">phoenix-scan01 bruker delt Proxmox/NAT egress IP 185.243.217.163. Nmap, vuln scan og external_active er deaktivert.</p>
+        </div>
+      </div>
+
       <PhoenixPanel title="Ny skanning" description="Passive oppslag: DNS, RDAP, TLS, HTTPS og sikkerhetsheadere. Ingen aktiv angrepstesting.">
-        <form onSubmit={runScan} className="grid gap-3 md:grid-cols-[1fr_auto]">
-          <Field label="Domene"><TextInput value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="hansen-it.com" /></Field>
-          <div className="flex items-end"><PrimaryButton disabled={state === "scanning"} type="submit"><SearchCheck size={16} />{state === "scanning" ? "Skanner..." : "Start scan"}</PrimaryButton></div>
+        {!crmConfigured ? <div className="mb-4 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">Demo mode: CRM-valg er ikke koblet fordi Supabase mangler eller ikke svarer. Scan kan fortsatt kjøres, men blir ikke lagret.</div> : null}
+        <form onSubmit={runScan} className="space-y-4">
+          <div className="grid gap-3 lg:grid-cols-3">
+            <Field label="Kunde">
+              <SelectInput
+                value={links.customer_id}
+                onChange={(event) => setLinks((current) => ({ ...current, customer_id: event.target.value }))}
+                options={[{ value: "", label: "Ingen valgt" }, ...customers.map((customer) => ({ value: customer.id, label: customer.company_name || customer.email || customer.id }))]}
+              />
+            </Field>
+            <Field label="Request">
+              <SelectInput
+                value={links.request_id}
+                onChange={(event) => setLinks((current) => ({ ...current, request_id: event.target.value }))}
+                options={[{ value: "", label: "Ingen valgt" }, ...requests.map((request) => ({ value: request.id, label: `${request.company || request.name || request.email || "Request"}${request.status ? ` · ${request.status}` : ""}` }))]}
+              />
+            </Field>
+            <Field label="Lead">
+              <SelectInput
+                value={links.lead_id}
+                onChange={(event) => setLinks((current) => ({ ...current, lead_id: event.target.value }))}
+                options={[{ value: "", label: "Ingen valgt" }, ...leads.map((lead) => ({ value: lead.id, label: `${lead.title || lead.customer?.company_name || lead.id}${lead.status ? ` · ${lead.status}` : ""}` }))]}
+              />
+            </Field>
+          </div>
+          <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+            <Field label="Domene"><TextInput value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="hansen-it.com" /></Field>
+            <div className="flex items-end"><SecondaryButton disabled={!selectedCustomer} type="button" onClick={useCustomerDomain}>Bruk kundedomene</SecondaryButton></div>
+            <div className="flex items-end"><PrimaryButton disabled={state === "scanning"} type="submit"><SearchCheck size={16} />{state === "scanning" ? "Skanner..." : "Start scan"}</PrimaryButton></div>
+          </div>
         </form>
         {error ? <div className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</div> : null}
       </PhoenixPanel>
@@ -156,6 +248,9 @@ export default function SecurityScanPage() {
           <PhoenixPanel title={`Rapport: ${report.domain}`} description={report.summary}>
             <div className="flex flex-wrap gap-2 text-sm text-slate-300">
               <StatusBadge>{report.saved ? "Lagret" : "Ikke lagret"}</StatusBadge>
+              {report.customer_id ? <StatusBadge>Kunde koblet</StatusBadge> : null}
+              {report.request_id ? <StatusBadge>Request koblet</StatusBadge> : null}
+              {report.lead_id ? <StatusBadge>Lead koblet</StatusBadge> : null}
               {report.reportId ? <span>Rapport-ID: {report.reportId}</span> : null}
               {report.saveError ? <span className="text-amber-200">Lagring feilet: {report.saveError}</span> : null}
             </div>
@@ -206,6 +301,12 @@ export default function SecurityScanPage() {
                     </SecondaryButton>
                     <SecondaryButton type="button" disabled={Boolean(actionBusy)} onClick={() => createCrmItem("task", action)}>
                       <CheckCircle2 size={15} />{actionBusy === `task-${action.id}` ? "Oppretter..." : "Create task"}
+                    </SecondaryButton>
+                    <SecondaryButton type="button" disabled={Boolean(actionBusy)} onClick={() => createCrmItem("quote", action)}>
+                      <FileText size={15} />{actionBusy === `quote-${action.id}` ? "Oppretter..." : "Create quote draft"}
+                    </SecondaryButton>
+                    <SecondaryButton type="button" disabled={Boolean(actionBusy) || !(report.customer_id || links.customer_id)} onClick={() => createCrmItem("note", action)}>
+                      <MessageSquarePlus size={15} />{actionBusy === `note-${action.id}` ? "Lagrer..." : "Add customer note"}
                     </SecondaryButton>
                   </div>
                 </article>

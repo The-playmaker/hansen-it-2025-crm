@@ -17,9 +17,29 @@ import {
   FileText,
   Link as LinkIcon,
   Download,
+  Package as PackageIcon,
+  Trash2,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { supabase } from "@/lib/supabaseClient";
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(Number(value || 0));
+}
+
+function lineTotalExVat(item) {
+  const explicit = Number(item.line_total_ex_vat || 0);
+  if (explicit > 0) return explicit;
+  return Number(item.quantity || 0) * Number(item.unit_price || 0);
+}
+
+function packageEstimate(pkg = {}) {
+  const min = Number(pkg.hourly_estimate_min || 0);
+  const max = Number(pkg.hourly_estimate_max || 0);
+  if (min && max) return `${min}-${max} timer`;
+  if (min) return `fra ${min} timer`;
+  return "Etter avtale";
+}
 
 export default function QuoteDetailsPage() {
   const { id } = useParams();
@@ -33,6 +53,9 @@ export default function QuoteDetailsPage() {
   const [notes, setNotes] = useState([]);
   const [timeEntries, setTimeEntries] = useState([]);
   const [attachments, setAttachments] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [quoteItems, setQuoteItems] = useState([]);
+  const [servicePackages, setServicePackages] = useState([]);
 
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingText, setEditingText] = useState("");
@@ -55,6 +78,11 @@ export default function QuoteDetailsPage() {
   const [busyPortal, setBusyPortal] = useState(false);
   const [busyPdf, setBusyPdf] = useState(false);
   const [busyUpload, setBusyUpload] = useState(false);
+  const [busyInvoice, setBusyInvoice] = useState(false);
+  const [busyPackage, setBusyPackage] = useState(false);
+  const [pdfStatus, setPdfStatus] = useState("");
+  const [invoiceMessage, setInvoiceMessage] = useState("");
+  const [selectedPackageId, setSelectedPackageId] = useState("");
 
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -69,6 +97,23 @@ export default function QuoteDetailsPage() {
     () => timeEntries.reduce((sum, t) => sum + Number(t.hours || 0) * Number(t.rate || 0), 0),
     [timeEntries]
   );
+
+  const quoteItemsSubtotal = useMemo(
+    () => quoteItems.reduce((sum, item) => sum + lineTotalExVat(item), 0),
+    [quoteItems]
+  );
+
+  const overallSubtotal = useMemo(
+    () => quoteItemsSubtotal + totalCost,
+    [quoteItemsSubtotal, totalCost]
+  );
+
+  const documentStoragePaths = useMemo(
+    () => new Set(documents.map((document) => document.storage_path).filter(Boolean)),
+    [documents]
+  );
+
+  const quoteNumber = useMemo(() => `Tilbud ${String(quoteId || "").slice(0, 8).toUpperCase()}`, [quoteId]);
 
   // ---- load me ----
   useEffect(() => {
@@ -117,6 +162,37 @@ export default function QuoteDetailsPage() {
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error || "Failed attachments");
     setAttachments(json.data || []);
+    setDocuments(json.documents || []);
+  };
+
+  const loadQuoteItems = async () => {
+    const res = await fetch(`/api/admin/quotes/${quoteId}/items`, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok) {
+      console.warn(json?.error || "Quote items not configured");
+      setQuoteItems([]);
+      return;
+    }
+    setQuoteItems(json.data || []);
+  };
+
+  const loadServicePackages = async () => {
+    const res = await fetch("/api/admin/service-packages", { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok) {
+      console.warn(json?.error || "Service packages not configured");
+      setServicePackages([]);
+      return;
+    }
+    setServicePackages((json.data || []).filter((pkg) => pkg.is_active !== false));
+  };
+
+  const loadPortalLink = async () => {
+    const res = await fetch(`/api/admin/quotes/${quoteId}/portal-link`, { cache: "no-store" });
+    const json = await res.json();
+    if (res.ok && json.data?.token && typeof window !== "undefined") {
+      setPortalUrl(`${window.location.origin}/portal/${json.data.token}`);
+    }
   };
 
   const loadMessages = async () => {
@@ -133,7 +209,7 @@ export default function QuoteDetailsPage() {
       setLoading(true);
       try {
         await Promise.all([loadEmployees(), loadQuote()]);
-        await Promise.all([loadNotes(), loadTime(), loadAttachments(), loadMessages()]);
+        await Promise.all([loadNotes(), loadTime(), loadAttachments(), loadMessages(), loadPortalLink(), loadQuoteItems(), loadServicePackages()]);
       } catch (e) {
         console.error(e);
         router.push("/admin/quotes");
@@ -171,7 +247,7 @@ export default function QuoteDetailsPage() {
       setQuote(json.data);
     } catch (e) {
       console.error(e);
-      alert(e.message || "Could not save");
+      alert(e.message || "Kunne ikke lagre.");
     } finally {
       setSaving(false);
     }
@@ -212,7 +288,7 @@ export default function QuoteDetailsPage() {
       setNewNote("");
     } catch (err) {
       console.error(err);
-      alert(err.message || "Could not add note");
+      alert(err.message || "Kunne ikke legge til notat.");
     }
   };
 
@@ -283,7 +359,7 @@ export default function QuoteDetailsPage() {
       setTimeDescription("");
     } catch (e) {
       console.error(e);
-      alert(e.message || "Could not add time entry");
+      alert(e.message || "Kunne ikke legge til timeføring.");
     }
   };
 
@@ -298,9 +374,11 @@ export default function QuoteDetailsPage() {
     });
 
     const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || "Upload failed");
+    if (!res.ok) throw new Error(json?.error || "Opplasting feilet");
 
     setAttachments((prev) => [json.data, ...prev]);
+    if (json.document) setDocuments((prev) => [json.document, ...prev]);
+    return json;
   };
 
   const handleUpload = async () => {
@@ -311,7 +389,7 @@ export default function QuoteDetailsPage() {
       setFile(null);
     } catch (e) {
       console.error(e);
-      alert(e.message || "Upload failed");
+      alert(e.message || "Opplasting feilet");
     } finally {
       setBusyUpload(false);
     }
@@ -326,14 +404,98 @@ export default function QuoteDetailsPage() {
     });
 
     const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || "Failed to sign URL");
+    if (!res.ok) throw new Error(json?.error || "Kunne ikke lage nedlastingslenke");
 
     window.open(json.url, "_blank", "noopener,noreferrer");
   } catch (e) {
     console.error(e);
-    alert("Could not download.");
+    alert("Kunne ikke laste ned.");
   }
 };
+
+  const openDocument = async (documentId) => {
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/documents/${documentId}/download?json=1`, { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke åpne dokumentet.");
+      window.open(json.url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke åpne dokumentet. Sjekk at PDF-en er lagret i Supabase Storage.");
+    }
+  };
+
+  const handleAddPackage = async () => {
+    if (!selectedPackageId) return;
+    try {
+      setBusyPackage(true);
+      const res = await fetch(`/api/admin/quotes/${quoteId}/add-service-package`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service_package_id: selectedPackageId, source: "quote_admin" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke legge pakken til tilbudet.");
+      setQuoteItems((prev) => [...prev, json.data]);
+      setSelectedPackageId("");
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke legge pakken til tilbudet.");
+    } finally {
+      setBusyPackage(false);
+    }
+  };
+
+  const handleDeleteQuoteItem = async (itemId) => {
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/items/${itemId}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke slette tilbudslinjen.");
+      setQuoteItems((prev) => prev.filter((item) => item.id !== itemId));
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke slette tilbudslinjen.");
+    }
+  };
+
+  const handleToggleDocumentVisibility = async (documentId, visible) => {
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/documents/${documentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_portal_visible: visible }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke oppdatere dokumentet.");
+      setDocuments((prev) => prev.map((document) => (
+        document.id === documentId
+          ? { ...document, ...json.data, is_portal_visible: visible, visible_in_portal: visible }
+          : document
+      )));
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke oppdatere dokumentet.");
+    }
+  };
+
+  const handleLinkAttachmentToPortal = async (attachmentId, visible = false) => {
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/attachments/${attachmentId}/portal-document`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_portal_visible: visible }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke koble vedlegget til portalen.");
+      setDocuments((prev) => {
+        const exists = prev.some((document) => document.id === json.data.id);
+        return exists ? prev.map((document) => (document.id === json.data.id ? json.data : document)) : [json.data, ...prev];
+      });
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke koble vedlegget til portalen.");
+    }
+  };
 
   // ---- portal link ----
 const handleCreatePortalLink = async () => {
@@ -363,7 +525,7 @@ const handleCreatePortalLink = async () => {
       const res = await fetch(`/api/admin/quotes/${quoteId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: newMessage.trim(), author_id: authorId }),
+        body: JSON.stringify({ message: newMessage.trim(), author_id: authorId, author_type: "admin", author_name: me?.name || me?.email || "Hansen IT" }),
       });
 
       const json = await res.json();
@@ -384,46 +546,146 @@ const handleCreatePortalLink = async () => {
       setBusyPdf(true);
 
       const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.text("Offer / Project Summary", 20, 20);
+      const margin = 18;
+      let y = 22;
+      const totalHours = timeEntries.reduce((sum, t) => sum + Number(t.hours || 0), 0);
+      const subtotal = overallSubtotal || Number(quote.total_ex_vat || quote.subtotal || quote.price || 0);
+      const vat = Number(quote.total_vat || Math.round(subtotal * 0.25));
+      const total = Number(quote.total_inc_vat || quote.total || subtotal + vat);
 
-      doc.setFontSize(11);
-      let y = 30;
-
-      const addLine = (t) => {
-        doc.text(String(t), 20, y);
-        y += 6;
+      const addWrapped = (text, x = margin, width = 174, lineHeight = 5.5) => {
+        const lines = doc.splitTextToSize(String(text || ""), width);
+        doc.text(lines, x, y);
+        y += lines.length * lineHeight;
+      };
+      const addLabel = (label, value) => {
+        doc.setFont(undefined, "bold");
+        doc.text(label, margin, y);
+        doc.setFont(undefined, "normal");
+        doc.text(String(value || "-"), 68, y);
+        y += 7;
       };
 
-      addLine(`Project ID: ${quote.id}`);
-      addLine(`Customer: ${quote.name || ""}`);
-      if (quote.email) addLine(`Email: ${quote.email}`);
-      if (quote.phone) addLine(`Phone: ${quote.phone}`);
-      if (quote.address) addLine(`Address: ${quote.address}`);
+      doc.setFillColor(21, 33, 73);
+      doc.rect(0, 0, 210, 42, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont(undefined, "bold");
+      doc.text("Hansen IT", margin, 18);
+      doc.setFontSize(12);
+      doc.setFont(undefined, "normal");
+      doc.text("Infrastruktur · Nettverk · Support · Cybersikkerhet", margin, 29);
+
+      y = 58;
+      doc.setTextColor(21, 33, 73);
+      doc.setFontSize(22);
+      doc.setFont(undefined, "bold");
+      doc.text("Tilbud fra Hansen IT", margin, y);
+      y += 10;
+      doc.setFontSize(11);
+      doc.setFont(undefined, "normal");
+      addLabel("Tilbudsnummer", quoteNumber);
+      addLabel("Kunde", quote.customer_name || quote.company || quote.name || "Ristesund AS");
+      addLabel("Kontakt", quote.name || "-");
+      addLabel("E-post", quote.email || "-");
+      addLabel("Telefon", quote.phone || "-");
+      addLabel("Status", quote.status || "kladd");
 
       y += 4;
-      addLine(`Status: ${quote.status || "Ny"}`);
-      const totalHours = timeEntries.reduce((sum, t) => sum + Number(t.hours || 0), 0);
-      addLine(`Logged hours: ${totalHours.toFixed(2)}h`);
+      doc.setFont(undefined, "bold");
+      doc.setFontSize(14);
+      doc.text(quote.title || quote.category || "Tilbudssammendrag", margin, y);
+      y += 8;
+      doc.setFont(undefined, "normal");
+      doc.setFontSize(10);
+      addWrapped(quote.description || quote.message || "Tilbudet er basert på henvendelse og dialog med Hansen IT.");
 
-      y += 4;
-      addLine("---");
-      addLine("Customer message:");
-      const msg = quote.message || "";
-      const split = doc.splitTextToSize(msg, 170);
-      doc.text(split, 20, y);
+      if (quoteItems.length) {
+        y += 6;
+        doc.setFont(undefined, "bold");
+        doc.setFontSize(14);
+        doc.text("Produktpakker og tilbudslinjer", margin, y);
+        y += 8;
+        doc.setFont(undefined, "normal");
+        doc.setFontSize(10);
+
+        quoteItems.forEach((item, index) => {
+          if (y > 246) {
+            doc.addPage();
+            y = 22;
+          }
+          const pkg = item.service_package || {};
+          const title = item.title || pkg.name || item.description || `Tilbudslinje ${index + 1}`;
+          const amount = lineTotalExVat(item);
+          doc.setFillColor(245, 248, 253);
+          doc.roundedRect(margin, y, 174, 24, 3, 3, "F");
+          y += 7;
+          doc.setFont(undefined, "bold");
+          doc.text(title, margin + 5, y);
+          doc.text(`${amount.toLocaleString("nb-NO")} kr eks. mva`, 142, y);
+          y += 5;
+          doc.setFont(undefined, "normal");
+          addWrapped(item.description || pkg.short_description || "Produktpakke fra Hansen IT", margin + 5, 155, 4.8);
+          const included = Array.isArray(pkg.service_package_items) ? pkg.service_package_items.slice(0, 4) : [];
+          if (included.length) addWrapped(`Inkludert: ${included.map((includedItem) => includedItem.title).join(", ")}`, margin + 5, 155, 4.8);
+          y += 4;
+        });
+
+        if (quote.security_report_id) {
+          addWrapped("Basert pÃ¥ Phoenix Security Assessment og anbefalte tiltak fra sikkerhetsrapporten.", margin, 174, 5);
+        }
+      }
+
+      y += 6;
+      doc.setDrawColor(218, 226, 240);
+      doc.line(margin, y, 192, y);
+      y += 9;
+      addLabel("Estimert tid", totalHours ? `${totalHours.toFixed(1)} timer` : "Etter avtale");
+      addLabel("Subtotal eks. mva", `${subtotal.toLocaleString("nb-NO")} kr`);
+      addLabel("MVA", `${vat.toLocaleString("nb-NO")} kr`);
+      addLabel("Total inkl. mva", `${total.toLocaleString("nb-NO")} kr`);
+
+      y += 6;
+      doc.setFillColor(245, 248, 253);
+      doc.roundedRect(margin, y, 174, 28, 3, 3, "F");
+      y += 9;
+      doc.setFont(undefined, "bold");
+      doc.text("Neste steg", margin + 6, y);
+      y += 6;
+      doc.setFont(undefined, "normal");
+      addWrapped("Kunden kan lese tilbudet, laste ned dokumenter, sende melding og godkjenne eller be om endringer i kundeportalen.", margin + 6, 160, 5);
 
       const blob = doc.output("blob");
-      const fileName = `offer_quote_${quote.id}.pdf`;
+      const fileName = `tilbud-${String(quote.id).slice(0, 8)}.pdf`;
 
       // Upload via API
       const pdfFile = new File([blob], fileName, { type: "application/pdf" });
-      await uploadViaApi(pdfFile, fileName);
+      const uploaded = await uploadViaApi(pdfFile, fileName);
+      if (!uploaded.document) throw new Error("PDF ble lastet opp, men ble ikke registrert som portaldokument.");
+      setPdfStatus("PDF generert og lagret. Gjør dokumentet synlig i portal når det er klart for kunde.");
     } catch (e) {
       console.error(e);
-      alert(e.message || "Could not generate/upload PDF");
+      setPdfStatus(e.message || "PDF-generering eller lagring feilet.");
+      alert(e.message || "Kunne ikke generere eller lagre PDF.");
     } finally {
       setBusyPdf(false);
+    }
+  };
+
+  const handleCreateInvoiceDraft = async () => {
+    try {
+      setBusyInvoice(true);
+      setInvoiceMessage("");
+      const res = await fetch(`/api/admin/quotes/${quoteId}/invoice-draft`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke lage fakturautkast.");
+      setInvoiceMessage(json.reused ? "Eksisterende fakturautkast funnet." : "Fakturautkast opprettet.");
+      router.push(`/admin/invoices/${json.data.id}`);
+    } catch (e) {
+      console.error(e);
+      setInvoiceMessage(e.message || "Kunne ikke lage fakturautkast.");
+    } finally {
+      setBusyInvoice(false);
     }
   };
 
@@ -434,6 +696,22 @@ const handleCreatePortalLink = async () => {
       </div>
     );
   }
+
+  const visibleDocuments = documents.filter((document) => document.is_portal_visible !== false && document.visible_in_portal !== false);
+  const hasQuotePdf = visibleDocuments.some((document) => document.type === "quote_pdf" || /tilbud|quote|offer/i.test(document.filename || ""));
+  const hasScanPdf = visibleDocuments.some((document) => document.type === "security_report_pdf" || /scan|security|sikkerhet/i.test(document.filename || ""));
+  const quoteTotal = Number(quote.total_inc_vat || quote.total || quote.total_ex_vat || overallSubtotal || 0);
+  const readiness = [
+    { label: "Quote har minst én linje/timeføring", ok: timeEntries.length > 0 || quoteTotal > 0 },
+    { label: "Quote total er større enn 0", ok: quoteTotal > 0 },
+    { label: "Portal token finnes", ok: Boolean(portalUrl) },
+    { label: "Quote PDF finnes", ok: hasQuotePdf },
+    { label: "Scan PDF finnes hvis scan er koblet", ok: hasScanPdf || !quote.security_report_id },
+    { label: "Dokumenter er synlige i portal", ok: visibleDocuments.length > 0 },
+    { label: "Approval actions er tilgjengelig", ok: Boolean(portalUrl) },
+    { label: "Meldingsskjema er tilgjengelig", ok: Boolean(portalUrl) }
+  ];
+  const portalReady = readiness.every((item) => item.ok);
 
   return (
     <div className="p-6 space-y-6">
@@ -462,12 +740,17 @@ const handleCreatePortalLink = async () => {
             disabled={busyPdf}
           >
             <FileText size={16} />
-            {busyPdf ? "Working…" : "Generate PDF"}
+            {busyPdf ? "Jobber..." : "Generer PDF"}
           </Button>
 
           <Button onClick={handleCreatePortalLink} className="gap-2" disabled={busyPortal}>
             <LinkIcon size={16} />
-            {busyPortal ? "Creating…" : "Create portal link"}
+            {busyPortal ? "Oppretter..." : "Lag portal-lenke"}
+          </Button>
+
+          <Button variant="outline" onClick={handleCreateInvoiceDraft} className="gap-2" disabled={busyInvoice}>
+            <FileText size={16} />
+            {busyInvoice ? "Lager..." : "Lag fakturautkast"}
           </Button>
         </div>
       </div>
@@ -476,15 +759,56 @@ const handleCreatePortalLink = async () => {
         <Card>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <div className="text-white font-semibold">Customer portal link</div>
+              <div className="text-white font-semibold">Kundeportal-lenke</div>
               <div className="text-brand-300 text-sm break-all">{portalUrl}</div>
             </div>
             <Button variant="outline" onClick={() => navigator.clipboard.writeText(portalUrl)}>
-              Copy
+              Kopier
             </Button>
           </div>
         </Card>
       ) : null}
+
+      <Card className={portalReady ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="text-white font-semibold">Klar for kundeinvitasjon</div>
+            <div className={portalReady ? "mt-1 text-sm text-emerald-100" : "mt-1 text-sm text-amber-100"}>
+              {portalReady ? "Portalen ser klar ut for kunde." : "Portalen er ikke klar for kunde ennå."}
+            </div>
+          </div>
+          <div className="text-sm text-white">{readiness.filter((item) => item.ok).length}/{readiness.length}</div>
+        </div>
+        <div className="mt-4 grid gap-2 md:grid-cols-2">
+          {readiness.map((item) => (
+            <div key={item.label} className="flex items-center gap-2 rounded-xl border border-white/10 bg-brand-950/40 px-3 py-2 text-sm">
+              <span className={item.ok ? "text-emerald-300" : "text-amber-300"}>{item.ok ? "✓" : "!"}</span>
+              <span className="text-brand-100">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div>
+            <div className="text-xs uppercase text-brand-400">Tilbudsstatus</div>
+            <div className="mt-1 text-white font-semibold">{quote.portal_status || quote.status || "Ny"}</div>
+          </div>
+          <div>
+            <div className="text-xs uppercase text-brand-400">Dokumentstatus</div>
+            <div className="mt-1 text-white font-semibold">
+              {documents.length ? "PDF lagret og synlig i portal" : "PDF mangler eller er ikke registrert"}
+            </div>
+            {pdfStatus ? <div className="mt-1 text-xs text-brand-300">{pdfStatus}</div> : null}
+          </div>
+          <div>
+            <div className="text-xs uppercase text-brand-400">Faktura</div>
+            <div className="mt-1 text-white font-semibold">Utkast kan lages fra godkjent tilbud</div>
+            {invoiceMessage ? <div className="mt-1 text-xs text-brand-300">{invoiceMessage}</div> : null}
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left */}
@@ -528,6 +852,9 @@ const handleCreatePortalLink = async () => {
                     <option value="Ny">Ny</option>
                     <option value="Pågår">Pågår</option>
                     <option value="Fullført">Fullført</option>
+                    <option value="sendt">Sendt</option>
+                    <option value="godkjent">Godkjent</option>
+                    <option value="endringer ønsket">Endringer ønsket</option>
                   </select>
                 </div>
               </div>
@@ -567,6 +894,81 @@ const handleCreatePortalLink = async () => {
               <div className="text-brand-300 text-sm whitespace-pre-wrap">
                 {quote.message || "-"}
               </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div className="text-white font-semibold flex items-center gap-2">
+                  <PackageIcon size={16} /> Produktpakker og tilbudslinjer
+                </div>
+                <div className="text-brand-400 text-sm">Pakker blir synlige i tilbud, PDF og kundeportal.</div>
+              </div>
+              <div className="text-sm text-white">{formatCurrency(quoteItemsSubtotal)} eks. mva</div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <select
+                value={selectedPackageId}
+                onChange={(event) => setSelectedPackageId(event.target.value)}
+                className="min-h-10 flex-1 rounded-lg border border-brand-700 bg-brand-900 px-3 py-2 text-sm text-white"
+              >
+                <option value="">Velg aktiv produktpakke</option>
+                {servicePackages.map((pkg) => (
+                  <option key={pkg.id} value={pkg.id}>
+                    {pkg.name} · fra {formatCurrency(pkg.fixed_price || pkg.price_from)}
+                  </option>
+                ))}
+              </select>
+              <Button type="button" onClick={handleAddPackage} disabled={busyPackage || !selectedPackageId} className="gap-2">
+                <Plus size={16} /> {busyPackage ? "Legger til..." : "Legg til pakke"}
+              </Button>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {quoteItems.length ? quoteItems.map((item) => {
+                const pkg = item.service_package || {};
+                const included = Array.isArray(pkg.service_package_items)
+                  ? pkg.service_package_items.slice(0, 5)
+                  : Array.isArray(item.metadata?.included_items)
+                    ? item.metadata.included_items.slice(0, 5)
+                    : [];
+                return (
+                  <div key={item.id} className="rounded-xl border border-brand-800 bg-brand-900/30 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-white font-semibold">{item.title || pkg.name || item.description}</span>
+                          {item.item_type === "package" || item.service_package_id ? (
+                            <span className="rounded-full border border-accent-blue/40 bg-accent-blue/10 px-2 py-0.5 text-xs text-sky-100">Pakke</span>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-sm text-brand-300">{item.description || pkg.short_description || "Tilbudslinje"}</p>
+                        {included.length ? (
+                          <div className="mt-3 rounded-lg border border-brand-800 bg-brand-950/40 p-3">
+                            <div className="mb-1 text-xs uppercase text-brand-400">Hva er inkludert</div>
+                            <ul className="space-y-1 text-sm text-brand-200">
+                              {included.map((includedItem) => <li key={includedItem.id || includedItem.title}>- {includedItem.title}</li>)}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-white font-semibold">{formatCurrency(lineTotalExVat(item))}</div>
+                        <div className="text-xs text-brand-400">{Number(item.quantity || 1)} {item.unit || "stk"} · {packageEstimate(pkg)}</div>
+                        <Button type="button" variant="outline" className="mt-3 gap-2" onClick={() => handleDeleteQuoteItem(item.id)}>
+                          <Trash2 size={14} /> Fjern
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div className="rounded-xl border border-dashed border-brand-700 p-4 text-sm text-brand-400">
+                  Ingen produktpakker eller tilbudslinjer er lagt til ennå.
+                </div>
+              )}
             </div>
           </Card>
 
@@ -671,13 +1073,13 @@ const handleCreatePortalLink = async () => {
               <Input value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Rate (e.g. 100)" />
               <Input value={timeDescription} onChange={(e) => setTimeDescription(e.target.value)} placeholder="Description (optional)" />
               <Button type="submit" className="gap-2">
-                <Plus size={16} /> Add time
+                <Plus size={16} /> Legg til tid
               </Button>
             </form>
 
             <div className="mt-4 space-y-2">
               {timeEntries.length === 0 ? (
-                <div className="text-brand-400 text-sm">No time entries.</div>
+                <div className="text-brand-400 text-sm">Ingen timeføringer ennå.</div>
               ) : (
                 timeEntries.map((t) => (
                   <div key={t.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
@@ -697,21 +1099,98 @@ const handleCreatePortalLink = async () => {
           <Card>
             <div className="flex items-center justify-between">
               <div className="text-white font-semibold flex items-center gap-2">
-                <Paperclip size={16} /> Attachments
+                <Paperclip size={16} /> Dokumenter og vedlegg
               </div>
-              <div className="text-xs text-brand-400">{attachments.length}</div>
+              <div className="text-xs text-brand-400">{documents.length} dokumenter · {attachments.length} vedlegg</div>
             </div>
+
+            <div className="mt-4 rounded-xl border border-brand-700 bg-brand-900/40 p-3 text-sm">
+              <div className="text-white font-semibold">Portal-dokumentstatus</div>
+              <div className="mt-1 text-brand-300">
+                {documents.length ? "PDF er registrert og synlig i kundeportalen." : "Ingen PDF er registrert som portaldokument ennå."}
+              </div>
+            </div>
+
+            {documents.length ? (
+              <div className="mt-4 space-y-2">
+                {documents.map((document) => (
+                  <div key={document.id} className="rounded-lg border border-brand-800 bg-brand-900/30 p-3">
+                    <div className="text-white text-sm font-medium flex items-center gap-2">
+                      <FileText size={14} /> {document.filename}
+                    </div>
+                    <div className="text-brand-500 text-[11px] mt-1">
+                      {document.type} · {document.visible_in_portal ? "Synlig i portal" : "Skjult"}
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="mt-2 gap-2"
+                      onClick={() => openDocument(document.id)}
+                    >
+                      <Download size={16} /> Åpne
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {documents.length ? (
+              <div className="mt-4 rounded-xl border border-brand-700 bg-brand-950/40 p-3">
+                <div className="text-white font-semibold">Dokumentkontroll</div>
+                <div className="mt-3 space-y-2">
+                  {documents.map((document) => (
+                    <div key={`control-${document.id}`} className="rounded-lg border border-brand-800 bg-brand-900/40 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-white">{document.title || document.filename}</div>
+                          <div className="mt-1 text-xs text-brand-400">{document.type || "attachment"} · {document.storage_path ? "storage OK" : document.external_url ? "external URL" : "mangler fil/URL"}</div>
+                          <div className="mt-1 text-xs text-brand-400">{document.is_portal_visible !== false && document.visible_in_portal !== false ? "Synlig i portal" : "Skjult i portal"}</div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" className="gap-2" onClick={() => openDocument(document.id)}>
+                            Test download
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => handleToggleDocumentVisibility(document.id, !(document.is_portal_visible !== false && document.visible_in_portal !== false))}
+                          >
+                            {document.is_portal_visible !== false && document.visible_in_portal !== false ? "Skjul i portal" : "Gjør synlig i portal"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-4 space-y-3">
               <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
               <Button onClick={handleUpload} disabled={busyUpload || !file} className="gap-2">
-                <Plus size={16} /> {busyUpload ? "Uploading…" : "Upload"}
+                <Plus size={16} /> {busyUpload ? "Laster opp..." : "Last opp"}
               </Button>
             </div>
 
+            {attachments.some((attachment) => !documentStoragePaths.has(attachment.file_path)) ? (
+              <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+                <div className="font-semibold">Vedlegg mangler portal-kobling</div>
+                <div className="mt-1">Disse ligger i gammel attachment-tabell. Koble dem til quote_documents for kundeportalen.</div>
+                <div className="mt-3 space-y-2">
+                  {attachments.filter((attachment) => !documentStoragePaths.has(attachment.file_path)).map((attachment) => (
+                    <div key={`legacy-${attachment.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/20 bg-brand-950/40 p-2">
+                      <span>{attachment.file_name}</span>
+                      <Button variant="outline" className="gap-2" onClick={() => handleLinkAttachmentToPortal(attachment.id, false)}>
+                        Koble til portal
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="mt-4 space-y-2">
               {attachments.length === 0 ? (
-                <div className="text-brand-400 text-sm">No attachments.</div>
+                <div className="text-brand-400 text-sm">Ingen vedlegg.</div>
               ) : (
                 attachments.map((a) => (
                   <div key={a.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
@@ -726,7 +1205,7 @@ const handleCreatePortalLink = async () => {
                       className="mt-2 gap-2"
                       onClick={() => downloadAttachment(a.file_path)}
                     >
-                      <Download size={16} /> Open
+                      <Download size={16} /> Åpne
                     </Button>
                   </div>
                 ))
