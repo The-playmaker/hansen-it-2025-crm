@@ -3,7 +3,21 @@ import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_request, { params }) {
+const storageBuckets = ["quote-attachments", "quote-documents", "documents"];
+
+async function createSignedDocumentUrl(document) {
+  let lastError = null;
+  for (const bucket of storageBuckets) {
+    const { data, error } = await supabaseAdmin.storage
+      .from(bucket)
+      .createSignedUrl(document.storage_path, 60 * 10, { download: document.filename || "dokument.pdf" });
+    if (data?.signedUrl) return data.signedUrl;
+    lastError = error;
+  }
+  throw lastError || new Error("Storage-path finnes ikke.");
+}
+
+export async function GET(request, { params }) {
   if (!hasSupabaseAdminConfig) {
     return NextResponse.json({ error: "Dokumentnedlasting er ikke konfigurert." }, { status: 503 });
   }
@@ -49,18 +63,17 @@ export async function GET(_request, { params }) {
   }
 
   const visible = document.is_portal_visible !== false && document.visible_in_portal !== false;
-  if (!visible || String(document.quote_id) !== String(tokenRow.quote_id)) {
+  const belongsToQuote = [document.quote_id, document.request_id].some((value) => String(value || "") === String(tokenRow.quote_id));
+  if (!visible || !belongsToQuote) {
     return NextResponse.json({ error: "Du har ikke tilgang til dette dokumentet." }, { status: 403 });
   }
 
-  const { data, error } = await supabaseAdmin.storage
-    .from("quote-attachments")
-    .createSignedUrl(document.storage_path, 60 * 10, { download: document.filename });
-
-  if (error || !data?.signedUrl) {
+  try {
+    const signedUrl = await createSignedDocumentUrl(document);
+    if (new URL(request.url).searchParams.get("json") === "1") return NextResponse.json({ url: signedUrl });
+    return NextResponse.redirect(signedUrl, 302);
+  } catch (error) {
     console.error("portal document signed url failed:", error);
     return NextResponse.json({ error: "Kunne ikke klargjøre nedlasting." }, { status: 500 });
   }
-
-  return NextResponse.redirect(data.signedUrl, 302);
 }

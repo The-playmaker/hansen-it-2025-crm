@@ -55,6 +55,32 @@ export async function GET(_req, { params }) {
     .eq("quote_id", quote.id)
     .order("created_at", { ascending: false });
 
+  // 4b) quote items / service packages
+  let quoteItems = [];
+  const { data: itemsData, error: itemsError } = await supabase
+    .from("quote_items")
+    .select("*")
+    .or(`quote_id.eq.${quote.id},request_id.eq.${quote.id}`)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (!itemsError && itemsData?.length) {
+    const packageIds = [...new Set(itemsData.map((item) => item.service_package_id).filter(Boolean))];
+    let packages = [];
+    if (packageIds.length) {
+      const packageResult = await supabase
+        .from("service_packages")
+        .select("*, service_package_items(*)")
+        .in("id", packageIds);
+      packages = packageResult.data || [];
+    }
+    const packageMap = new Map(packages.map((pkg) => [String(pkg.id), pkg]));
+    quoteItems = itemsData.map((item) => ({
+      ...item,
+      service_package: item.service_package_id ? packageMap.get(String(item.service_package_id)) || null : null,
+    }));
+  }
+
   // 5) attachments
   const { data: attachments } = await supabase
     .from("quote_attachments")
@@ -90,6 +116,7 @@ export async function GET(_req, { params }) {
     quote,
     employee,
     timeEntries: timeEntries || [],
+    quoteItems,
     attachments: attachments || [],
     documents,
   });

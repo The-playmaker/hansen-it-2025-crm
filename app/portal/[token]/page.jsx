@@ -31,6 +31,12 @@ function moneyValue(...values) {
   return 0;
 }
 
+function lineTotalExVat(item) {
+  const explicit = Number(item.line_total_ex_vat || 0);
+  if (explicit > 0) return explicit;
+  return Number(item.quantity || 0) * Number(item.unit_price || 0);
+}
+
 function normalizeStatus(status, portalStatus) {
   if (portalStatus === "approved" || status === "godkjent") return "Godkjent";
   if (portalStatus === "changes_requested" || status === "endringer ønsket") return "Endringer ønsket";
@@ -64,6 +70,7 @@ export default function QuotePortal() {
   const [attachments, setAttachments] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [timeEntries, setTimeEntries] = useState([]);
+  const [quoteItems, setQuoteItems] = useState([]);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [invalid, setInvalid] = useState(false);
@@ -75,35 +82,55 @@ export default function QuotePortal() {
   const totals = useMemo(() => {
     const hours = timeEntries.reduce((sum, entry) => sum + Number(entry.hours || 0), 0);
     const timeSubtotal = timeEntries.reduce((sum, entry) => sum + Number(entry.hours || 0) * Number(entry.rate || 0), 0);
+    const itemSubtotal = quoteItems.reduce((sum, item) => sum + lineTotalExVat(item), 0);
     const quote = data?.quote || {};
-    const subtotal = moneyValue(timeSubtotal, quote.total_ex_vat, quote.subtotal, quote.price_ex_vat, quote.price);
+    const subtotal = moneyValue(itemSubtotal + timeSubtotal, quote.total_ex_vat, quote.subtotal, quote.price_ex_vat, quote.price);
     const vat = moneyValue(quote.total_vat, quote.vat_amount, subtotal * vatRate);
     const total = moneyValue(quote.total_inc_vat, quote.total, subtotal + vat);
     return { hours, subtotal, vat, total, averageRate: hours ? subtotal / hours : 0 };
-  }, [timeEntries, data]);
+  }, [timeEntries, quoteItems, data]);
 
   const quoteLines = useMemo(() => {
+    if (quoteItems.length) {
+      return quoteItems.map((item) => ({
+        id: item.id,
+        title: item.title || item.service_package?.name || item.description || "Tilbudslinje",
+        description: item.description || item.service_package?.short_description || "Produktpakke fra Hansen IT",
+        included: Array.isArray(item.service_package?.service_package_items) ? item.service_package.service_package_items.slice(0, 6) : [],
+        quantity: Number(item.quantity || 1),
+        unit: item.unit || "pakke",
+        unitPrice: Number(item.unit_price || 0),
+        total: lineTotalExVat(item),
+        isPackage: item.item_type === "package" || Boolean(item.service_package_id)
+      }));
+    }
     if (timeEntries.length) {
       return timeEntries.map((entry) => ({
         id: entry.id,
+        title: entry.description || "Arbeid etter avtale",
         description: entry.description || "Arbeid etter avtale",
+        included: [],
         quantity: Number(entry.hours || 0),
         unit: "timer",
         unitPrice: Number(entry.rate || 0),
-        total: Number(entry.hours || 0) * Number(entry.rate || 0)
+        total: Number(entry.hours || 0) * Number(entry.rate || 0),
+        isPackage: false
       }));
     }
     const quote = data?.quote || {};
     const subtotal = totals.subtotal || Number(quote.total_ex_vat || quote.subtotal || quote.price || 0);
     return subtotal ? [{
       id: "quote-summary",
+      title: quote.title || quote.category || "Tilbud fra Hansen IT",
       description: quote.title || quote.category || "Tilbud fra Hansen IT",
+      included: [],
       quantity: 1,
       unit: "pakke",
       unitPrice: subtotal,
-      total: subtotal
+      total: subtotal,
+      isPackage: false
     }] : [];
-  }, [timeEntries, data, totals.subtotal]);
+  }, [quoteItems, timeEntries, data, totals.subtotal]);
 
   const load = async () => {
     if (!tokenStr) return;
@@ -117,6 +144,7 @@ export default function QuotePortal() {
         return;
       }
       setTimeEntries(json.timeEntries || []);
+      setQuoteItems(json.quoteItems || []);
       setAttachments(json.attachments || []);
       setDocuments(json.documents || []);
       setData({ quote: json.quote, employee: json.employee, token: json.token });
@@ -322,7 +350,15 @@ export default function QuotePortal() {
                     <tbody>
                       {quoteLines.length ? quoteLines.map((line) => (
                         <tr key={line.id} className="border-t border-white/10">
-                          <td className="px-3 py-2">{line.description}</td>
+                          <td className="px-3 py-3">
+                            <div className="font-semibold text-white">{line.title || line.description}</div>
+                            {line.description && line.description !== line.title ? <div className="mt-1 text-xs text-slate-300">{line.description}</div> : null}
+                            {line.included?.length ? (
+                              <ul className="mt-2 space-y-1 text-xs text-slate-400">
+                                {line.included.map((includedItem) => <li key={includedItem.id || includedItem.title}>- {includedItem.title}</li>)}
+                              </ul>
+                            ) : null}
+                          </td>
                           <td className="px-3 py-2">{line.quantity} {line.unit}</td>
                           <td className="px-3 py-2">{line.unitPrice ? formatCurrency(line.unitPrice) : "Etter avtale"}</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(line.total)}</td>
@@ -372,6 +408,8 @@ export default function QuotePortal() {
                   <a
                     key={document.id}
                     href={`/api/portal/quote/${encodeURIComponent(tokenStr)}/documents/${document.id}/download`}
+                    target="_blank"
+                    rel="noreferrer"
                     className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3 text-left hover:border-[#3FA1FF]/50"
                   >
                     <span>

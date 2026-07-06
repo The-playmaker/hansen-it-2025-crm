@@ -17,9 +17,29 @@ import {
   FileText,
   Link as LinkIcon,
   Download,
+  Package as PackageIcon,
+  Trash2,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { supabase } from "@/lib/supabaseClient";
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(Number(value || 0));
+}
+
+function lineTotalExVat(item) {
+  const explicit = Number(item.line_total_ex_vat || 0);
+  if (explicit > 0) return explicit;
+  return Number(item.quantity || 0) * Number(item.unit_price || 0);
+}
+
+function packageEstimate(pkg = {}) {
+  const min = Number(pkg.hourly_estimate_min || 0);
+  const max = Number(pkg.hourly_estimate_max || 0);
+  if (min && max) return `${min}-${max} timer`;
+  if (min) return `fra ${min} timer`;
+  return "Etter avtale";
+}
 
 export default function QuoteDetailsPage() {
   const { id } = useParams();
@@ -34,6 +54,8 @@ export default function QuoteDetailsPage() {
   const [timeEntries, setTimeEntries] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [quoteItems, setQuoteItems] = useState([]);
+  const [servicePackages, setServicePackages] = useState([]);
 
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingText, setEditingText] = useState("");
@@ -57,8 +79,10 @@ export default function QuoteDetailsPage() {
   const [busyPdf, setBusyPdf] = useState(false);
   const [busyUpload, setBusyUpload] = useState(false);
   const [busyInvoice, setBusyInvoice] = useState(false);
+  const [busyPackage, setBusyPackage] = useState(false);
   const [pdfStatus, setPdfStatus] = useState("");
   const [invoiceMessage, setInvoiceMessage] = useState("");
+  const [selectedPackageId, setSelectedPackageId] = useState("");
 
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -72,6 +96,16 @@ export default function QuoteDetailsPage() {
   const totalCost = useMemo(
     () => timeEntries.reduce((sum, t) => sum + Number(t.hours || 0) * Number(t.rate || 0), 0),
     [timeEntries]
+  );
+
+  const quoteItemsSubtotal = useMemo(
+    () => quoteItems.reduce((sum, item) => sum + lineTotalExVat(item), 0),
+    [quoteItems]
+  );
+
+  const overallSubtotal = useMemo(
+    () => quoteItemsSubtotal + totalCost,
+    [quoteItemsSubtotal, totalCost]
   );
 
   const quoteNumber = useMemo(() => `Tilbud ${String(quoteId || "").slice(0, 8).toUpperCase()}`, [quoteId]);
@@ -126,6 +160,28 @@ export default function QuoteDetailsPage() {
     setDocuments(json.documents || []);
   };
 
+  const loadQuoteItems = async () => {
+    const res = await fetch(`/api/admin/quotes/${quoteId}/items`, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok) {
+      console.warn(json?.error || "Quote items not configured");
+      setQuoteItems([]);
+      return;
+    }
+    setQuoteItems(json.data || []);
+  };
+
+  const loadServicePackages = async () => {
+    const res = await fetch("/api/admin/service-packages", { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok) {
+      console.warn(json?.error || "Service packages not configured");
+      setServicePackages([]);
+      return;
+    }
+    setServicePackages((json.data || []).filter((pkg) => pkg.is_active !== false));
+  };
+
   const loadPortalLink = async () => {
     const res = await fetch(`/api/admin/quotes/${quoteId}/portal-link`, { cache: "no-store" });
     const json = await res.json();
@@ -148,7 +204,7 @@ export default function QuoteDetailsPage() {
       setLoading(true);
       try {
         await Promise.all([loadEmployees(), loadQuote()]);
-        await Promise.all([loadNotes(), loadTime(), loadAttachments(), loadMessages(), loadPortalLink()]);
+        await Promise.all([loadNotes(), loadTime(), loadAttachments(), loadMessages(), loadPortalLink(), loadQuoteItems(), loadServicePackages()]);
       } catch (e) {
         console.error(e);
         router.push("/admin/quotes");
@@ -352,8 +408,49 @@ export default function QuoteDetailsPage() {
   }
 };
 
-  const openDocument = (documentId) => {
-    window.open(`/api/admin/quotes/${quoteId}/documents/${documentId}/download`, "_blank", "noopener,noreferrer");
+  const openDocument = async (documentId) => {
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/documents/${documentId}/download?json=1`, { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke åpne dokumentet.");
+      window.open(json.url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke åpne dokumentet. Sjekk at PDF-en er lagret i Supabase Storage.");
+    }
+  };
+
+  const handleAddPackage = async () => {
+    if (!selectedPackageId) return;
+    try {
+      setBusyPackage(true);
+      const res = await fetch(`/api/admin/quotes/${quoteId}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service_package_id: selectedPackageId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke legge pakken til tilbudet.");
+      setQuoteItems((prev) => [...prev, json.data]);
+      setSelectedPackageId("");
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke legge pakken til tilbudet.");
+    } finally {
+      setBusyPackage(false);
+    }
+  };
+
+  const handleDeleteQuoteItem = async (itemId) => {
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/items/${itemId}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke slette tilbudslinjen.");
+      setQuoteItems((prev) => prev.filter((item) => item.id !== itemId));
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke slette tilbudslinjen.");
+    }
   };
 
   // ---- portal link ----
@@ -408,7 +505,7 @@ const handleCreatePortalLink = async () => {
       const margin = 18;
       let y = 22;
       const totalHours = timeEntries.reduce((sum, t) => sum + Number(t.hours || 0), 0);
-      const subtotal = totalCost || Number(quote.total_ex_vat || quote.subtotal || quote.price || 0);
+      const subtotal = overallSubtotal || Number(quote.total_ex_vat || quote.subtotal || quote.price || 0);
       const vat = Number(quote.total_vat || Math.round(subtotal * 0.25));
       const total = Number(quote.total_inc_vat || quote.total || subtotal + vat);
 
@@ -458,6 +555,42 @@ const handleCreatePortalLink = async () => {
       doc.setFont(undefined, "normal");
       doc.setFontSize(10);
       addWrapped(quote.description || quote.message || "Tilbudet er basert på henvendelse og dialog med Hansen IT.");
+
+      if (quoteItems.length) {
+        y += 6;
+        doc.setFont(undefined, "bold");
+        doc.setFontSize(14);
+        doc.text("Produktpakker og tilbudslinjer", margin, y);
+        y += 8;
+        doc.setFont(undefined, "normal");
+        doc.setFontSize(10);
+
+        quoteItems.forEach((item, index) => {
+          if (y > 246) {
+            doc.addPage();
+            y = 22;
+          }
+          const pkg = item.service_package || {};
+          const title = item.title || pkg.name || item.description || `Tilbudslinje ${index + 1}`;
+          const amount = lineTotalExVat(item);
+          doc.setFillColor(245, 248, 253);
+          doc.roundedRect(margin, y, 174, 24, 3, 3, "F");
+          y += 7;
+          doc.setFont(undefined, "bold");
+          doc.text(title, margin + 5, y);
+          doc.text(`${amount.toLocaleString("nb-NO")} kr eks. mva`, 142, y);
+          y += 5;
+          doc.setFont(undefined, "normal");
+          addWrapped(item.description || pkg.short_description || "Produktpakke fra Hansen IT", margin + 5, 155, 4.8);
+          const included = Array.isArray(pkg.service_package_items) ? pkg.service_package_items.slice(0, 4) : [];
+          if (included.length) addWrapped(`Inkludert: ${included.map((includedItem) => includedItem.title).join(", ")}`, margin + 5, 155, 4.8);
+          y += 4;
+        });
+
+        if (quote.security_report_id) {
+          addWrapped("Basert pÃ¥ Phoenix Security Assessment og anbefalte tiltak fra sikkerhetsrapporten.", margin, 174, 5);
+        }
+      }
 
       y += 6;
       doc.setDrawColor(218, 226, 240);
@@ -523,7 +656,7 @@ const handleCreatePortalLink = async () => {
   const visibleDocuments = documents.filter((document) => document.is_portal_visible !== false && document.visible_in_portal !== false);
   const hasQuotePdf = visibleDocuments.some((document) => document.type === "quote_pdf" || /tilbud|quote|offer/i.test(document.filename || ""));
   const hasScanPdf = visibleDocuments.some((document) => document.type === "security_report_pdf" || /scan|security|sikkerhet/i.test(document.filename || ""));
-  const quoteTotal = Number(quote.total_inc_vat || quote.total || quote.total_ex_vat || totalCost || 0);
+  const quoteTotal = Number(quote.total_inc_vat || quote.total || quote.total_ex_vat || overallSubtotal || 0);
   const readiness = [
     { label: "Quote har minst én linje/timeføring", ok: timeEntries.length > 0 || quoteTotal > 0 },
     { label: "Quote total er større enn 0", ok: quoteTotal > 0 },
@@ -717,6 +850,77 @@ const handleCreatePortalLink = async () => {
               <div className="text-brand-300 text-sm whitespace-pre-wrap">
                 {quote.message || "-"}
               </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div className="text-white font-semibold flex items-center gap-2">
+                  <PackageIcon size={16} /> Produktpakker og tilbudslinjer
+                </div>
+                <div className="text-brand-400 text-sm">Pakker blir synlige i tilbud, PDF og kundeportal.</div>
+              </div>
+              <div className="text-sm text-white">{formatCurrency(quoteItemsSubtotal)} eks. mva</div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <select
+                value={selectedPackageId}
+                onChange={(event) => setSelectedPackageId(event.target.value)}
+                className="min-h-10 flex-1 rounded-lg border border-brand-700 bg-brand-900 px-3 py-2 text-sm text-white"
+              >
+                <option value="">Velg aktiv produktpakke</option>
+                {servicePackages.map((pkg) => (
+                  <option key={pkg.id} value={pkg.id}>
+                    {pkg.name} · fra {formatCurrency(pkg.fixed_price || pkg.price_from)}
+                  </option>
+                ))}
+              </select>
+              <Button type="button" onClick={handleAddPackage} disabled={busyPackage || !selectedPackageId} className="gap-2">
+                <Plus size={16} /> {busyPackage ? "Legger til..." : "Legg til pakke"}
+              </Button>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {quoteItems.length ? quoteItems.map((item) => {
+                const pkg = item.service_package || {};
+                const included = Array.isArray(pkg.service_package_items) ? pkg.service_package_items.slice(0, 5) : [];
+                return (
+                  <div key={item.id} className="rounded-xl border border-brand-800 bg-brand-900/30 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-white font-semibold">{item.title || pkg.name || item.description}</span>
+                          {item.item_type === "package" || item.service_package_id ? (
+                            <span className="rounded-full border border-accent-blue/40 bg-accent-blue/10 px-2 py-0.5 text-xs text-sky-100">Pakke</span>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-sm text-brand-300">{item.description || pkg.short_description || "Tilbudslinje"}</p>
+                        {included.length ? (
+                          <div className="mt-3 rounded-lg border border-brand-800 bg-brand-950/40 p-3">
+                            <div className="mb-1 text-xs uppercase text-brand-400">Hva er inkludert</div>
+                            <ul className="space-y-1 text-sm text-brand-200">
+                              {included.map((includedItem) => <li key={includedItem.id || includedItem.title}>- {includedItem.title}</li>)}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-white font-semibold">{formatCurrency(lineTotalExVat(item))}</div>
+                        <div className="text-xs text-brand-400">{Number(item.quantity || 1)} {item.unit || "stk"} · {packageEstimate(pkg)}</div>
+                        <Button type="button" variant="outline" className="mt-3 gap-2" onClick={() => handleDeleteQuoteItem(item.id)}>
+                          <Trash2 size={14} /> Fjern
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div className="rounded-xl border border-dashed border-brand-700 p-4 text-sm text-brand-400">
+                  Ingen produktpakker eller tilbudslinjer er lagt til ennå.
+                </div>
+              )}
             </div>
           </Card>
 
