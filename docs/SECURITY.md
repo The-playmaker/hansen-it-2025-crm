@@ -152,3 +152,15 @@ Teams, Slack og Resend skal behandles som eksterne integrasjoner:
 ## Demo fallback
 
 LocalStorage er kun demo fallback når Supabase mangler. I produksjon skal Supabase være source of truth.
+
+## Auth status
+
+`/login` bruker fortsatt midlertidig Phoenix-session-cookie for v1/test. UI-et skal ikke vise dev-debug eller tekniske auth-feil til bruker.
+
+Produksjonsretning:
+
+- Supabase Auth eller annen valgt IdP.
+- Microsoft/Entra ID OAuth for adminbrukere.
+- Rollemodell for `owner`, `admin`, `technician` og `viewer`.
+- Admin-ruter og admin-API-er krever innlogging.
+- Portal-ruter bruker bare lange, random portal-tokens.

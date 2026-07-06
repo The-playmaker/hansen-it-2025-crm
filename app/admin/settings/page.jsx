@@ -50,6 +50,16 @@ export default function SettingsIndex() {
             </Link>
           </div>
         </Card>
+
+        <Card>
+          <div className="space-y-2">
+            <div className="text-white font-semibold">Data-opprydding</div>
+            <div className="text-brand-300 text-sm">Rydd testdata og reset Ristesund testflyt med guardrails.</div>
+            <Link className="text-accent-blue underline text-sm" href="/admin/settings/data-cleanup">
+              Åpne
+            </Link>
+          </div>
+        </Card>
       </div>
     </div>
   );

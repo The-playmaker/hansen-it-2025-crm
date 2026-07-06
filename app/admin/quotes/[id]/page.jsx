@@ -772,6 +772,7 @@ const handleCreatePortalLink = async () => {
     ? prepareChecks.map((item) => ({ label: item.label || item.key, ok: Boolean(item.ok), details: item.details || "" }))
     : localReadiness;
   const portalReady = readiness.every((item) => item.ok);
+  const quoteApproved = ["approved", "godkjent"].includes(String(quote.portal_status || quote.status || "").toLowerCase());
 
   return (
     <div className="p-6 space-y-6">
@@ -817,7 +818,7 @@ const handleCreatePortalLink = async () => {
             {busyPortal ? "Oppretter..." : "Lag portal-lenke"}
           </Button>
 
-          <Button variant="outline" onClick={handleCreateInvoiceDraft} className="gap-2" disabled={busyInvoice}>
+          <Button variant="outline" onClick={handleCreateInvoiceDraft} className="gap-2" disabled={busyInvoice || !quoteApproved}>
             <FileText size={16} />
             {busyInvoice ? "Lager..." : "Lag fakturautkast"}
           </Button>
@@ -876,7 +877,7 @@ const handleCreatePortalLink = async () => {
           </div>
           <div>
             <div className="text-xs uppercase text-brand-400">Faktura</div>
-            <div className="mt-1 text-white font-semibold">Utkast kan lages fra godkjent tilbud</div>
+            <div className="mt-1 text-white font-semibold">{quoteApproved ? "Klar for fakturautkast" : "Fakturautkast kan lages når tilbudet er godkjent."}</div>
             {invoiceMessage ? <div className="mt-1 text-xs text-brand-300">{invoiceMessage}</div> : null}
           </div>
         </div>
