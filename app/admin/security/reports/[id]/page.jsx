@@ -134,7 +134,7 @@ export default function SecurityReportDetailPage({ params }) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Kunne ikke lage tilbudskladd fra produktpakker.");
-      setActionMessage(`Tilbudskladd opprettet: ${result.data?.title || result.data?.id}`);
+      setActionMessage(`Tilbud oppdatert: ${result.data?.title || result.data?.id}${result.url ? ` (${result.url})` : ""}`);
     } catch (err) {
       setError(err.message || "Kunne ikke lage tilbudskladd fra produktpakker.");
     } finally {
@@ -177,9 +177,9 @@ export default function SecurityReportDetailPage({ params }) {
               {row.lead_id ? <StatusBadge>Lead koblet</StatusBadge> : null}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <SecondaryButton type="button" onClick={() => downloadSecurityReportPdf(row)}><Download size={16} />Download PDF</SecondaryButton>
-              <SecondaryButton type="button" onClick={() => downloadSecurityReportJson(row)}><FileJson size={16} />Download JSON</SecondaryButton>
-              <SecondaryButton type="button" disabled={Boolean(actionBusy)} onClick={createShareLink}><LinkIcon size={16} />{actionBusy === "share" ? "Lager..." : "Share link"}</SecondaryButton>
+              <SecondaryButton type="button" onClick={() => downloadSecurityReportPdf(row)}><Download size={16} />Last ned PDF</SecondaryButton>
+              <SecondaryButton type="button" onClick={() => downloadSecurityReportJson(row)}><FileJson size={16} />Last ned JSON</SecondaryButton>
+              <SecondaryButton type="button" disabled={Boolean(actionBusy)} onClick={createShareLink}><LinkIcon size={16} />{actionBusy === "share" ? "Lager..." : "Lag delbar lenke"}</SecondaryButton>
             </div>
           </PhoenixPanel>
 
@@ -219,9 +219,9 @@ export default function SecurityReportDetailPage({ params }) {
                     <StatusBadge>{severityLabels[action.severity] || action.severity || action.status}</StatusBadge>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <SecondaryButton disabled={Boolean(actionBusy)} onClick={() => createCrmAction("task", action)}><CheckCircle2 size={15} />Create task</SecondaryButton>
-                    <SecondaryButton disabled={Boolean(actionBusy)} onClick={() => createCrmAction("quote", action)}><FileText size={15} />Create quote draft</SecondaryButton>
-                    <SecondaryButton disabled={Boolean(actionBusy) || !row.customer_id} onClick={() => createCrmAction("note", action)}><MessageSquarePlus size={15} />Add customer note</SecondaryButton>
+                    <SecondaryButton disabled={Boolean(actionBusy)} onClick={() => createCrmAction("task", action)}><CheckCircle2 size={15} />Opprett oppgave</SecondaryButton>
+                    <SecondaryButton disabled={Boolean(actionBusy)} onClick={() => createCrmAction("quote", action)}><FileText size={15} />Opprett/oppdater tilbud</SecondaryButton>
+                    <SecondaryButton disabled={Boolean(actionBusy) || !row.customer_id} onClick={() => createCrmAction("note", action)}><MessageSquarePlus size={15} />Legg til kundenotat</SecondaryButton>
                   </div>
                 </article>
               )) : <EmptyState text="Ingen prioriterte tiltak." />}
@@ -250,7 +250,7 @@ export default function SecurityReportDetailPage({ params }) {
             {recommendedPackages.some((pkg) => pkg.id) ? (
               <div className="mt-4">
                 <PrimaryButton type="button" disabled={Boolean(actionBusy)} onClick={() => createPackageQuote(recommendedPackages.filter((pkg) => pkg.id).map((pkg) => pkg.id))}>
-                  <PackagePlus size={16} />Lag quote draft fra anbefalte pakker
+                  <PackagePlus size={16} />Opprett/oppdater tilbud fra anbefalte pakker
                 </PrimaryButton>
               </div>
             ) : null}

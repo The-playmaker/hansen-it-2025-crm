@@ -80,6 +80,8 @@ export default function QuoteDetailsPage() {
   const [busyUpload, setBusyUpload] = useState(false);
   const [busyInvoice, setBusyInvoice] = useState(false);
   const [busyPackage, setBusyPackage] = useState(false);
+  const [busyPreparePortal, setBusyPreparePortal] = useState(false);
+  const [prepareChecks, setPrepareChecks] = useState(null);
   const [pdfStatus, setPdfStatus] = useState("");
   const [invoiceMessage, setInvoiceMessage] = useState("");
   const [selectedPackageId, setSelectedPackageId] = useState("");
@@ -551,6 +553,24 @@ const handleCreatePortalLink = async () => {
     setBusyPortal(false);
   }
 };
+
+  const handlePreparePortal = async () => {
+    if (!quoteId) return;
+    setBusyPreparePortal(true);
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/prepare-portal`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke klargjøre kundeportalen.");
+      setPrepareChecks(json.checks || []);
+      if (json.portalUrl) setPortalUrl(json.portalUrl);
+      await Promise.all([loadQuote(), loadAttachments(), loadQuoteItems(), loadPortalLink()]);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke klargjøre kundeportalen.");
+    } finally {
+      setBusyPreparePortal(false);
+    }
+  };
   // ---- PDF (generate + upload) ----
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -738,7 +758,7 @@ const handleCreatePortalLink = async () => {
   const hasQuotePdf = visibleDocuments.some((document) => document.type === "quote_pdf" || /tilbud|quote|offer/i.test(document.filename || ""));
   const hasScanPdf = visibleDocuments.some((document) => document.type === "security_report_pdf" || /scan|security|sikkerhet/i.test(document.filename || ""));
   const quoteTotal = Number(quote.total_inc_vat || quote.total || quote.total_ex_vat || overallSubtotal || 0);
-  const readiness = [
+  const localReadiness = [
     { label: "Quote har minst én linje/timeføring", ok: timeEntries.length > 0 || quoteTotal > 0 },
     { label: "Quote total er større enn 0", ok: quoteTotal > 0 },
     { label: "Portal token finnes", ok: Boolean(portalUrl) },
@@ -748,6 +768,9 @@ const handleCreatePortalLink = async () => {
     { label: "Approval actions er tilgjengelig", ok: Boolean(portalUrl) },
     { label: "Meldingsskjema er tilgjengelig", ok: Boolean(portalUrl) }
   ];
+  const readiness = Array.isArray(prepareChecks) && prepareChecks.length
+    ? prepareChecks.map((item) => ({ label: item.label || item.key, ok: Boolean(item.ok), details: item.details || "" }))
+    : localReadiness;
   const portalReady = readiness.every((item) => item.ok);
 
   return (
@@ -770,6 +793,15 @@ const handleCreatePortalLink = async () => {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            onClick={handlePreparePortal}
+            className="gap-2"
+            disabled={busyPreparePortal}
+          >
+            <LinkIcon size={16} />
+            {busyPreparePortal ? "Klargjør..." : "Klargjør kundeportal"}
+          </Button>
+
           <Button
             variant="outline"
             onClick={handleGenerateOfferPdf}
@@ -820,7 +852,10 @@ const handleCreatePortalLink = async () => {
           {readiness.map((item) => (
             <div key={item.label} className="flex items-center gap-2 rounded-xl border border-white/10 bg-brand-950/40 px-3 py-2 text-sm">
               <span className={item.ok ? "text-emerald-300" : "text-amber-300"}>{item.ok ? "✓" : "!"}</span>
-              <span className="text-brand-100">{item.label}</span>
+              <span className="text-brand-100">
+                {item.label}
+                {item.details ? <span className="ml-1 text-brand-400">- {item.details}</span> : null}
+              </span>
             </div>
           ))}
         </div>

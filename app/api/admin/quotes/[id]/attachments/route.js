@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { quoteResolveResponse, resolveQuoteId } from "@/lib/quotes/resolveQuoteId";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req, { params }) {
-  const quoteLookup = await supabaseAdmin
-    .from("quotes")
-    .select("id, source_request_id")
-    .eq("id", params.id)
-    .maybeSingle();
-  const attachmentQuoteIds = [params.id, quoteLookup.data?.source_request_id].filter(Boolean);
+  let quote = null;
+  try {
+    quote = await resolveQuoteId(params.id);
+  } catch (error) {
+    const response = quoteResolveResponse(error);
+    return NextResponse.json({ error: response.error }, { status: response.status });
+  }
+
+  const attachmentQuoteIds = [quote.id, quote.source_request_id].filter(Boolean);
 
   const { data, error } = await supabaseAdmin
     .from("quote_attachments")
@@ -24,7 +28,7 @@ export async function GET(req, { params }) {
   const { data: documents } = await supabaseAdmin
     .from("quote_documents")
     .select("*")
-    .eq("quote_id", params.id)
+    .eq("quote_id", quote.id)
     .order("created_at", { ascending: false });
 
   return NextResponse.json({ data, documents: documents || [] });
@@ -40,9 +44,17 @@ export async function POST(req, { params }) {
 
   const isPdf = (file.type || "").includes("pdf") || file.name.toLowerCase().endsWith(".pdf");
   const bucket = isPdf ? "phoenix-documents" : "quote-attachments";
+  let quote = null;
+  try {
+    quote = await resolveQuoteId(params.id);
+  } catch (error) {
+    const response = quoteResolveResponse(error);
+    return NextResponse.json({ error: response.error }, { status: response.status });
+  }
+
   const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
     .from(bucket)
-    .upload(`${params.id}/${Date.now()}-${file.name}`, file);
+    .upload(`${quote.id}/${Date.now()}-${file.name}`, file);
 
   if (uploadError) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
@@ -52,7 +64,7 @@ export async function POST(req, { params }) {
     .from("quote_attachments")
     .insert([
       {
-        quote_id: params.id,
+        quote_id: quote.id,
         file_name: file.name,
         file_path: uploadData.path,
       },
@@ -66,26 +78,11 @@ export async function POST(req, { params }) {
 
   let document = null;
   if (isPdf) {
-    let { data: quote } = await supabaseAdmin
-      .from("requests")
-      .select("id, customer_id, source_request_id")
-      .eq("id", params.id)
-      .maybeSingle();
-
-    if (!quote) {
-      const fallback = await supabaseAdmin
-        .from("quotes")
-        .select("id, customer_id, source_request_id")
-        .eq("id", params.id)
-        .maybeSingle();
-      quote = fallback.data;
-    }
-
     const { data: documentData, error: documentError } = await supabaseAdmin
       .from("quote_documents")
       .insert({
-        quote_id: params.id,
-        request_id: quote?.source_request_id || (quote?.id !== params.id ? quote?.id : null),
+        quote_id: quote.id,
+        request_id: quote.source_request_id || null,
         customer_id: quote?.customer_id || null,
         type: file.name.toLowerCase().includes("security") ? "security_report_pdf" : "quote_pdf",
         title: file.name.toLowerCase().includes("security") ? "Samlet sikkerhetsrapport" : "Tilbud PDF",
