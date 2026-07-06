@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("quote_portal_tokens")
-    .select("*,quote:requests(name,email)")
+    .select("*,quote:quotes(title,status,customer_id)")
     .order("created_at", { ascending: false });
 
   if (error) {
