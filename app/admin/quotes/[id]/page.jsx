@@ -425,6 +425,40 @@ export default function QuoteDetailsPage() {
     }
   };
 
+  const testPortalDocumentDownload = async (document) => {
+    const token = portalUrl?.split("/").filter(Boolean).pop();
+    if (!token) {
+      alert("Portal-token finnes ikke. Lag portal-lenke for tilbudet først.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/portal/quote/${encodeURIComponent(token)}/documents/${document.id}/download?json=1`, { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert([
+          "Portal download feilet.",
+          `Token finnes: ja`,
+          `Document id: ${document.id}`,
+          `Quote id: ${document.quote_id || quoteId}`,
+          `Storage object: ${document.storage_path ? "registrert" : "mangler storage_path"}`,
+          `Feil: ${json?.error || res.statusText}`,
+        ].join("\n"));
+        return;
+      }
+      window.open(json.url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.error(error);
+      alert([
+        "Portal download-test feilet.",
+        `Token finnes: ja`,
+        `Document id: ${document.id}`,
+        `Quote id: ${document.quote_id || quoteId}`,
+        `Storage object: ${document.storage_path ? "registrert" : "mangler storage_path"}`,
+      ].join("\n"));
+    }
+  };
+
   const handleAddPackage = async () => {
     if (!selectedPackageId) return;
     try {
@@ -1148,6 +1182,9 @@ const handleCreatePortalLink = async () => {
                         <div className="flex flex-wrap gap-2">
                           <Button variant="outline" className="gap-2" onClick={() => openDocument(document.id)}>
                             Test download
+                          </Button>
+                          <Button variant="outline" className="gap-2" onClick={() => testPortalDocumentDownload(document)}>
+                            Test portal download
                           </Button>
                           <Button
                             variant="outline"

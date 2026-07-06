@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { PortalTokenError, resolveQuotePortalToken } from "@/lib/portal/resolveQuotePortalToken";
 
 export const dynamic = "force-dynamic";
 
@@ -29,22 +30,8 @@ export async function POST(req) {
       return NextResponse.json({ error: "Mangler token eller dokument." }, { status: 400 });
     }
 
-    // Validate token -> get quote_id
-    const { data: tokenRow, error: tokenErr } = await supabaseAdmin
-      .from("quote_portal_tokens")
-      .select("*")
-      .eq("token", token)
-      .maybeSingle();
+    const { quote } = await resolveQuotePortalToken(token);
 
-    if (tokenErr || !tokenRow) {
-      return NextResponse.json({ error: "Ugyldig portal-lenke." }, { status: 404 });
-    }
-
-    if (tokenRow.expires_at && new Date(tokenRow.expires_at) < new Date()) {
-      return NextResponse.json({ error: "Portal-lenken er utløpt." }, { status: 410 });
-    }
-
-    // IMPORTANT: ensure the file belongs to that quote
     const { data: attachment, error: attErr } = await supabaseAdmin
       .from("quote_attachments")
       .select("id, quote_id, file_path")
@@ -55,13 +42,17 @@ export async function POST(req) {
       return NextResponse.json({ error: "Dokumentet ble ikke funnet." }, { status: 404 });
     }
 
-    if (String(attachment.quote_id) !== String(tokenRow.quote_id)) {
+    const allowedQuoteIds = [quote.id, quote.source_request_id].filter(Boolean).map(String);
+    if (!allowedQuoteIds.includes(String(attachment.quote_id))) {
       return NextResponse.json({ error: "Du har ikke tilgang til dette dokumentet." }, { status: 403 });
     }
 
     return NextResponse.json({ url: await createSignedUrl(file_path) });
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "Kunne ikke klargjøre nedlasting." }, { status: 500 });
+  } catch (error) {
+    if (error instanceof PortalTokenError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    console.error("legacy portal attachment signed url failed:", error);
+    return NextResponse.json({ error: "Kunne ikke klargjore nedlasting." }, { status: 500 });
   }
 }

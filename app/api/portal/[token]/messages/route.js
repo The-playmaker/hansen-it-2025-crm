@@ -1,44 +1,43 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { PortalTokenError, resolveQuotePortalToken } from "@/lib/portal/resolveQuotePortalToken";
 
 export const dynamic = "force-dynamic";
 
-async function getQuoteIdFromToken(token) {
-  const { data, error } = await supabaseAdmin
-    .from("quote_portal_tokens")
-    .select("quote_id")
-    .eq("token", token)
-    .single();
-
-  if (error) {
-    throw new Error("Invalid token");
+async function getQuoteFromToken(token) {
+  try {
+    return await resolveQuotePortalToken(token);
+  } catch (error) {
+    if (error instanceof PortalTokenError) throw error;
+    console.error("portal message token resolve failed:", error);
+    throw new PortalTokenError("Ugyldig portal-lenke.", 401);
   }
-
-  return data.quote_id;
 }
 
-export async function GET(req, { params }) {
+export async function GET(_req, { params }) {
   try {
-    const quoteId = await getQuoteIdFromToken(params.token);
+    const { quote } = await getQuoteFromToken(params.token);
     const { data, error } = await supabaseAdmin
       .from("quote_messages")
       .select("*")
-      .eq("quote_id", quoteId)
+      .eq("quote_id", quote.id)
       .order("created_at", { ascending: false });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("portal messages read failed:", error);
+      return NextResponse.json({ error: "Kunne ikke hente meldinger." }, { status: 500 });
     }
 
     return NextResponse.json({ data });
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 401 });
+  } catch (error) {
+    const status = error instanceof PortalTokenError ? error.status : 401;
+    return NextResponse.json({ error: error.message || "Ugyldig portal-lenke." }, { status });
   }
 }
 
 export async function POST(req, { params }) {
   try {
-    const quoteId = await getQuoteIdFromToken(params.token);
+    const { quote } = await getQuoteFromToken(params.token);
     const body = await req.json();
     const message = String(body.message || "").trim();
     if (!message) {
@@ -47,16 +46,18 @@ export async function POST(req, { params }) {
 
     const { data, error } = await supabaseAdmin
       .from("quote_messages")
-      .insert([{ quote_id: quoteId, author_type: "customer", author_name: "Kunde", message }])
+      .insert([{ quote_id: quote.id, author_type: "customer", author_name: "Kunde", message }])
       .select()
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("portal message insert failed:", error);
+      return NextResponse.json({ error: "Kunne ikke lagre meldingen." }, { status: 500 });
     }
 
     return NextResponse.json({ data });
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 401 });
+  } catch (error) {
+    const status = error instanceof PortalTokenError ? error.status : 401;
+    return NextResponse.json({ error: error.message || "Ugyldig portal-lenke." }, { status });
   }
 }
