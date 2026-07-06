@@ -521,6 +521,9 @@ export default function QuoteDetailsPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || "Kunne ikke koble vedlegget til portalen.");
+      if (json.portalToken?.token && typeof window !== "undefined") {
+        setPortalUrl(`${window.location.origin}/portal/${json.portalToken.token}`);
+      }
       setDocuments((prev) => {
         const exists = prev.some((document) => document.id === json.data.id);
         return exists ? prev.map((document) => (document.id === json.data.id ? json.data : document)) : [json.data, ...prev];
@@ -1216,7 +1219,7 @@ const handleCreatePortalLink = async () => {
                   {attachments.filter((attachment) => !documentStoragePaths.has(attachment.file_path)).map((attachment) => (
                     <div key={`legacy-${attachment.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/20 bg-brand-950/40 p-2">
                       <span>{attachment.file_name}</span>
-                      <Button variant="outline" className="gap-2" onClick={() => handleLinkAttachmentToPortal(attachment.id, false)}>
+                      <Button variant="outline" className="gap-2" onClick={() => handleLinkAttachmentToPortal(attachment.id, true)}>
                         Koble til portal
                       </Button>
                     </div>
