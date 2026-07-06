@@ -91,14 +91,7 @@ export async function GET(_req, { params }) {
     }));
   }
 
-  // 5) attachments
-  const { data: attachments } = await supabase
-    .from("quote_attachments")
-    .select("*")
-    .eq("quote_id", quote.id)
-    .order("created_at", { ascending: false });
-
-  // 6) portal documents. quote_documents is source of truth.
+  // 5) portal documents. quote_documents is source of truth.
   const { data: documents } = await supabase
     .from("quote_documents")
     .select("*")
@@ -115,7 +108,6 @@ export async function GET(_req, { params }) {
     employee,
     timeEntries: timeEntries || [],
     quoteItems,
-    attachments: attachments || [],
-    documents,
+    documents: documents || [],
   });
 }

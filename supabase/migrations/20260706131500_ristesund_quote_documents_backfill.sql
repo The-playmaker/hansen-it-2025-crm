@@ -61,4 +61,16 @@ begin
       where qd.quote_id = ristesund_quote_id
         and qd.storage_path = qa.file_path
     );
+
+  update public.quote_portal_tokens
+  set quote_id = ristesund_quote_id
+  where quote_id = ristesund_request_id;
+
+  update public.quote_messages
+  set quote_id = ristesund_quote_id
+  where quote_id = ristesund_request_id;
+
+  update public.quote_notes
+  set quote_id = ristesund_quote_id
+  where quote_id = ristesund_request_id;
 end $$;

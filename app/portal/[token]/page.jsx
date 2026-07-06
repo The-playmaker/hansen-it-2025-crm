@@ -70,7 +70,6 @@ export default function QuotePortal() {
   const tokenStr = String(token || "");
 
   const [data, setData] = useState(null);
-  const [attachments, setAttachments] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [timeEntries, setTimeEntries] = useState([]);
   const [quoteItems, setQuoteItems] = useState([]);
@@ -152,7 +151,6 @@ export default function QuotePortal() {
       }
       setTimeEntries(json.timeEntries || []);
       setQuoteItems(json.quoteItems || []);
-      setAttachments(json.attachments || []);
       setDocuments(json.documents || []);
       setData({ quote: json.quote, employee: json.employee, token: json.token });
 
@@ -218,22 +216,6 @@ export default function QuotePortal() {
       alert(error.message || "Kunne ikke oppdatere status.");
     } finally {
       setActionBusy(false);
-    }
-  };
-
-  const downloadAttachment = async (filePath) => {
-    try {
-      const response = await fetch("/api/portal/attachments/sign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: tokenStr, file_path: filePath })
-      });
-      const json = await response.json();
-      if (!response.ok) throw new Error(json?.error || "Kunne ikke laste ned.");
-      window.open(json.url, "_blank", "noopener,noreferrer");
-    } catch (error) {
-      console.error(error);
-      alert("Kunne ikke laste ned dokumentet.");
     }
   };
 
@@ -427,16 +409,6 @@ export default function QuotePortal() {
                   </a>
                 )) : <p className="text-sm text-slate-400">Dokumenter blir tilgjengelige her når de er klargjort av Hansen IT.</p>}
 
-                {!documents.length && attachments.length ? (
-                  <div className="border-t border-white/10 pt-3">
-                    <p className="mb-2 text-xs uppercase text-slate-400">Vedlegg</p>
-                    {attachments.map((attachment) => (
-                      <button key={attachment.id} type="button" onClick={() => downloadAttachment(attachment.file_path)} className="mb-2 w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left text-sm hover:border-[#3FA1FF]/50">
-                        {attachment.file_name}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
               </div>
             </Card>
 
