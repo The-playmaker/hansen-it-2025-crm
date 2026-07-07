@@ -30,7 +30,8 @@ NEXT_PUBLIC_CRM_PUBLIC_URL=https://crm.hansen-it.com
 
 # Teams / Slack
 TEAMS_WEBHOOK_URL=https://...
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+N8N_CONTACT_WEBHOOK_URL=https://n8n.example.com/webhook/phoenix-contact-created
+SLACK_WEBHOOK_URL=
 
 # Resend
 RESEND_API_KEY=<resend-api-key>
@@ -77,13 +78,15 @@ POST /api/notify/teams
 
 Når en sak med `priority='hast'` oppdateres, sendes også melding.
 
-## Slack-varsler
+## n8n / Slack-varsler
 
-Hvis `SLACK_WEBHOOK_URL` finnes, sender `/api/public/contact` et best-effort Slack-varsel etter at en gyldig lead er lagret.
+`/api/public/contact` sender et best-effort event til `N8N_CONTACT_WEBHOOK_URL` etter at en gyldig henvendelse er lagret i `requests`.
 
-Slack-feil logges kontrollert, men skal ikke stoppe lead-mottak eller krasje API-et.
+n8n bør håndtere Slack, Teams, e-post og annen automasjon videre. Dette gjør CRM til source of truth og hindrer at nettsiden sender parallelle/doble varsler.
 
-Slack-meldingen viser navn, firma, e-post, telefon, kategori, kort melding og kilde.
+n8n-feil logges kontrollert, men skal ikke stoppe lead-mottak eller krasje API-et.
+
+Eventet heter `phoenix.contact.created` og inneholder navn, firma, e-post, telefon, kategori, prioritet, kort melding, kilde og `requests.id`.
 
 ## Resend
 
