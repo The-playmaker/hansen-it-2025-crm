@@ -39,7 +39,7 @@ export default function LeadsPage() {
 
   const filtered = useMemo(() => {
     return leads.filter((lead) => {
-      const haystack = `${lead.name || ""} ${lead.email || ""} ${lead.company || ""} ${lead.phone || ""} ${lead.message || ""}`.toLowerCase();
+      const haystack = `${lead.display_name || ""} ${lead.name || ""} ${lead.email || ""} ${lead.company || ""} ${lead.phone || ""} ${lead.message || ""} ${lead.notes || ""}`.toLowerCase();
       const matchesQuery = haystack.includes(query.toLowerCase());
       const isConverted = Boolean(lead.converted_to_customer || lead.customer_id || lead.status === "converted");
       const matchesStatus = status === "alle" || (status === "converted" ? isConverted : lead.status === status);
@@ -124,12 +124,13 @@ export default function LeadsPage() {
               <article key={lead.id} className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h3 className="font-semibold text-white">{lead.company || lead.name || "Ukjent henvendelse"}</h3>
+                    <h3 className="font-semibold text-white">{lead.display_name || lead.company || lead.name || lead.email || "Uten navn"}</h3>
                     <p className="mt-1 text-sm text-slate-400">{lead.name || "Ukjent navn"} - {lead.email || "Ingen e-post"}{lead.phone ? ` - ${lead.phone}` : ""}</p>
                   </div>
                   <div className="flex flex-wrap gap-2"><StatusBadge>{lead.status}</StatusBadge><StatusBadge>{lead.priority}</StatusBadge></div>
                 </div>
                 <p className="mt-3 whitespace-pre-line text-sm text-slate-300">{lead.message || "Ingen melding."}</p>
+                {lead.notes ? <p className="mt-2 whitespace-pre-line rounded-xl border border-white/10 bg-slate-900/60 p-3 text-sm text-slate-300">Notat: {lead.notes}</p> : null}
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
                   <span>Request ID: {lead.id}</span>
                   <span>Opprettet: {formatDate(lead.created_at)}</span>
@@ -148,6 +149,13 @@ export default function LeadsPage() {
                 </div><div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <Field label="Status"><SelectInput disabled={savingId === lead.id} value={editableRequestStatuses.includes(lead.status) ? lead.status : "ny"} options={editableRequestStatuses} onChange={(event) => updateLead(lead, { status: event.target.value })} /></Field>
                   <Field label="Prioritet"><SelectInput disabled={savingId === lead.id} value={lead.priority || "normal"} options={priorities.filter((item) => item !== "alle")} onChange={(event) => updateLead(lead, { priority: event.target.value })} /></Field>
+                  <Field label="Visningsnavn"><TextInput disabled={savingId === lead.id} value={lead.display_name || ""} onChange={(event) => setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, display_name: event.target.value } : item))} onBlur={(event) => updateLead(lead, { display_name: event.target.value })} placeholder="F.eks. Ristesund sikkerhetssjekk" /></Field>
+                  <Field label="Firma"><TextInput disabled={savingId === lead.id} value={lead.company || ""} onChange={(event) => setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, company: event.target.value } : item))} onBlur={(event) => updateLead(lead, { company: event.target.value })} /></Field>
+                  <Field label="Kontaktperson"><TextInput disabled={savingId === lead.id} value={lead.name || ""} onChange={(event) => setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, name: event.target.value } : item))} onBlur={(event) => updateLead(lead, { name: event.target.value })} /></Field>
+                  <Field label="Internt notat"><TextInput disabled={savingId === lead.id} value={lead.notes || ""} onChange={(event) => setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, notes: event.target.value } : item))} onBlur={(event) => updateLead(lead, { notes: event.target.value })} /></Field>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" disabled={savingId === lead.id} onClick={() => updateLead(lead, { archive: true })} className="inline-flex min-h-9 items-center justify-center rounded-xl border border-amber-400/30 px-3 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-500/10 disabled:opacity-50">Arkiver</button>
                 </div>
               </article>
             )) : <EmptyState text="Ingen requests i dette filteret." />}

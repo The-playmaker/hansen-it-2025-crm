@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireMe } from "@/lib/requireMe";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { quoteResolveResponse, resolveQuoteId } from "@/lib/quotes/resolveQuoteId";
 
 export const dynamic = "force-dynamic";
 
@@ -24,14 +25,23 @@ export async function GET(request, { params }) {
   if (!hasSupabaseAdminConfig) return NextResponse.json({ error: "Supabase er ikke konfigurert." }, { status: 503 });
 
   const wantsJson = new URL(request.url).searchParams.get("json") === "1";
+  let quote = null;
+  try {
+    quote = await resolveQuoteId(params.id);
+  } catch (error) {
+    const response = quoteResolveResponse(error);
+    return NextResponse.json({ error: response.error }, { status: response.status });
+  }
+
   const { data: document, error: documentError } = await supabaseAdmin
     .from("quote_documents")
     .select("id, quote_id, request_id, filename, storage_path, external_url")
     .eq("id", params.documentId)
+    .eq("quote_id", quote.id)
+    .is("deleted_at", null)
     .maybeSingle();
 
-  const belongsToQuote = document && [document.quote_id, document.request_id].some((value) => String(value || "") === String(params.id));
-  if (documentError || !document || !belongsToQuote) {
+  if (documentError || !document) {
     return NextResponse.json({ error: "Dokumentet ble ikke funnet for dette tilbudet." }, { status: 404 });
   }
 

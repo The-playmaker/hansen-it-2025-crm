@@ -74,6 +74,7 @@ export async function GET(_req, { params }) {
     .select("*")
     .eq("quote_id", quote.id)
     .eq("is_portal_visible", true)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   return NextResponse.json({

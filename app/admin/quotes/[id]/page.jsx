@@ -41,6 +41,25 @@ function packageEstimate(pkg = {}) {
   return "Etter avtale";
 }
 
+const documentTypeLabels = {
+  quote_pdf: "Tilbud PDF",
+  scan_combined_pdf: "Samlet sikkerhetsrapport",
+  scan_domain_pdf: "Teknisk rapport",
+  attachment: "Vedlegg"
+};
+
+function documentLabel(document = {}) {
+  return document.display_name || document.title || document.filename || documentTypeLabels[document.type] || "Uten navn";
+}
+
+function documentTypeLabel(type) {
+  return documentTypeLabels[type] || "Vedlegg";
+}
+
+function isDocumentVisible(document = {}) {
+  return document.is_portal_visible === true || document.visible_in_portal === true;
+}
+
 export default function QuoteDetailsPage() {
   const { id } = useParams();
   const quoteId = String(id || "");
@@ -514,6 +533,60 @@ export default function QuoteDetailsPage() {
     }
   };
 
+  const handleRenameDocument = async (document) => {
+    const nextName = window.prompt("Nytt visningsnavn", document.display_name || document.title || document.filename || "");
+    if (nextName === null) return;
+
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/documents/${document.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: nextName }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke navngi dokumentet.");
+      setDocuments((prev) => prev.map((item) => item.id === document.id ? json.data : item));
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke navngi dokumentet.");
+    }
+  };
+
+  const handleChangeDocumentType = async (document, type) => {
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/documents/${document.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke endre dokumenttype.");
+      setDocuments((prev) => prev.map((item) => item.id === document.id ? json.data : item));
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke endre dokumenttype.");
+    }
+  };
+
+  const handleDeleteDocumentLink = async (document) => {
+    if (!window.confirm(`Slette dokumentkoblingen "${documentLabel(document)}"? Dokumentet fjernes fra portalen.`)) return;
+    const deleteStorageFile = window.confirm("Vil du også slette selve PDF-filen fra Supabase Storage? Velg Avbryt for å bare slette koblingen.");
+
+    try {
+      const res = await fetch(`/api/admin/quotes/${quoteId}/documents/${document.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deleteStorageFile }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Kunne ikke slette dokumentkoblingen.");
+      setDocuments((prev) => prev.filter((item) => item.id !== document.id));
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Kunne ikke slette dokumentkoblingen.");
+    }
+  };
+
   const handleLinkAttachmentToPortal = async (attachmentId, visible = false) => {
     try {
       const res = await fetch(`/api/admin/quotes/${quoteId}/attachments/${attachmentId}/portal-document`, {
@@ -785,7 +858,7 @@ const handleCreatePortalLink = async () => {
 
           <div>
             <div className="text-white text-xl font-bold">
-              Quote · {quote.name || "No name"}
+              Tilbud · {quote.display_name || quote.title || quote.customer_name || quote.company || quote.name || "Uten navn"}
             </div>
             <div className="text-brand-300 text-sm">
               {quote.email || "-"} · {quote.phone || "-"}
@@ -905,7 +978,7 @@ const handleCreatePortalLink = async () => {
                     className="bg-brand-900 border border-brand-700 rounded-lg px-3 py-2 text-white text-sm"
                     disabled={saving}
                   >
-                    <option value="">Unassigned</option>
+                    <option value="">Ikke tildelt</option>
                     {employees.map((e) => (
                       <option key={e.id} value={e.id}>
                         {e.name}
@@ -1098,8 +1171,8 @@ const handleCreatePortalLink = async () => {
 
           <Card>
             <div className="flex items-center justify-between">
-              <div className="text-white font-semibold">Messages</div>
-              {hasNewMessage && <div className="text-xs text-white bg-red-500 px-2 py-1 rounded-full">New Message</div>}
+              <div className="text-white font-semibold">Meldinger</div>
+              {hasNewMessage && <div className="text-xs text-white bg-red-500 px-2 py-1 rounded-full">Ny melding</div>}
             </div>
             <form onSubmit={handleSendMessage} className="mt-4 space-y-3">
               <Textarea
@@ -1108,13 +1181,13 @@ const handleCreatePortalLink = async () => {
                 placeholder="Write a message to the customer…"
               />
               <Button type="submit" className="gap-2">
-                <Plus size={16} /> Send message
+                <Plus size={16} /> Send melding
               </Button>
             </form>
 
             <div className="mt-5 space-y-3">
               {messages.length === 0 ? (
-                <div className="text-brand-400 text-sm">No messages yet.</div>
+                <div className="text-brand-400 text-sm">Ingen meldinger ennå.</div>
               ) : (
                 messages.map((m) => (
                   <div key={m.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
@@ -1172,7 +1245,7 @@ const handleCreatePortalLink = async () => {
           <Card>
             <div className="flex items-center justify-between">
               <div className="text-white font-semibold flex items-center gap-2">
-                <Paperclip size={16} /> Dokumenter og vedlegg
+                <Paperclip size={16} /> Dokumenter
               </div>
               <div className="text-xs text-brand-400">{documents.length} dokumenter · {attachments.length} vedlegg</div>
             </div>
@@ -1189,7 +1262,7 @@ const handleCreatePortalLink = async () => {
                 {documents.map((document) => (
                   <div key={document.id} className="rounded-lg border border-brand-800 bg-brand-900/30 p-3">
                     <div className="text-white text-sm font-medium flex items-center gap-2">
-                      <FileText size={14} /> {document.filename}
+                      <FileText size={14} /> {documentLabel(document)}
                     </div>
                     <div className="text-brand-500 text-[11px] mt-1">
                       {document.type} · {document.visible_in_portal ? "Synlig i portal" : "Skjult"}
@@ -1201,6 +1274,13 @@ const handleCreatePortalLink = async () => {
                     >
                       <Download size={16} /> Åpne
                     </Button>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleRenameDocument(document)}>Navngi</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleToggleDocumentVisibility(document.id, !isDocumentVisible(document))}>
+                        {isDocumentVisible(document) ? "Fjern fra portal" : "Gjør synlig"}
+                      </Button>
+                      <Button variant="danger" size="sm" onClick={() => handleDeleteDocumentLink(document)}>Slett kobling</Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1214,11 +1294,17 @@ const handleCreatePortalLink = async () => {
                     <div key={`control-${document.id}`} className="rounded-lg border border-brand-800 bg-brand-900/40 p-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <div className="text-sm font-semibold text-white">{document.title || document.filename}</div>
+                          <div className="text-sm font-semibold text-white">{documentLabel(document)}</div>
                           <div className="mt-1 text-xs text-brand-400">{document.type || "attachment"} · {document.storage_path ? "storage OK" : document.external_url ? "external URL" : "mangler fil/URL"}</div>
                           <div className="mt-1 text-xs text-brand-400">{document.is_portal_visible !== false && document.visible_in_portal !== false ? "Synlig i portal" : "Skjult i portal"}</div>
                         </div>
                         <div className="flex flex-wrap gap-2">
+                          <select value={document.type || "attachment"} onChange={(event) => handleChangeDocumentType(document, event.target.value)} className="rounded-lg border border-brand-700 bg-brand-950 px-2 py-1 text-xs text-white">
+                            {Object.entries(documentTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                          </select>
+                          <Button variant="outline" className="gap-2" onClick={() => handleRenameDocument(document)}>
+                            Navngi
+                          </Button>
                           <Button variant="outline" className="gap-2" onClick={() => openDocument(document.id)}>
                             Test download
                           </Button>
@@ -1228,7 +1314,7 @@ const handleCreatePortalLink = async () => {
                           <Button
                             variant="outline"
                             className="gap-2"
-                            onClick={() => handleToggleDocumentVisibility(document.id, !(document.is_portal_visible !== false && document.visible_in_portal !== false))}
+                            onClick={() => handleToggleDocumentVisibility(document.id, !isDocumentVisible(document))}
                           >
                             {document.is_portal_visible !== false && document.visible_in_portal !== false ? "Skjul i portal" : "Gjør synlig i portal"}
                           </Button>
@@ -1295,9 +1381,9 @@ const handleCreatePortalLink = async () => {
           </Card>
 
           <Card>
-            <div className="text-white font-semibold">Assigned employee</div>
+            <div className="text-white font-semibold">Ansvarlig</div>
             <div className="text-brand-300 text-sm mt-1">
-              {assignedEmployee ? assignedEmployee.name : "Unassigned"}
+              {assignedEmployee ? assignedEmployee.name : "Ikke tildelt"}
             </div>
           </Card>
         </div>
