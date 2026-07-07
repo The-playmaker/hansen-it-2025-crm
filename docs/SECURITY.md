@@ -153,14 +153,78 @@ Teams, Slack og Resend skal behandles som eksterne integrasjoner:
 
 LocalStorage er kun demo fallback når Supabase mangler. I produksjon skal Supabase være source of truth.
 
-## Auth status
+## Admin Auth v2
 
-`/login` bruker fortsatt midlertidig Phoenix-session-cookie for v1/test. UI-et skal ikke vise dev-debug eller tekniske auth-feil til bruker.
+`/login` bruker Supabase Auth for adminbrukere. Den gamle lokale `phoenixUser`-cookien er ikke lenger produksjonsvei.
 
-Produksjonsretning:
+Admin-tilgang krever:
 
-- Supabase Auth eller annen valgt IdP.
-- Microsoft/Entra ID OAuth for adminbrukere.
-- Rollemodell for `owner`, `admin`, `technician` og `viewer`.
-- Admin-ruter og admin-API-er krever innlogging.
-- Portal-ruter bruker bare lange, random portal-tokens.
+- Supabase Auth-bruker.
+- Rad i `public.admin_profiles`.
+- `is_active=true`.
+- Rolle: `owner`, `admin`, `employee` eller `viewer`.
+
+Protected:
+
+- `/admin/*`
+- `/api/admin/*`
+
+Public/token-basert og fortsatt uten admin-login:
+
+- `/portal/*`
+- `/api/portal/*`
+- `/api/public/contact`
+
+`/api/admin/auth/me` returnerer innlogget bruker, admin-profil og rolle uten å eksponere secrets.
+
+Migration:
+
+- `supabase/migrations/20260707133000_admin_profiles_auth.sql`
+
+Migrationen oppretter `admin_profiles` og seeder `flemming@hansen-it.com` som `owner` hvis brukeren allerede finnes i Supabase Auth. Opprett Supabase Auth-brukeren før migrationen kjøres, eller legg inn profilen manuelt etterpå.
+
+Eksempel:
+
+```sql
+insert into public.admin_profiles (id, email, name, role, is_active)
+select id, email, 'Flemming Hansen', 'owner', true
+from auth.users
+where lower(email) = lower('flemming@hansen-it.com')
+on conflict (id) do update
+set role = 'owner', is_active = true, updated_at = now();
+```
+
+## Admin roles
+
+Minimumsmodell:
+
+- `owner`: full tilgang.
+- `admin`: drift/adminhandlinger.
+- `employee`: CRM, quotes, scan/report arbeidsflyt.
+- `viewer`: lesetilgang.
+
+Avansert RBAC UI, MFA management og Microsoft/Entra ID SSO er ikke bygget i denne runden, men Supabase Auth-modellen blokkerer ikke dette senere.
+
+## Public contact spam-beskyttelse
+
+`/api/public/contact` er public, men skal ikke bruke anon-key fallback. Endpointet krever `SUPABASE_SERVICE_ROLE_KEY` server-side for lagring, validerer input, bruker Cloudflare Turnstile og har enkel rate limit per IP/e-post.
+
+Miljøvariabler:
+
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+- `TURNSTILE_SECRET_KEY`
+- `CAPTCHA_REQUIRED=true`
+- `CAPTCHA_BYPASS_FOR_PREVIEW=false`
+- `CAPTCHA_BYPASS_FOR_PRODUCTION=false`
+
+Bypass i production anbefales ikke.
+
+## Production checklist
+
+- Supabase Auth-brukere er opprettet.
+- `admin_profiles` har riktige roller og `is_active=true`.
+- `SUPABASE_SERVICE_ROLE_KEY` finnes bare server-side.
+- RLS-policyer er vurdert/ferdigstilt før bred produksjon.
+- Public portal-tokens er lange, random og har utløp der det er relevant.
+- Aktiv scanning krever signert scan authorization.
+- Turnstile er konfigurert for public contact.

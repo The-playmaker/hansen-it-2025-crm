@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -179,6 +180,9 @@ async function loadConvertedEntities(requestRow) {
 }
 
 export async function POST(_request, { params }) {
+  const auth = await requireAdmin({ minRole: "employee" });
+  if (!auth.ok) return adminErrorResponse(auth);
+
   if (!hasSupabaseAdminConfig) {
     return NextResponse.json({ error: "Supabase er ikke konfigurert." }, { status: 503 });
   }

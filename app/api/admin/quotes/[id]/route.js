@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
+import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { quoteResolveResponse, resolveQuoteId } from "@/lib/quotes/resolveQuoteId";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req, { params }) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return adminErrorResponse(auth);
+
   try {
     const data = await resolveQuoteId(params.id);
     return NextResponse.json({ data });
@@ -15,6 +19,9 @@ export async function GET(req, { params }) {
 }
 
 export async function PATCH(req, { params }) {
+  const auth = await requireAdmin({ minRole: "employee" });
+  if (!auth.ok) return adminErrorResponse(auth);
+
   const body = await req.json();
   let quote = null;
   try {

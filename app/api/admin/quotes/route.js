@@ -1,9 +1,13 @@
 ﻿import { NextResponse } from "next/server";
+import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return adminErrorResponse(auth);
+
   if (!hasSupabaseAdminConfig) return NextResponse.json({ configured: false, data: [] });
   const url = new URL(req.url);
   const search = (url.searchParams.get("search") || "").trim();
@@ -37,6 +41,9 @@ export async function GET(req) {
 }
 
 export async function POST(request) {
+  const auth = await requireAdmin({ minRole: "employee" });
+  if (!auth.ok) return adminErrorResponse(auth);
+
   if (!hasSupabaseAdminConfig) return NextResponse.json({ error: "Supabase er ikke konfigurert." }, { status: 503 });
   const body = await request.json();
   if (!body.name && !body.company) return NextResponse.json({ error: "Kunde/firma er påkrevd." }, { status: 400 });

@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import { getClientIp, verifyTurnstileToken } from "@/lib/captcha/turnstile";
+import { checkRateLimit } from "@/lib/rateLimit";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -107,8 +108,14 @@ export async function POST(request) {
     return json({ status: "error", message: "Navn, e-post og melding er påkrevd." }, { status: 400 });
   }
 
+  const clientIp = getClientIp(request);
+  const rateLimit = checkRateLimit(`contact:${clientIp || payload.email.toLowerCase()}`, { limit: 8, windowMs: 60_000 });
+  if (!rateLimit.ok) {
+    return json({ status: "error", message: "For mange innsendinger på kort tid. Prøv igjen om litt." }, { status: 429 });
+  }
+
   if (!hasTrustedContactRelay(request)) {
-    const captcha = await verifyTurnstileToken(payload.turnstileToken, { ip: getClientIp(request) });
+    const captcha = await verifyTurnstileToken(payload.turnstileToken, { ip: clientIp });
     if (!captcha.ok) {
       return json({ status: "error", message: captcha.message }, { status: captcha.status || 400 });
     }

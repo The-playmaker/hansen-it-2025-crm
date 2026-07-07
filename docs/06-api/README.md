@@ -12,7 +12,13 @@ Phoenix API-er skal være enkle, server-side først og trygge å bruke fra Codex
 
 ## Auth
 
-Adminruter under `/api/admin/*` krever Phoenix-session via `requireMe()`.
+Adminruter under `/api/admin/*` krever Supabase Auth-session og aktiv rolle i `admin_profiles`.
+
+Adminrollen valideres server-side:
+
+- middleware beskytter `/admin/*` og `/api/admin/*`
+- sensitive API-ruter skal i tillegg bruke `requireAdmin({ minRole })`
+- `SUPABASE_SERVICE_ROLE_KEY` kan bare brukes etter admin-validering i serverkode
 
 Public ruter er kun for spesifikke formål:
 - `/api/public/contact`

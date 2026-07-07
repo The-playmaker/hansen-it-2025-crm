@@ -40,7 +40,7 @@ export function AdminShell({ children }) {
   const [collapsed, setCollapsed] = useState(false);
 
   const nav = [...baseNav];
-  if (me?.role === "admin") {
+  if (["owner", "admin"].includes(me?.role)) {
     nav.push({ href: "/admin/settings", label: "Innstillinger", icon: Settings });
   }
 
@@ -113,6 +113,13 @@ export function AdminShell({ children }) {
         </nav>
 
         <div className="border-t border-white/10 p-3">
+          {me ? (
+            <div className={`${collapsed ? "hidden" : "mb-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3"}`}>
+              <p className="truncate text-sm font-semibold text-white">{me.name || me.email}</p>
+              <p className="mt-1 truncate text-xs text-slate-400">{me.email}</p>
+              <span className="mt-2 inline-flex rounded-full border border-cyan-300/25 bg-cyan-300/10 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-cyan-200">{me.role}</span>
+            </div>
+          ) : null}
           <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-slate-400 hover:bg-rose-500/10 hover:text-rose-200" title="Logg ut">
             <LogOut className="h-5 w-5 shrink-0" />
             <span className={`${collapsed ? "hidden" : "block"}`}>Logg ut</span>
