@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { getClientIp, verifyTurnstileToken } from "@/lib/captcha/turnstile";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -31,8 +32,15 @@ function normalizePayload(body) {
     message: String(body.message || "").trim(),
     category: String(body.category || "").trim(),
     source: String(body.source || "hansen-it-2025").trim(),
-    priority: ["hast", "urgent", "high", "høy", "true"].includes(priority) ? "hast" : "normal"
+    priority: ["hast", "urgent", "high", "høy", "true"].includes(priority) ? "hast" : "normal",
+    turnstileToken: String(body.turnstileToken || body.captchaToken || body["cf-turnstile-response"] || "").trim()
   };
+}
+
+function hasTrustedContactRelay(request) {
+  const expectedSecret = process.env.CRM_CONTACT_RELAY_SECRET;
+  const providedSecret = request.headers.get("x-phoenix-contact-secret");
+  return Boolean(expectedSecret && providedSecret && providedSecret === expectedSecret);
 }
 
 function shortMessage(message) {
@@ -40,47 +48,49 @@ function shortMessage(message) {
   return `${message.slice(0, 237)}...`;
 }
 
-async function notifySlack(payload, savedTarget, savedId) {
-  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+async function notifyN8n(payload, savedTarget, savedId) {
+  const webhookUrl = process.env.N8N_CONTACT_WEBHOOK_URL || process.env.N8N_WEBHOOK_URL;
   if (!webhookUrl) return;
 
   const company = payload.company || "Ikke oppgitt";
   const phone = payload.phone || "Ikke oppgitt";
   const category = payload.category || "Ikke oppgitt";
   const source = payload.source || "hansen-it-2025";
-  const priority = payload.priority === "hast" ? "Haster" : "Normal";
+  const priorityLabel = payload.priority === "hast" ? "Haster" : "Normal";
 
   try {
     const response = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text: `Ny henvendelse fra ${payload.name} (${company})`,
-        blocks: [
-          { type: "header", text: { type: "plain_text", text: "Ny henvendelse i Project Phoenix", emoji: true } },
-          {
-            type: "section",
-            fields: [
-              { type: "mrkdwn", text: `*Navn:*\n${payload.name}` },
-              { type: "mrkdwn", text: `*Firma:*\n${company}` },
-              { type: "mrkdwn", text: `*E-post:*\n${payload.email}` },
-              { type: "mrkdwn", text: `*Telefon:*\n${phone}` },
-              { type: "mrkdwn", text: `*Kategori:*\n${category}` },
-              { type: "mrkdwn", text: `*Kilde:*\n${source}` },
-              { type: "mrkdwn", text: `*Prioritet:*\n${priority}` }
-            ]
-          },
-          { type: "section", text: { type: "mrkdwn", text: `*Melding:*\n${shortMessage(payload.message)}` } },
-          { type: "context", elements: [{ type: "mrkdwn", text: `Lagret i ${savedTarget}${savedId ? ` (${savedId})` : ""}` }] }
-        ]
+        event: "phoenix.contact.created",
+        target: savedTarget,
+        id: savedId,
+        savedAt: new Date().toISOString(),
+        contact: {
+          name: payload.name,
+          company,
+          email: payload.email,
+          phone,
+          category,
+          source,
+          priority: payload.priority,
+          priorityLabel,
+          message: payload.message,
+          shortMessage: shortMessage(payload.message)
+        },
+        slack: {
+          text: `Ny henvendelse fra ${payload.name} (${company})`,
+          title: "Ny henvendelse i Project Phoenix"
+        }
       })
     });
 
     if (!response.ok) {
-      console.error("Slack request notification failed:", { status: response.status, statusText: response.statusText });
+      console.error("n8n contact notification failed:", { status: response.status, statusText: response.statusText });
     }
   } catch (error) {
-    console.error("Slack request notification error:", error);
+    console.error("n8n contact notification error:", error);
   }
 }
 
@@ -95,6 +105,13 @@ export async function POST(request) {
 
   if (!payload.name || !payload.email || !payload.message) {
     return json({ status: "error", message: "Navn, e-post og melding er påkrevd." }, { status: 400 });
+  }
+
+  if (!hasTrustedContactRelay(request)) {
+    const captcha = await verifyTurnstileToken(payload.turnstileToken, { ip: getClientIp(request) });
+    if (!captcha.ok) {
+      return json({ status: "error", message: captcha.message }, { status: captcha.status || 400 });
+    }
   }
 
   const { configured } = getSupabaseConfig();
@@ -134,7 +151,7 @@ export async function POST(request) {
     return json({ status: "error", message: "Kunne ikke lagre henvendelsen i CRM." }, { status: 500 });
   }
 
-  await notifySlack(payload, "requests", data?.id || null);
+  await notifyN8n(payload, "requests", data?.id || null);
 
   return json({ status: "ok", message: "Takk! Henvendelsen er sendt til Hansen IT.", target: "requests", id: data?.id || null });
 }

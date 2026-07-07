@@ -1,4 +1,6 @@
 // app/api/contact/route.js
+import { getClientIp, verifyTurnstileToken } from "@/lib/captcha/turnstile";
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -6,6 +8,15 @@ export async function POST(request) {
     if (!name || !email || !message)
       return new Response(JSON.stringify({ status: "error", message: "Mangler felt" }),
         { status: 400, headers: { "Content-Type": "application/json" } });
+
+    const captcha = await verifyTurnstileToken(
+      String(body.turnstileToken || body.captchaToken || body["cf-turnstile-response"] || "").trim(),
+      { ip: getClientIp(request) }
+    );
+    if (!captcha.ok) {
+      return new Response(JSON.stringify({ status: "error", message: captcha.message }),
+        { status: captcha.status || 400, headers: { "Content-Type": "application/json" } });
+    }
 
     const n8nWebhook = process.env.N8N_WEBHOOK_URL;
     const res = await fetch(n8nWebhook, {
