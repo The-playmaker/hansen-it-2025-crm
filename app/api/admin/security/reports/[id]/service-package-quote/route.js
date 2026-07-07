@@ -33,6 +33,12 @@ export async function POST(request, { params }) {
   const report = innerReport(row);
   const recommendation = buildReportRecommendation(report);
   const packageIds = Array.isArray(body.packageIds) ? body.packageIds.filter(Boolean) : [];
+  const isScanReport = row.source_table === "scan_reports";
+  const reportQuoteId = row.quote_id || row.authorization?.quote_id || null;
+  const reportCustomerId = row.customer_id || row.authorization?.customer_id || null;
+  const reportContactId = row.contact_id || row.authorization?.contact_id || null;
+  const reportRequestId = row.request_id || row.authorization?.request_id || null;
+  const reportLeadId = row.lead_id || row.authorization?.lead_id || null;
 
   let query = supabaseAdmin
     .from("service_packages")
@@ -59,25 +65,36 @@ export async function POST(request, { params }) {
   ].filter(Boolean).join("\n\n");
 
   let quote = null;
-  const existingByReport = await supabaseAdmin.from("quotes").select("*").eq("security_report_id", row.id).maybeSingle();
-  if (existingByReport.data) quote = existingByReport.data;
+  if (reportQuoteId) {
+    const existingById = await supabaseAdmin.from("quotes").select("*").eq("id", reportQuoteId).maybeSingle();
+    if (existingById.data) quote = existingById.data;
+  }
 
-  if (!quote && row.request_id) {
+  if (!quote) {
+    const existingByReport = await supabaseAdmin
+      .from("quotes")
+      .select("*")
+      .eq(isScanReport ? "scan_report_id" : "security_report_id", row.id)
+      .maybeSingle();
+    if (existingByReport.data) quote = existingByReport.data;
+  }
+
+  if (!quote && reportRequestId) {
     const existingByRequest = await supabaseAdmin
       .from("quotes")
       .select("*")
-      .eq("source_request_id", row.request_id)
+      .eq("source_request_id", reportRequestId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (existingByRequest.data) quote = existingByRequest.data;
   }
 
-  if (!quote && row.customer_id) {
+  if (!quote && reportCustomerId) {
     const existingByCustomer = await supabaseAdmin
       .from("quotes")
       .select("*")
-      .eq("customer_id", row.customer_id)
+      .eq("customer_id", reportCustomerId)
       .ilike("title", `%${report.domain || row.domain || "Security"}%`)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -86,18 +103,22 @@ export async function POST(request, { params }) {
   }
 
   if (!quote) {
+    const quotePayload = {
+      title,
+      customer_id: reportCustomerId || null,
+      contact_id: reportContactId || null,
+      lead_id: reportLeadId || null,
+      source_request_id: reportRequestId || null,
+      status: "kladd",
+      description: `${message}\n\nEstimert subtotal fra anbefalte pakker: ${subtotal.toLocaleString("nb-NO")} kr eks. mva.`,
+      internal_notes: `Opprettet fra sikkerhetsrapport ${row.id}`,
+    };
+    if (isScanReport) quotePayload.scan_report_id = row.id;
+    else quotePayload.security_report_id = row.id;
+
     const { data, error } = await supabaseAdmin
       .from("quotes")
-      .insert({
-        title,
-        customer_id: row.customer_id || null,
-        lead_id: row.lead_id || null,
-        source_request_id: row.request_id || null,
-        security_report_id: row.id,
-        status: "kladd",
-        description: `${message}\n\nEstimert subtotal fra anbefalte pakker: ${subtotal.toLocaleString("nb-NO")} kr eks. mva.`,
-        internal_notes: `Opprettet fra sikkerhetsrapport ${row.id}`,
-      })
+      .insert(quotePayload)
       .select("*")
       .single();
 
@@ -106,6 +127,13 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: "Kunne ikke opprette tilbudskladd." }, { status: 500 });
     }
     quote = data;
+  }
+
+  if (quote && isScanReport) {
+    await Promise.all([
+      supabaseAdmin.from("scan_reports").update({ quote_id: quote.id }).eq("id", row.id),
+      row.authorization_id ? supabaseAdmin.from("scan_authorizations").update({ quote_id: quote.id }).eq("id", row.authorization_id) : Promise.resolve()
+    ]);
   }
 
   const { data: existingItems } = await supabaseAdmin
@@ -137,6 +165,7 @@ export async function POST(request, { params }) {
       metadata: {
         source: "scan_report",
         report_id: row.id,
+        report_table: row.source_table || "security_scan_reports",
         included_items: includedItems,
         package_slug: pkg.slug,
         package_category: pkg.category,

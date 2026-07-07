@@ -12,6 +12,11 @@ const scanTypes = [
 ];
 
 const initialForm = {
+  customer_id: "",
+  contact_id: "",
+  request_id: "",
+  quote_id: "",
+  lead_id: "",
   customer_name: "",
   signer_name: "",
   signer_email: "",
@@ -78,6 +83,9 @@ export default function ScanAuthorizationsPage() {
   const [form, setForm] = useState(initialForm);
   const [preflight, setPreflight] = useState(null);
   const [confirmDnsWarnings, setConfirmDnsWarnings] = useState(false);
+  const [customers, setCustomers] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [quotes, setQuotes] = useState([]);
 
   const pendingCount = useMemo(() => items.filter((item) => item.status === "pending").length, [items]);
   const signedCount = useMemo(() => items.filter((item) => item.status === "signed").length, [items]);
@@ -103,12 +111,87 @@ export default function ScanAuthorizationsPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRelations() {
+      const [customerRes, requestRes, quoteRes] = await Promise.all([
+        fetch("/api/admin/customers", { cache: "no-store" }),
+        fetch("/api/admin/requests", { cache: "no-store" }),
+        fetch("/api/admin/quotes?table=quotes", { cache: "no-store" })
+      ]);
+      const [customerJson, requestJson, quoteJson] = await Promise.all([
+        customerRes.json().catch(() => ({})),
+        requestRes.json().catch(() => ({})),
+        quoteRes.json().catch(() => ({}))
+      ]);
+      if (cancelled) return;
+      setCustomers(customerJson.data || []);
+      setRequests(requestJson.data || []);
+      setQuotes(quoteJson.data || []);
+    }
+    loadRelations().catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const domainWarnings = useMemo(() => localDomainWarnings(form.domains), [form.domains]);
 
   const update = (key, value) => {
     setPreflight(null);
     setConfirmDnsWarnings(false);
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const selectedCustomer = customers.find((customer) => String(customer.id) === String(form.customer_id));
+  const selectedContact = selectedCustomer?.contacts?.find((contact) => String(contact.id) === String(form.contact_id));
+  const selectedRequest = requests.find((request) => String(request.id) === String(form.request_id));
+  const selectedQuote = quotes.find((quote) => String(quote.id) === String(form.quote_id));
+
+  const chooseCustomer = (customerId) => {
+    const customer = customers.find((item) => String(item.id) === String(customerId));
+    const primaryContact = customer?.contacts?.find((contact) => contact.is_primary) || customer?.contacts?.[0];
+    setPreflight(null);
+    setConfirmDnsWarnings(false);
+    setForm((current) => ({
+      ...current,
+      customer_id: customerId,
+      contact_id: primaryContact?.id || "",
+      customer_name: customer?.company_name || customer?.name || current.customer_name,
+      signer_email: primaryContact?.email || customer?.email || current.signer_email,
+      signer_name: primaryContact?.name || current.signer_name
+    }));
+  };
+
+  const chooseRequest = (requestId) => {
+    const request = requests.find((item) => String(item.id) === String(requestId));
+    setPreflight(null);
+    setConfirmDnsWarnings(false);
+    setForm((current) => ({
+      ...current,
+      request_id: requestId,
+      customer_id: request?.customer_id || current.customer_id,
+      contact_id: request?.contact_id || current.contact_id,
+      lead_id: request?.lead_id || current.lead_id,
+      customer_name: request?.company || request?.customer_name || request?.name || current.customer_name,
+      signer_email: request?.email || current.signer_email,
+      signer_name: request?.name || current.signer_name
+    }));
+  };
+
+  const chooseQuote = (quoteId) => {
+    const quote = quotes.find((item) => String(item.id) === String(quoteId));
+    setPreflight(null);
+    setConfirmDnsWarnings(false);
+    setForm((current) => ({
+      ...current,
+      quote_id: quoteId,
+      customer_id: quote?.customer_id || current.customer_id,
+      contact_id: quote?.contact_id || current.contact_id,
+      request_id: quote?.source_request_id || current.request_id,
+      lead_id: quote?.lead_id || current.lead_id,
+      customer_name: quote?.customer_name || quote?.company || quote?.name || current.customer_name,
+      signer_email: quote?.email || current.signer_email,
+      signer_name: quote?.name || current.signer_name
+    }));
   };
 
   const updateScanType = (value) => {
@@ -179,8 +262,26 @@ export default function ScanAuthorizationsPage() {
         <PhoenixPanel title="Queued"><p className="text-3xl font-bold text-sky-200">{queuedCount}</p><p className="text-sm text-slate-400">Venter paa runner</p></PhoenixPanel>
       </div>
 
-      <PhoenixPanel title="Ny autorisasjon" description="Definer scope for kunden signerer. Aktiv skanning skal ikke kjores uten signert autorisasjon.">
+      <PhoenixPanel title="Ny autorisasjon" description="Koble scan til CRM først, og definer deretter scope kunden skal signere.">
         <form onSubmit={createAuthorization} className="grid gap-4 lg:grid-cols-2">
+          <div className="lg:col-span-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-100">Koble til CRM</h3>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <Field label="Velg eksisterende kunde"><SelectInput value={form.customer_id} onChange={(event) => chooseCustomer(event.target.value)} options={[{ value: "", label: "Ingen valgt" }, ...customers.map((customer) => ({ value: customer.id, label: customer.company_name || customer.name || customer.email || customer.id }))]} /></Field>
+              <Field label="Velg kontaktperson"><SelectInput value={form.contact_id} onChange={(event) => update("contact_id", event.target.value)} options={[{ value: "", label: "Ingen valgt" }, ...(selectedCustomer?.contacts || []).map((contact) => ({ value: contact.id, label: contact.name || contact.email || contact.id }))]} /></Field>
+              <Field label="Velg henvendelse/request"><SelectInput value={form.request_id} onChange={(event) => chooseRequest(event.target.value)} options={[{ value: "", label: "Ingen valgt" }, ...requests.map((request) => ({ value: request.id, label: request.company || request.customer_name || request.name || request.email || request.id }))]} /></Field>
+              <Field label="Velg eksisterende tilbud"><SelectInput value={form.quote_id} onChange={(event) => chooseQuote(event.target.value)} options={[{ value: "", label: "Opprett nytt tilbud senere" }, ...quotes.map((quote) => ({ value: quote.id, label: quote.title || quote.customer_name || quote.company || quote.name || quote.id }))]} /></Field>
+            </div>
+            <div className="mt-4 grid gap-2 text-sm text-cyan-50 md:grid-cols-2">
+              <p>Kunde: <span className="font-semibold">{selectedCustomer?.company_name || form.customer_name || "Ikke valgt"}</span></p>
+              <p>Kontakt: <span className="font-semibold">{selectedContact?.name || form.signer_name || "Ikke valgt"}</span></p>
+              <p>Request: <span className="font-semibold">{selectedRequest?.company || selectedRequest?.name || form.request_id || "Ikke valgt"}</span></p>
+              <p>Tilbud: <span className="font-semibold">{selectedQuote?.title || selectedQuote?.customer_name || form.quote_id || "Opprettes senere"}</span></p>
+            </div>
+          </div>
+          <div className="lg:col-span-2">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Autorisasjonsdetaljer</h3>
+          </div>
           <Field label="Kunde/firma"><TextInput value={form.customer_name} onChange={(event) => update("customer_name", event.target.value)} required /></Field>
           <Field label="E-post til signatar"><TextInput type="email" value={form.signer_email} onChange={(event) => update("signer_email", event.target.value)} required /></Field>
           <Field label="Navn signatar"><TextInput value={form.signer_name} onChange={(event) => update("signer_name", event.target.value)} /></Field>
@@ -211,7 +312,7 @@ export default function ScanAuthorizationsPage() {
             </div>
           ) : null}
           <div className="lg:col-span-2">
-            <PrimaryButton disabled={saving || !configured} type="submit"><ShieldCheck size={16} />{saving ? "Oppretter..." : "Opprett token-lenke"}</PrimaryButton>
+            <PrimaryButton disabled={saving || !configured} type="submit"><ShieldCheck size={16} />{saving ? "Oppretter..." : "Opprett autorisasjon"}</PrimaryButton>
           </div>
         </form>
       </PhoenixPanel>

@@ -14,7 +14,7 @@ export async function GET(_request, { params }) {
 
   const { data, error } = await supabaseAdmin
     .from("scan_authorizations")
-    .select("*, scan_scopes(*), scan_jobs(*), scan_reports(*)")
+    .select("*, customer:customers(id,company_name,email), contact:contacts(id,name,email), request:requests(id,name,company,email,status), quote:quotes(id,title,status,total_inc_vat), scan_scopes(*), scan_jobs(*), scan_reports(*)")
     .eq("id", params.id)
     .single();
 

@@ -7,6 +7,21 @@ export async function GET(req) {
   if (!hasSupabaseAdminConfig) return NextResponse.json({ configured: false, data: [] });
   const url = new URL(req.url);
   const search = (url.searchParams.get("search") || "").trim();
+  const table = (url.searchParams.get("table") || "").trim();
+
+  if (table === "quotes") {
+    let quoteQuery = supabaseAdmin
+      .from("quotes")
+      .select("*, customer:customers(id,company_name,email), contact:contacts(id,name,email)")
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (search) quoteQuery = quoteQuery.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+
+    const { data, error } = await quoteQuery;
+    if (error) return NextResponse.json({ configured: true, error: error.message, data: [] }, { status: 500 });
+    return NextResponse.json({ configured: true, data: data || [] });
+  }
 
   let query = supabaseAdmin
     .from("requests")
