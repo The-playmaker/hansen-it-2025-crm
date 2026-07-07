@@ -7,6 +7,10 @@ export async function POST(req) {
   const email = body.email || "post@hansen-it.com";
   const name = body.name || "Hansen IT Admin";
 
+  if (!email) {
+    return NextResponse.json({ error: "Feil e-post eller passord." }, { status: 401 });
+  }
+
   const response = NextResponse.json({ ok: true });
   response.cookies.set({
     name: "phoenixUser",
