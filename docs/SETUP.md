@@ -35,9 +35,29 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 # Resend
 RESEND_API_KEY=<resend-api-key>
 SCAN_REPORT_FROM=Hansen IT <rapport@hansen-it.com>
+
+# Cloudflare Turnstile / public contact form
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=<site-key>
+TURNSTILE_SECRET_KEY=<secret-key>
+CAPTCHA_REQUIRED=true
+CAPTCHA_BYPASS_FOR_PREVIEW=false
+CAPTCHA_BYPASS_FOR_PRODUCTION=false
+CRM_CONTACT_RELAY_SECRET=<shared-secret-from-hansen-it-2025>
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` er server-side only. Den skal bare brukes i API-ruter/serverkode og aldri eksponeres til frontend.
+
+## Cloudflare Turnstile
+
+Public contact API bruker Cloudflare Turnstile for spamkontroll.
+
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` brukes kun i frontend-widget.
+- `TURNSTILE_SECRET_KEY` brukes server-side for å verifisere token.
+- `CAPTCHA_REQUIRED=true` gjør captcha påkrevd også utenfor production.
+- `CAPTCHA_BYPASS_FOR_PREVIEW=true` kan brukes i preview/dev når Turnstile ikke er konfigurert.
+- `CAPTCHA_BYPASS_FOR_PRODUCTION=true` finnes kun som nødventil og anbefales ikke.
+
+`/api/public/contact` krever enten gyldig Turnstile-token eller en server-side relay secret fra `hansen-it-2025` via `CRM_CONTACT_RELAY_SECRET`. Relay secret skal aldri legges i frontend eller `NEXT_PUBLIC_*`.
 
 ## Vercel
 

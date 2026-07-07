@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { getClientIp, verifyTurnstileToken } from "@/lib/captcha/turnstile";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -31,8 +32,15 @@ function normalizePayload(body) {
     message: String(body.message || "").trim(),
     category: String(body.category || "").trim(),
     source: String(body.source || "hansen-it-2025").trim(),
-    priority: ["hast", "urgent", "high", "høy", "true"].includes(priority) ? "hast" : "normal"
+    priority: ["hast", "urgent", "high", "høy", "true"].includes(priority) ? "hast" : "normal",
+    turnstileToken: String(body.turnstileToken || body.captchaToken || body["cf-turnstile-response"] || "").trim()
   };
+}
+
+function hasTrustedContactRelay(request) {
+  const expectedSecret = process.env.CRM_CONTACT_RELAY_SECRET;
+  const providedSecret = request.headers.get("x-phoenix-contact-secret");
+  return Boolean(expectedSecret && providedSecret && providedSecret === expectedSecret);
 }
 
 function shortMessage(message) {
@@ -95,6 +103,13 @@ export async function POST(request) {
 
   if (!payload.name || !payload.email || !payload.message) {
     return json({ status: "error", message: "Navn, e-post og melding er påkrevd." }, { status: 400 });
+  }
+
+  if (!hasTrustedContactRelay(request)) {
+    const captcha = await verifyTurnstileToken(payload.turnstileToken, { ip: getClientIp(request) });
+    if (!captcha.ok) {
+      return json({ status: "error", message: captcha.message }, { status: captcha.status || 400 });
+    }
   }
 
   const { configured } = getSupabaseConfig();
