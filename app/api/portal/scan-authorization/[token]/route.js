@@ -142,6 +142,11 @@ export async function POST(request, { params }) {
     .insert({
       authorization_id: signedAuthorization.id,
       scope_id: updatedScope.id,
+      customer_id: signedAuthorization.customer_id || null,
+      contact_id: signedAuthorization.contact_id || null,
+      request_id: signedAuthorization.request_id || null,
+      quote_id: signedAuthorization.quote_id || null,
+      lead_id: signedAuthorization.lead_id || null,
       status: "queued",
       scan_type: scanType,
       domains,

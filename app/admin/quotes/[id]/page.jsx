@@ -688,7 +688,7 @@ const handleCreatePortalLink = async () => {
           y += 4;
         });
 
-        if (quote.security_report_id) {
+        if (quote.security_report_id || quote.scan_report_id) {
           addWrapped("Basert pÃ¥ Phoenix Security Assessment og anbefalte tiltak fra sikkerhetsrapporten.", margin, 174, 5);
         }
       }
@@ -763,7 +763,7 @@ const handleCreatePortalLink = async () => {
     { label: "Quote total er større enn 0", ok: quoteTotal > 0 },
     { label: "Portal token finnes", ok: Boolean(portalUrl) },
     { label: "Quote PDF finnes", ok: hasQuotePdf },
-    { label: "Scan PDF finnes hvis scan er koblet", ok: hasScanPdf || !quote.security_report_id },
+    { label: "Scan PDF finnes hvis scan er koblet", ok: hasScanPdf || !(quote.security_report_id || quote.scan_report_id) },
     { label: "Dokumenter er synlige i portal", ok: visibleDocuments.length > 0 },
     { label: "Approval actions er tilgjengelig", ok: Boolean(portalUrl) },
     { label: "Meldingsskjema er tilgjengelig", ok: Boolean(portalUrl) }

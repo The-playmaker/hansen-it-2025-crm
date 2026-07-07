@@ -182,7 +182,8 @@ export async function POST(request, { params }) {
   const scanPdf = documents.find((document) => /scan|security|sikkerhet/i.test(`${document.type || ""} ${document.filename || ""}`));
 
   checks.push(quotePdf ? ok("quote_pdf", "Tilbud PDF", quotePdf.filename) : fail("quote_pdf", "Tilbud PDF", "Tilbud PDF mangler."));
-  checks.push(scanPdf || !quote.security_report_id
+  const hasLinkedScanReport = Boolean(quote.security_report_id || quote.scan_report_id);
+  checks.push(scanPdf || !hasLinkedScanReport
     ? ok("scan_pdf", "Sikkerhetsrapport", scanPdf?.filename || "Ingen sikkerhetsrapport koblet til tilbudet.")
     : fail("scan_pdf", "Sikkerhetsrapport", "Sikkerhetsrapport mangler."));
 

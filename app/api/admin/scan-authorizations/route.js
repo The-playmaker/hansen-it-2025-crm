@@ -23,7 +23,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("scan_authorizations")
-    .select("*, scan_scopes(*), scan_jobs(*)")
+    .select("*, customer:customers(id,company_name,email), contact:contacts(id,name,email), request:requests(id,name,company,email,status), quote:quotes(id,title,status,total_inc_vat), scan_scopes(*), scan_jobs(*)")
     .order("created_at", { ascending: false })
     .limit(200);
 
@@ -66,6 +66,11 @@ export async function POST(request) {
 
   const authorizationPayload = {
     token: randomBytes(32).toString("hex"),
+    customer_id: String(body.customer_id || "").trim() || null,
+    contact_id: String(body.contact_id || "").trim() || null,
+    request_id: String(body.request_id || "").trim() || null,
+    quote_id: String(body.quote_id || "").trim() || null,
+    lead_id: String(body.lead_id || "").trim() || null,
     customer_name: customerName,
     signer_name: String(body.signer_name || "").trim() || null,
     signer_email: signerEmail,

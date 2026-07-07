@@ -194,6 +194,25 @@ export default function ScanAuthorizationDetailsPage() {
     }
   };
 
+  const syncQuoteFromReport = async (report) => {
+    if (!report?.id) return;
+    setBusy(`sync-quote-${report.id}`);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/scan-reports/${report.id}/sync-quote`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Kunne ikke opprette eller oppdatere tilbud.");
+      setMessage("Tilbud er opprettet/oppdatert fra anbefalte pakker.");
+      if (result.url) router.push(result.url);
+      else await load();
+    } catch (err) {
+      setError(err.message || "Kunne ikke opprette eller oppdatere tilbud.");
+    } finally {
+      setBusy("");
+    }
+  };
+
   const downloadCombinedPdf = () => {
     if (!domainReports.length && !combinedReports.length) return;
     const doc = new jsPDF();
@@ -322,6 +341,7 @@ export default function ScanAuthorizationDetailsPage() {
   const scope = item?.scan_scopes?.[0];
   const runner = job?.metadata?.runner || {};
   const scannedDomains = job?.metadata?.passive_domains_scanned || reports.map(reportDomain);
+  const primaryReport = combinedReports[0] || domainReports[0] || reports[0] || null;
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -362,6 +382,33 @@ export default function ScanAuthorizationDetailsPage() {
                 <SecondaryButton type="button" onClick={copyLink}><Copy size={16} />{copied ? "Kopiert" : "Kopier lenke"}</SecondaryButton>
                 <Link href={portalUrl} target="_blank"><SecondaryButton type="button">Åpne portal</SecondaryButton></Link>
               </div>
+            </div>
+          </PhoenixPanel>
+
+          <PhoenixPanel title="Forretningskobling" description="Koblingen som driver flyten videre til tilbud, dokumenter og kundeportal.">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <p className="text-sm text-slate-400">Kunde</p>
+                <p className="mt-1 font-semibold text-white">{item.customer?.company_name || item.customer_name || "Ikke koblet"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <p className="text-sm text-slate-400">Kontaktperson</p>
+                <p className="mt-1 font-semibold text-white">{item.contact?.name || item.signer_name || "Ikke koblet"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <p className="text-sm text-slate-400">Henvendelse</p>
+                <p className="mt-1 font-semibold text-white">{item.request?.company || item.request?.name || item.request_id || "Ikke koblet"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <p className="text-sm text-slate-400">Tilbud / portal</p>
+                <p className="mt-1 font-semibold text-white">{item.quote?.title || item.quote_id || "Mangler tilbud"}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {item.quote_id ? <Link href={`/admin/quotes/${item.quote_id}`}><SecondaryButton type="button">Åpne tilbud</SecondaryButton></Link> : null}
+              {!item.quote_id && primaryReport ? <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => syncQuoteFromReport(primaryReport)}>Opprett tilbud fra denne scannen</SecondaryButton> : null}
+              {!item.customer_id ? <SecondaryButton type="button" disabled>Koble til kunde</SecondaryButton> : null}
+              {!item.request_id ? <SecondaryButton type="button" disabled>Koble til henvendelse</SecondaryButton> : null}
             </div>
           </PhoenixPanel>
 
@@ -484,6 +531,7 @@ export default function ScanAuthorizationDetailsPage() {
                 </SecondaryButton>
                 {combinedReports.length ? <a href="#combined-report"><SecondaryButton type="button"><FileText size={16} />Åpne samlet rapport</SecondaryButton></a> : null}
                 {(combinedReports.length || domainReports.length) ? <SecondaryButton type="button" onClick={downloadCombinedPdf}><Download size={16} />Last ned samlet PDF</SecondaryButton> : null}
+                {primaryReport ? <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => syncQuoteFromReport(primaryReport)}><FileText size={16} />Opprett/oppdater tilbud</SecondaryButton> : null}
               </div>
             ) : <EmptyState text="Samlet rapport kan genereres når scan job er completed." />}
 
@@ -521,10 +569,9 @@ export default function ScanAuthorizationDetailsPage() {
                       </div>
                       <p className="mt-3 text-sm text-slate-300">{report.report?.summary || report.title}</p>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <Link href={`/admin/security/reports/${report.id}`}><SecondaryButton type="button"><FileText size={16} />Open report</SecondaryButton></Link>
-                        <SecondaryButton type="button" onClick={() => downloadSecurityReportPdf(report)}><Download size={16} />Download PDF</SecondaryButton>
-                        <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => createCrmItem("task", report, primaryFinding)}><MessageSquarePlus size={16} />Create task</SecondaryButton>
-                        <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => createCrmItem("quote", report, primaryFinding)}><FileText size={16} />Create quote draft</SecondaryButton>
+                        <Link href={`/admin/security/reports/${report.id}`}><SecondaryButton type="button"><FileText size={16} />Åpne rapport</SecondaryButton></Link>
+                        <SecondaryButton type="button" onClick={() => downloadSecurityReportPdf(report)}><Download size={16} />Last ned PDF</SecondaryButton>
+                        <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => createCrmItem("task", report, primaryFinding)}><MessageSquarePlus size={16} />Opprett oppgave</SecondaryButton>
                       </div>
                     </article>
                   );

@@ -369,7 +369,15 @@ async function persist(job, authorization, report) {
   const rawResult = { ...report, runner };
   const { data: result, error: resultError } = await supabase
     .from("scan_results")
-    .insert({ job_id: job.id, authorization_id: authorization.id, status: "completed", summary: report.summary, raw_result: rawResult })
+    .insert({
+      job_id: job.id,
+      authorization_id: authorization.id,
+      customer_id: job.customer_id || authorization.customer_id || null,
+      request_id: job.request_id || authorization.request_id || null,
+      status: "completed",
+      summary: report.summary,
+      raw_result: rawResult
+    })
     .select("*")
     .single();
 
@@ -395,7 +403,17 @@ async function persist(job, authorization, report) {
 
   const { error: reportError } = await supabase
     .from("scan_reports")
-    .insert({ job_id: job.id, authorization_id: authorization.id, title: `Phoenix Security Report: ${report.domain}`, report: rawResult });
+    .insert({
+      job_id: job.id,
+      authorization_id: authorization.id,
+      customer_id: job.customer_id || authorization.customer_id || null,
+      contact_id: job.contact_id || authorization.contact_id || null,
+      request_id: job.request_id || authorization.request_id || null,
+      quote_id: job.quote_id || authorization.quote_id || null,
+      lead_id: job.lead_id || authorization.lead_id || null,
+      title: `Phoenix Security Report: ${report.domain}`,
+      report: rawResult
+    });
 
   if (reportError) throw reportError;
 }
