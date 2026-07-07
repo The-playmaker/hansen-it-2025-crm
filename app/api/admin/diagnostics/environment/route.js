@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
 import { hasSupabaseAdminConfig } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -20,10 +21,9 @@ function maskSupabaseUrl(rawUrl) {
   }
 }
 
-export async function GET(request) {
-  if (!request.cookies.get("phoenixUser")) {
-    return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
-  }
+export async function GET() {
+  const auth = await requireAdmin({ minRole: "admin" });
+  if (!auth.ok) return adminErrorResponse(auth);
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 

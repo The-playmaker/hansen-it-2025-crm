@@ -1,39 +1,71 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { ArrowRight, LockKeyhole, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const router = useRouter();
+  const authConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const supabase = useMemo(() => (authConfigured ? createSupabaseBrowserClient() : null), [authConfigured]);
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [error, setError] = useState(null);
-  const [form, setForm] = useState({ name: "Hansen IT Admin", email: "post@hansen-it.com", password: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
 
   useEffect(() => {
-    fetch("/api/me", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : null)
-      .then((data) => {
-        if (data?.session || data?.id || data?.email) router.replace("/admin/dashboard");
+    if (!authConfigured) {
+      setChecking(false);
+      setError("Innlogging er ikke konfigurert.");
+      return;
+    }
+
+    fetch("/api/admin/auth/me", { cache: "no-store" })
+      .then((response) => {
+        if (response.ok) router.replace("/admin/dashboard");
       })
-      .catch(() => {});
-  }, [router]);
+      .catch(() => {})
+      .finally(() => setChecking(false));
+  }, [authConfigured, router]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get("error");
+    if (reason === "forbidden") setError("Du har ikke tilgang til CRM.");
+    if (reason === "not_configured") setError("Innlogging er ikke konfigurert.");
+  }, []);
 
   const startLogin = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
 
+    if (!supabase) {
+      setError("Innlogging er ikke konfigurert.");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: form.email.trim(),
+        password: form.password
       });
 
-      if (!response.ok) throw new Error("Feil e-post eller passord.");
-      router.push("/admin/dashboard");
+      if (loginError) throw new Error("Feil e-post eller passord.");
+
+      const response = await fetch("/api/admin/auth/me", { cache: "no-store" });
+      if (response.status === 403) {
+        await supabase.auth.signOut().catch(() => {});
+        throw new Error("Du har ikke tilgang til CRM.");
+      }
+      if (!response.ok) throw new Error("Innlogging feilet. Prøv igjen.");
+
+      const params = new URLSearchParams(window.location.search);
+      const returnTo = params.get("returnTo");
+      router.push(returnTo && returnTo.startsWith("/admin") ? returnTo : "/admin/dashboard");
       router.refresh();
     } catch (err) {
       setError(err?.message || "Feil e-post eller passord.");
@@ -58,23 +90,19 @@ export default function LoginPage() {
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--hi-blue)] text-white">
               <LockKeyhole size={26} />
             </div>
-            <h2 className="mt-6 text-2xl font-bold">Logg inn</h2>
+            <h2 className="mt-6 text-2xl font-bold">Logg inn i Hansen IT CRM</h2>
             <p className="mt-2 text-sm text-slate-300">Tilgang er kun for autoriserte brukere.</p>
             <label className="mt-5 block text-sm font-medium text-slate-200">
-              Navn
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 min-h-11 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-white outline-none focus:border-cyan-300" />
-            </label>
-            <label className="mt-4 block text-sm font-medium text-slate-200">
               E-post
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-1 min-h-11 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-white outline-none focus:border-cyan-300" />
+              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} autoComplete="email" required className="mt-1 min-h-11 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-white outline-none focus:border-cyan-300" />
             </label>
             <label className="mt-4 block text-sm font-medium text-slate-200">
               Passord
-              <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="mt-1 min-h-11 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-white outline-none focus:border-cyan-300" />
+              <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="current-password" required className="mt-1 min-h-11 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-white outline-none focus:border-cyan-300" />
             </label>
             {error ? <div className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-100">{error}</div> : null}
-            <button disabled={loading} className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--hi-blue)] px-4 py-3 font-bold text-white hover:bg-[var(--hi-blue-light)] disabled:opacity-70">
-              {loading ? "Logger inn..." : "Logg inn"}<ArrowRight size={18} />
+            <button disabled={loading || checking || !authConfigured} className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--hi-blue)] px-4 py-3 font-bold text-white hover:bg-[var(--hi-blue-light)] disabled:opacity-70">
+              {loading || checking ? "Sjekker tilgang..." : "Logg inn"}<ArrowRight size={18} />
             </button>
             <p className="mt-4 text-xs text-slate-500">Du blir sendt til dashboard etter innlogging.</p>
           </form>

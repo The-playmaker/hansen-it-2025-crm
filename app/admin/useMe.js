@@ -5,9 +5,9 @@ export function useMe() {
   const [me, setMe] = useState(null);
 
   useEffect(() => {
-    fetch("/api/me", { cache: "no-store" })
+    fetch("/api/admin/auth/me", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then(setMe)
+      .then((data) => setMe(data?.admin || null))
       .catch(() => setMe(null));
   }, []);
 

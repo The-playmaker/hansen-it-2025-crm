@@ -27,7 +27,9 @@ Ikke inkludert i v1:
 
 ## Auth etter Casdoor-fjerning
 
-Casdoor ble fjernet fra Phoenix v1. `/login` bruker en enkel lokal Phoenix-session som setter `phoenixUser` cookie via `/api/auth/login`.
+Oppdatert status: Auth v2 bruker Supabase Auth og `public.admin_profiles` for adminroller. Gammel lokal cookie er bare demo fallback når `NEXT_PUBLIC_DEMO_MODE=true` utenfor production.
+
+Casdoor ble fjernet fra Phoenix v1. Den tidlige dev-flyten brukte en enkel lokal Phoenix-session med `phoenixUser` cookie.
 
 Neste auth-steg bør være produksjonsauth, for eksempel Supabase Auth med RLS-policyer.
 
