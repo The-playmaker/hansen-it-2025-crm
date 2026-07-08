@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
+import { requireMe } from "@/lib/requireMe";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { quoteResolveResponse, resolveQuoteId } from "@/lib/quotes/resolveQuoteId";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req, { params }) {
+  const me = requireMe();
+  if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
+
   let quote = null;
   try {
     quote = await resolveQuoteId(params.id);
@@ -29,12 +33,16 @@ export async function GET(req, { params }) {
     .from("quote_documents")
     .select("*")
     .eq("quote_id", quote.id)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   return NextResponse.json({ data, documents: documents || [] });
 }
 
 export async function POST(req, { params }) {
+  const me = requireMe();
+  if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
+
   const formData = await req.formData();
   const file = formData.get("file");
 

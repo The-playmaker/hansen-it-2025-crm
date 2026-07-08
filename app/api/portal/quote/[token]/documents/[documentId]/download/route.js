@@ -43,6 +43,7 @@ export async function GET(request, { params }) {
     .eq("id", documentId)
     .eq("quote_id", quote.id)
     .eq("is_portal_visible", true)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (documentError) {
@@ -64,7 +65,8 @@ export async function GET(request, { params }) {
     const { count } = await supabaseAdmin
       .from("quote_documents")
       .select("id", { count: "exact", head: true })
-      .eq("quote_id", quote.id);
+      .eq("quote_id", quote.id)
+      .is("deleted_at", null);
 
     console.warn("portal document not found", {
       tokenSource,

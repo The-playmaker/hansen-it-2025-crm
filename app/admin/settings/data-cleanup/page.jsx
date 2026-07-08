@@ -53,7 +53,7 @@ export default function DataCleanupPage() {
     }
   }, [kind]);
 
-  useEffect(() => { if (me?.role === "admin") loadCounts(kind); }, [me, kind, loadCounts]);
+  useEffect(() => { if (["owner", "admin"].includes(me?.role)) loadCounts(kind); }, [me, kind, loadCounts]);
 
   const runCleanup = async () => {
     setBusy(true);
@@ -78,7 +78,7 @@ export default function DataCleanupPage() {
   };
 
   if (loading) return <div className="p-6 text-slate-300">Laster...</div>;
-  if (me?.role !== "admin") return <div className="p-6 text-slate-300">Kun admin har tilgang.</div>;
+  if (!["owner", "admin"].includes(me?.role)) return <div className="p-6 text-slate-300">Kun owner/admin har tilgang.</div>;
 
   return (
     <div className="space-y-6 p-4 md:p-8">

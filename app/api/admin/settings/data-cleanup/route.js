@@ -33,7 +33,7 @@ const ristesundSpecs = [
 function assertAdmin() {
   const me = requireMe();
   if (!me) return { error: "Ikke innlogget.", status: 401 };
-  if (me.role !== "admin") return { error: "Kun admin kan rydde testdata.", status: 403 };
+  if (!["owner", "admin"].includes(me.role)) return { error: "Kun owner/admin kan rydde testdata.", status: 403 };
   if (!hasSupabaseAdminConfig) return { error: "Supabase er ikke konfigurert.", status: 503 };
   return { me };
 }
