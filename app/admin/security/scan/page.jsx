@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -32,6 +32,7 @@ export default function SecurityScanPage() {
   const [crmConfigured, setCrmConfigured] = useState(true);
   const [state, setState] = useState("idle");
   const [error, setError] = useState("");
+  const [domainSuggestion, setDomainSuggestion] = useState(null);
   const [report, setReport] = useState(null);
   const [actionBusy, setActionBusy] = useState("");
   const [actionResult, setActionResult] = useState("");
@@ -76,11 +77,15 @@ export default function SecurityScanPage() {
     if (nextDomain) setDomain(nextDomain);
   };
 
-  const runScan = async (event) => {
-    event.preventDefault();
-    if (!domain.trim()) return;
+  const runScan = async (event, overrideDomain = null) => {
+    if (event?.preventDefault) event.preventDefault();
+    const targetDomain = String(overrideDomain ?? domain).trim();
+    if (!targetDomain) return;
+    if (overrideDomain) setDomain(targetDomain);
+
     setState("scanning");
     setError("");
+    setDomainSuggestion(null);
     setActionResult("");
     setShareUrl("");
     setReport(null);
@@ -89,14 +94,21 @@ export default function SecurityScanPage() {
       const response = await fetch("/api/admin/security/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domain, ...links })
+        body: JSON.stringify({ domain: targetDomain, ...links })
       });
       const result = await response.json();
+      if (response.status === 422) {
+        setError(result.error || "Domenet ser ikke ut til å være i bruk.");
+        setDomainSuggestion(result.suggestion || null);
+        setState("error");
+        return;
+      }
       if (!response.ok) throw new Error(result.error || "Skanningen feilet.");
       setReport(result);
       setState("done");
     } catch (err) {
       setError(err.message || "Skanningen feilet.");
+      setDomainSuggestion(null);
       setState("error");
     }
   };
@@ -230,7 +242,30 @@ export default function SecurityScanPage() {
             <div className="flex items-end"><PrimaryButton disabled={state === "scanning"} type="submit"><SearchCheck size={16} />{state === "scanning" ? "Skanner..." : "Start scan"}</PrimaryButton></div>
           </div>
         </form>
-        {error ? <div className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</div> : null}
+        {error || domainSuggestion ? (
+          <div className="mt-4 space-y-3">
+            {domainSuggestion ? (
+              <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-50">
+                <p className="font-semibold text-amber-100">
+                  Fant ingen DNS-oppføringer for {domain}.
+                </p>
+                <p className="mt-1 text-amber-100/90">Mente du {domainSuggestion}?</p>
+                <div className="mt-3">
+                  <PrimaryButton
+                    type="button"
+                    disabled={state === "scanning"}
+                    onClick={() => runScan(null, domainSuggestion)}
+                  >
+                    <SearchCheck size={16} />
+                    Skann {domainSuggestion} i stedet
+                  </PrimaryButton>
+                </div>
+              </div>
+            ) : error ? (
+              <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</div>
+            ) : null}
+          </div>
+        ) : null}
       </PhoenixPanel>
 
       {state === "scanning" ? <PhoenixPanel><EmptyState text="Skanner domene. Dette kan ta opptil ett minutt..." /></PhoenixPanel> : null}
@@ -242,7 +277,7 @@ export default function SecurityScanPage() {
             <MetricCard label="Web" value={`${report.categories.web.score}/${report.categories.web.max}`} detail="HTTPS, TLS og headere" tone="cyan" />
             <MetricCard label="E-post" value={`${report.categories.email.score}/${report.categories.email.max}`} detail="SPF, DKIM og DMARC" tone="amber" />
             <MetricCard label="Domene" value={`${report.categories.domain.score}/${report.categories.domain.max}`} detail="RDAP og DNSSEC" tone="emerald" />
-            <MetricCard label="Spoofing" value={severityLabels[report.spoofingRisk?.level] || "ukjent"} detail={report.spoofingRisk?.reason || "E-postrisiko"} tone={report.spoofingRisk?.level === "low" ? "emerald" : report.spoofingRisk?.level === "medium" ? "amber" : "rose"} />
+            <MetricCard label="E-postrisiko" value={severityLabels[report.spoofingRisk?.level] || "ukjent"} detail={report.spoofingRisk?.reason || "Risiko for e-postforfalskning"} tone={report.spoofingRisk?.level === "low" ? "emerald" : report.spoofingRisk?.level === "medium" ? "amber" : "rose"} />
           </div>
 
           <PhoenixPanel title={`Rapport: ${report.domain}`} description={report.summary}>

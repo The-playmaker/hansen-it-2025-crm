@@ -1,4 +1,9 @@
+import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
+
 export async function POST(req) {
+  const auth = await requireAdmin({ minRole: "employee" });
+  if (!auth.ok) return adminErrorResponse(auth);
+
   try {
     const body = await req.json();
     const { name, email, company, message, priority, id, status } = body;

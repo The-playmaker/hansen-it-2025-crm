@@ -1,7 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FiRefreshCw, FiLogOut } from 'react-icons/fi';
-import { supabase } from '../../lib/supabaseClient';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import DetailModal from '../../components/DetailModal';
 
 const STATUS = ['Ny', 'Pågår', 'Fullført'];
@@ -19,6 +19,13 @@ async function notifyTeamsIfHast(rec) {
 }
 
 export default function Dashboard() {
+  const authConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+  const supabase = useMemo(
+    () => (authConfigured ? createSupabaseBrowserClient() : null),
+    [authConfigured]
+  );
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,13 +35,14 @@ export default function Dashboard() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       if (!data.session) window.location.href = '/login';
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -52,6 +60,7 @@ export default function Dashboard() {
   useEffect(() => { fetchData(); }, []);
 
   useEffect(() => {
+    if (!supabase) return;
     const channel = supabase
       .channel('requests-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, async payload => {
@@ -67,7 +76,7 @@ export default function Dashboard() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [supabase]);
 
   const updateItem = async (id, patch) => {
     setSavingId(id);

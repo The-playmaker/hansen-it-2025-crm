@@ -135,6 +135,48 @@ Før aktiv scan skal domener løses til A/AAAA. MX-, Microsoft-, Google-, CDN- o
 
 Internal scan krever agent eller avtalt VPN/tilgang hos kunde.
 
+## Én scoringsmotor
+
+`lib/securityScan/score.js` (`buildSecurityReport`) er eneste kilde til score, grade, categories og findings.
+
+- CRM API: `app/api/admin/security/scan` + `lib/scanJobs.js`
+- Scanner-node: `scripts/scanner-runner.mjs` (importerer score/checks relativt, uten `@/`)
+
+Regresjon: `npm run test:score`.
+
+## Exposed backend / manglende RLS (Phoenix Scan)
+
+Sjekken ligger i `lib/securityScan/checks/exposedBackend.js` og er et differensierende funn: mange SMB-apper eksponerer Supabase anon-nøkkelen (normalt) uten Row Level Security (katastrofalt). Etablerte skannere sjekker sjeldent dette.
+
+### Hva sjekken gjør
+
+1. Henter `https://<domene>/` og parser samme-origin `<script src>`-URL-er.
+2. Henter opptil 10 JS-filer (maks 2 MB hver, 8 sek timeout) og søker etter kjente nøkkelmønstre (Supabase URL/JWT, Firebase, Airtable, Stripe live publishable).
+3. For Supabase-JWT: dekoder payload og skiller `anon` fra `service_role`. Lekket `service_role` er alltid critical — den omgår RLS.
+4. For hvert funnet prosjekt med anon-nøkkel: gjør **ett** ikke-destruktivt `GET` per tabellnavn fra en **fast** liste (`users`, `profiles`, `customers`, … — maks 12 kall, 200 ms mellomrom, `select=*&limit=1`).
+5. Tolkning: HTTP 200 med data → RLS mangler/åpen (critical); tom array → info; 401/403 → OK; 404 → ignorer. **Responsinnhold logges ikke** — kun tabellnavn og antall rader.
+
+### Hva sjekken ikke gjør
+
+- Ingen skriving, oppdatering eller sletting.
+- Ingen enumerering av tabeller utover den faste listen med vanlige navn.
+- Ingen nedlasting eller lagring av radinnhold.
+- Ingen brute-force, fuzzing eller angrep mot Auth/Storage.
+- Ingen probing av interne/private adresser (`assertPublicTarget` før både nettside og Supabase-host).
+
+### Når den kjøres
+
+Sjekken kjøres **kun** når begge er oppfylt:
+
+- `SCANNER_ALLOW_ACTIVE_SCAN=true`
+- signert scan authorization for domenet (scanner-runner etter signert jobb; admin `/api/admin/security/scan` krever signert scope for domenet, evt. `authorization_id` i body)
+
+Uten dette hoppes sjekken over (`exposedBackend.ran === false`) — øvrige passive kontroller kjører som før.
+
+### Kundekommunikasjon
+
+Hvis en kunde spør: sjekken er autorisert, lese-only, begrenset til offentlig JS pluss én rad-begrenset lesing mot kjente tabellnavn for å bekrefte manglende RLS. Ingen data ble endret eller eksportert.
+
 ## Requests og konvertering
 
 `requests` er source of truth for innkommende henvendelser.
@@ -219,6 +261,15 @@ Miljøvariabler:
 
 Bypass i production anbefales ikke.
 
+## security.txt (RFC 9116)
+
+crm.hansen-it.com eksponerer:
+
+- `GET /.well-known/security.txt` (`force-static`, `Cache-Control: public, max-age=86400`)
+- `/security-policy` (norsk responsible disclosure)
+
+`Expires` er hardkodet (ikke `new Date()`) og må fornyes før `2027-07-15`. Contact peker på `security@hansen-it.com` — opprett M365-alias manuelt hvis det mangler.
+
 ## Production checklist
 
 - Supabase Auth-brukere er opprettet.
@@ -228,3 +279,5 @@ Bypass i production anbefales ikke.
 - Public portal-tokens er lange, random og har utløp der det er relevant.
 - Aktiv scanning krever signert scan authorization.
 - Turnstile er konfigurert for public contact.
+- `security@hansen-it.com` alias finnes i Microsoft 365.
+- `security.txt` Expires er gyldig (under 1 år frem).

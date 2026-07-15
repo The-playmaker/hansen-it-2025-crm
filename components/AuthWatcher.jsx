@@ -1,12 +1,21 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function AuthWatcher() {
   const router = useRouter();
+  const authConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+  const supabase = useMemo(
+    () => (authConfigured ? createSupabaseBrowserClient() : null),
+    [authConfigured]
+  );
 
   useEffect(() => {
+    if (!supabase) return;
+
     (async () => {
       if (typeof window !== "undefined" && window.location.href.includes("code=")) {
         try {
@@ -25,7 +34,7 @@ export default function AuthWatcher() {
     });
 
     return () => listener.subscription.unsubscribe();
-  }, [router]);
+  }, [router, supabase]);
 
   return null;
 }

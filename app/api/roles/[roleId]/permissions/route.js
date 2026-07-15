@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabaseServer";
+import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function PUT(req, { params }) {
-  const supabase = getSupabaseServer();
+  const auth = await requireAdmin({ minRole: "owner" });
+  if (!auth.ok) return adminErrorResponse(auth);
+
+  const supabase = supabaseAdmin;
   const roleId = params.roleId;
   const { permissionIds } = await req.json(); // array of permission UUIDs
 

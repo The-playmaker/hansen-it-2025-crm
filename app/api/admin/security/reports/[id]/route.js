@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
 import { logAdminAudit } from "@/lib/adminAudit";
-import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 import { getSecurityScanReport } from "@/lib/securityScan/storage";
 
 export const dynamic = "force-dynamic";

@@ -1,5 +1,5 @@
-﻿import { NextResponse } from "next/server";
-import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { NextResponse } from "next/server";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 import { mapRequestToLead } from "@/lib/requestLeadMapping";
 
 export const dynamic = "force-dynamic";

@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabaseServer";
+import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const supabase = getSupabaseServer();
+  const auth = await requireAdmin({ minRole: "admin" });
+  if (!auth.ok) return adminErrorResponse(auth);
+
+  const supabase = supabaseAdmin;
 
   const { data: roles, error: rErr } = await supabase
     .from("roles")
@@ -23,7 +27,10 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  const supabase = getSupabaseServer();
+  const auth = await requireAdmin({ minRole: "owner" });
+  if (!auth.ok) return adminErrorResponse(auth);
+
+  const supabase = supabaseAdmin;
   const { name, description } = await req.json();
 
   if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });

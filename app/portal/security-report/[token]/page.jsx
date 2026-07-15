@@ -77,13 +77,13 @@ export default function SecurityReportPortalPage() {
               <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5"><p className="text-sm text-slate-400">Domene</p><p className="mt-2 text-xl font-bold">{reportRow.domain}</p></div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5"><p className="text-sm text-slate-400">Web</p><p className="mt-2 text-xl font-bold">{report.categories?.web?.score ?? "-"}/{report.categories?.web?.max ?? "-"}</p></div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5"><p className="text-sm text-slate-400">E-post</p><p className="mt-2 text-xl font-bold">{report.categories?.email?.score ?? "-"}/{report.categories?.email?.max ?? "-"}</p></div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5"><p className="text-sm text-slate-400">Spoofing</p><p className="mt-2 text-xl font-bold">{report.spoofingRisk?.level || "ukjent"}</p></div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5"><p className="text-sm text-slate-400">E-postrisiko</p><p className="mt-2 text-xl font-bold">{{ low: "Lav", medium: "Middels", high: "Høy", critical: "Kritisk" }[report.spoofingRisk?.level] || report.spoofingRisk?.level || "ukjent"}</p></div>
             </section>
 
             <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6">
               <h2 className="text-lg font-semibold">Sammendrag</h2>
               <p className="mt-2 text-slate-300">{report.summary || "Ingen sammendrag lagret."}</p>
-              {report.spoofingRisk?.reason ? <p className="mt-3 text-sm text-amber-200">Spoofing-risk: {report.spoofingRisk.reason}</p> : null}
+              {report.spoofingRisk?.reason ? <p className="mt-3 text-sm text-amber-200">E-postrisiko: {report.spoofingRisk.reason}</p> : null}
               <button
                 type="button"
                 onClick={() => downloadSecurityReportPdf(reportRow, { shareUrl: typeof window !== "undefined" ? window.location.href : "" })}

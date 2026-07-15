@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { PHOENIX_STORAGE_KEY, phoenixMockData } from "@/lib/phoenixMockData";

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 import { PortalTokenError, resolveQuotePortalToken } from "@/lib/portal/resolveQuotePortalToken";
 
 export const dynamic = "force-dynamic";

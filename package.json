@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test:score": "node scripts/test-score.mjs",
     "scanner:run": "node scripts/scanner-runner.mjs"
   },
   "dependencies": {

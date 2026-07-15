@@ -1,10 +1,33 @@
 #!/usr/bin/env node
+/**
+ * Phoenix scanner node runner (standalone, outside Next.js).
+ *
+ * Scoring is NOT done here — lib/securityScan/score.js (buildSecurityReport)
+ * is the single source of truth, shared with the CRM API scan path.
+ */
 
-import { Resolver } from "node:dns/promises";
 import os from "node:os";
-import tls from "node:tls";
 import { setTimeout as sleep } from "node:timers/promises";
 import { createClient } from "@supabase/supabase-js";
+import { checkWeb } from "../lib/securityScan/checks/web.js";
+import { checkTls } from "../lib/securityScan/checks/tls.js";
+import { checkEmail } from "../lib/securityScan/checks/email.js";
+import {
+  checkDnssec,
+  discoverSubdomains,
+} from "../lib/securityScan/checks/dns.js";
+import { checkDomainRegistration } from "../lib/securityScan/checks/rdap.js";
+import {
+  checkExposedBackend,
+  isActiveScanAllowed,
+  skippedExposedBackend,
+} from "../lib/securityScan/checks/exposedBackend.js";
+import { assertPublicTarget } from "../lib/securityScan/guards.js";
+import { buildSecurityReport } from "../lib/securityScan/score.js";
+import {
+  assessDomainDns,
+  InvalidDomainError,
+} from "../lib/scanAuthorizationValidation.js";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -32,27 +55,36 @@ const runner = {
   egressDedicated,
   allowActiveScan,
   mode: process.env.SCANNER_MODE || "passive",
-  version: "phoenix-scanner-runner-v1",
-  path: process.argv[1] || "/opt/phoenix-scanner/app/scanner-runner.mjs"
+  version: "phoenix-scanner-runner-v2",
+  path: process.argv[1] || "/opt/phoenix-scanner/app/scanner-runner.mjs",
 };
 
 const pollIntervalMs = Math.max(Number(process.env.SCANNER_POLL_INTERVAL_MS || 15000), 5000);
 const runOnce = process.env.RUN_ONCE === "1" || process.argv.includes("--once");
 const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
-const resolver = new Resolver({ timeout: 5000, tries: 2 });
-resolver.setServers((process.env.SCANNER_DNS_SERVERS || "1.1.1.1,8.8.8.8").split(",").map((server) => server.trim()).filter(Boolean));
 
-const domainPattern = /^(?!-)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/i;
-const severityRank = { critical: 0, high: 1, medium: 2, low: 3, info: 4, ok: 5 };
-const dkimSelectors = (process.env.SCANNER_DKIM_SELECTORS || "selector1,selector2,google,default,mail,smtp").split(",").map((selector) => selector.trim()).filter(Boolean);
+const domainPattern = /^(?!-)[a-z0-9æøå-]{1,63}(\.[a-z0-9æøå-]{1,63})+$/i;
 
 function log(message, extra = {}) {
-  const payload = { ts: new Date().toISOString(), node: runner.name, internalIp: runner.internalIp, egressIp: runner.egressIp, mode: runner.mode, ...extra };
+  const payload = {
+    ts: new Date().toISOString(),
+    node: runner.name,
+    internalIp: runner.internalIp,
+    egressIp: runner.egressIp,
+    mode: runner.mode,
+    ...extra,
+  };
   console.log(`[phoenix-scanner] ${message} ${JSON.stringify(payload)}`);
 }
 
 function normalizeDomain(input) {
-  return String(input || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0].split(":")[0];
+  return String(input || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .split("/")[0]
+    .split(":")[0];
 }
 
 function safeError(error) {
@@ -63,246 +95,68 @@ function dbSeverity(severity) {
   return ["critical", "high", "medium", "low"].includes(severity) ? severity : "info";
 }
 
-function gradeFromScore(score) {
-  if (score >= 90) return "A";
-  if (score >= 75) return "B";
-  if (score >= 60) return "C";
-  if (score >= 40) return "D";
-  return "E";
-}
+/**
+ * Run the same checks as lib/scanJobs.js / API scan, then score via buildSecurityReport.
+ */
+async function passiveScanDomain(domain, { authorizationSigned = false } = {}) {
+  const normalized = normalizeDomain(domain);
+  if (!domainPattern.test(normalized)) throw new Error(`Invalid domain in scope: ${domain}`);
 
-async function resolveSafe(type, name) {
-  try {
-    if (type === "a") return await resolver.resolve4(name);
-    if (type === "aaaa") return await resolver.resolve6(name);
-    if (type === "mx") return (await resolver.resolveMx(name)).sort((a, b) => a.priority - b.priority);
-    if (type === "txt") return (await resolver.resolveTxt(name)).map((chunks) => chunks.join(""));
-    if (type === "ns") return await resolver.resolveNs(name);
-  } catch {
-    return [];
-  }
-  return [];
-}
+  await assertPublicTarget(normalized);
 
-async function fetchWeb(domain) {
-  const headers = { "user-agent": "PhoenixScanRunner/1.0 passive (+https://hansen-it.com)" };
-  const result = {
-    httpsReachable: false,
-    httpReachable: false,
-    httpRedirectsToHttps: null,
-    status: null,
-    finalUrl: null,
-    headers: {},
-    rawHeaders: {}
-  };
-
-  try {
-    const response = await fetch(`https://${domain}/`, { method: "GET", redirect: "manual", headers, signal: AbortSignal.timeout(9000) });
-    result.httpsReachable = response.status < 500;
-    result.status = response.status;
-    result.finalUrl = `https://${domain}/`;
-    result.rawHeaders = Object.fromEntries(response.headers.entries());
-    result.headers = {
-      hsts: Boolean(response.headers.get("strict-transport-security")),
-      csp: Boolean(response.headers.get("content-security-policy")),
-      xContentTypeOptions: (response.headers.get("x-content-type-options") || "").toLowerCase() === "nosniff",
-      frameProtection: Boolean(response.headers.get("x-frame-options")) || (response.headers.get("content-security-policy") || "").includes("frame-ancestors"),
-      referrerPolicy: Boolean(response.headers.get("referrer-policy")),
-      permissionsPolicy: Boolean(response.headers.get("permissions-policy"))
-    };
-  } catch (error) {
-    result.httpsError = safeError(error);
+  const dnsPresence = await assessDomainDns(normalized);
+  if (dnsPresence.empty) {
+    throw new InvalidDomainError(normalized, dnsPresence.suggestion);
   }
 
-  try {
-    const response = await fetch(`http://${domain}/`, { method: "GET", redirect: "manual", headers, signal: AbortSignal.timeout(9000) });
-    result.httpReachable = response.status < 500;
-    if ([301, 302, 307, 308].includes(response.status)) {
-      result.httpRedirectsToHttps = (response.headers.get("location") || "").startsWith("https://");
-    } else {
-      result.httpRedirectsToHttps = false;
-    }
-  } catch (error) {
-    result.httpError = safeError(error);
-  }
-
-  return result;
-}
-
-function checkTls(domain) {
-  return new Promise((resolve) => {
-    const socket = tls.connect({ host: domain, port: 443, servername: domain, rejectUnauthorized: false, timeout: 8000 }, () => {
-      const cert = socket.getPeerCertificate();
-      const daysToExpiry = cert?.valid_to ? Math.floor((new Date(cert.valid_to).getTime() - Date.now()) / 86400000) : null;
-      const result = {
-        ok: true,
-        authorized: socket.authorized,
-        authorizationError: socket.authorizationError || null,
-        protocol: socket.getProtocol(),
-        cipher: socket.getCipher()?.name || null,
-        issuer: cert?.issuer?.O || cert?.issuer?.CN || null,
-        subject: cert?.subject?.CN || null,
-        validFrom: cert?.valid_from || null,
-        validTo: cert?.valid_to || null,
-        daysToExpiry
-      };
-      socket.destroy();
-      resolve(result);
-    });
-    socket.on("error", (error) => resolve({ ok: false, error: safeError(error) }));
-    socket.on("timeout", () => {
-      socket.destroy();
-      resolve({ ok: false, error: "TLS connection timed out." });
-    });
-  });
-}
-
-async function checkEmail(domain) {
-  const [txt, dmarcTxt, mx] = await Promise.all([
-    resolveSafe("txt", domain),
-    resolveSafe("txt", `_dmarc.${domain}`),
-    resolveSafe("mx", domain)
+  const [web, email, dnssec, rdap, subdomains] = await Promise.all([
+    checkWeb(normalized).catch(() => ({ reachable: false, headers: {} })),
+    checkEmail(normalized).catch(() => ({
+      hasMx: false,
+      mx: [],
+      spf: { present: false },
+      dmarc: { present: false },
+      dkim: { present: false, selectors: [] },
+      mtaSts: false,
+      tlsRpt: false,
+    })),
+    checkDnssec(normalized).catch(() => ({ enabled: null })),
+    checkDomainRegistration(normalized).catch(() => ({ found: false })),
+    discoverSubdomains(normalized).catch(() => []),
   ]);
 
-  const spf = txt.find((record) => record.toLowerCase().startsWith("v=spf1"));
-  const dmarc = dmarcTxt.find((record) => record.toLowerCase().startsWith("v=dmarc1"));
-  const dmarcPolicy = dmarc?.match(/p\s*=\s*(none|quarantine|reject)/i)?.[1]?.toLowerCase() || null;
-  const dkim = [];
+  const tlsInfo = web.reachable
+    ? await checkTls(web.finalHost || normalized).catch(() => ({ ok: false }))
+    : { ok: false };
 
-  for (const selector of dkimSelectors) {
-    const records = await resolveSafe("txt", `${selector}._domainkey.${domain}`);
-    const record = records.find((entry) => entry.toLowerCase().startsWith("v=dkim1"));
-    if (record) dkim.push({ selector, record });
+  let exposedBackend = skippedExposedBackend("not_authorized");
+  if (authorizationSigned && isActiveScanAllowed()) {
+    exposedBackend = await checkExposedBackend(normalized).catch(() =>
+      skippedExposedBackend("check_failed")
+    );
   }
 
-  return {
-    hasMx: mx.length > 0,
-    mx: mx.map((record) => ({ exchange: record.exchange, priority: record.priority })),
-    spf: { present: Boolean(spf), record: spf || null },
-    dkim: { present: dkim.length > 0, selectors: dkim },
-    dmarc: { present: Boolean(dmarc), policy: dmarcPolicy, record: dmarc || null }
-  };
-}
-
-async function checkDns(domain) {
-  const [a, aaaa, ns] = await Promise.all([
-    resolveSafe("a", domain),
-    resolveSafe("aaaa", domain),
-    resolveSafe("ns", domain)
-  ]);
-  return { a, aaaa, ns };
-}
-
-function finding(findings, item) {
-  findings.push({ category: "domain", evidence: {}, recommendation: null, ...item });
-}
-
-function buildReport(domain, checks) {
-  const { dns, web, tlsInfo, email } = checks;
-  const findings = [];
-  let score = 0;
-
-  if (dns.a.length || dns.aaaa.length) score += 12;
-  finding(findings, {
-    id: "dns-records",
-    category: "dns",
-    title: dns.a.length || dns.aaaa.length ? "DNS peker til offentlige adresser" : "Domenet mangler A/AAAA-records",
-    severity: dns.a.length || dns.aaaa.length ? "ok" : "high",
-    description: dns.a.length || dns.aaaa.length ? "Domenet har offentlig DNS-oppsett." : "Domenet ser ikke ut til å peke til en webtjeneste.",
-    recommendation: dns.a.length || dns.aaaa.length ? null : "Kontroller DNS-sonen og legg inn riktig A/AAAA-record.",
-    evidence: dns
+  const report = buildSecurityReport({
+    domain: normalized,
+    web,
+    tlsInfo,
+    email,
+    dnssec,
+    rdap,
+    subdomains,
+    exposedBackend,
+    dnsPresence,
   });
-
-  if (web.httpsReachable) score += 18;
-  finding(findings, {
-    id: "https-reachable",
-    category: "http",
-    title: web.httpsReachable ? "HTTPS svarer" : "HTTPS svarer ikke",
-    severity: web.httpsReachable ? "ok" : "high",
-    description: web.httpsReachable ? "Nettstedet svarer via sikker HTTPS-forbindelse." : "Nettstedet ser ikke ut til å være tilgjengelig via sikker HTTPS-forbindelse.",
-    recommendation: web.httpsReachable ? null : "Sett opp gyldig TLS/HTTPS på webserver eller CDN.",
-    evidence: { status: web.status, error: web.httpsError || null }
-  });
-
-  if (web.httpRedirectsToHttps === true) score += 8;
-  finding(findings, {
-    id: "http-redirect",
-    category: "http",
-    title: web.httpRedirectsToHttps === true ? "HTTP videresendes til HTTPS" : "HTTP videresendes ikke til HTTPS",
-    severity: web.httpRedirectsToHttps === true ? "ok" : "medium",
-    description: web.httpRedirectsToHttps === true ? "Besøkende sendes automatisk til sikker versjon." : "Besøkende kan ende på usikret HTTP-versjon.",
-    recommendation: web.httpRedirectsToHttps === true ? null : "Sett opp permanent redirect fra HTTP til HTTPS.",
-    evidence: { httpReachable: web.httpReachable, httpRedirectsToHttps: web.httpRedirectsToHttps }
-  });
-
-  if (tlsInfo.ok && tlsInfo.authorized) score += 18;
-  finding(findings, {
-    id: "tls-certificate",
-    category: "tls",
-    title: tlsInfo.ok && tlsInfo.authorized ? "TLS-sertifikat validerer" : "TLS-sertifikat bør kontrolleres",
-    severity: tlsInfo.ok && tlsInfo.authorized ? "ok" : "high",
-    description: tlsInfo.ok && tlsInfo.authorized ? "Sertifikatet validerer i passiv kontroll." : "Sertifikatet kunne ikke valideres trygt fra scanner-node.",
-    recommendation: tlsInfo.ok && tlsInfo.authorized ? null : "Kontroller sertifikat, mellomliggende sertifikater og automatisk fornyelse.",
-    evidence: tlsInfo
-  });
-
-  const presentHeaders = Object.entries(web.headers || {}).filter(([, present]) => present).map(([name]) => name);
-  score += Math.min(14, presentHeaders.length * 3);
-  finding(findings, {
-    id: "security-headers",
-    category: "headers",
-    title: `${presentHeaders.length} sikkerhetsheadere observert`,
-    severity: presentHeaders.length >= 4 ? "ok" : "medium",
-    description: presentHeaders.length >= 4 ? "Flere viktige security headers er på plass." : "Noen vanlige security headers mangler eller bør strammes inn.",
-    recommendation: presentHeaders.length >= 4 ? null : "Vurder HSTS, CSP, X-Content-Type-Options, frame protection, Referrer-Policy og Permissions-Policy.",
-    evidence: { presentHeaders, headers: web.rawHeaders }
-  });
-
-  if (email.hasMx) score += 5;
-  if (email.spf.present) score += 8;
-  if (email.dkim.present) score += 7;
-  if (email.dmarc.present && email.dmarc.policy !== "none") score += 10;
-  finding(findings, {
-    id: "email-authentication",
-    category: "email",
-    title: "E-postbeskyttelse kontrollert",
-    severity: email.hasMx && email.spf.present && email.dkim.present && email.dmarc.present ? "ok" : "high",
-    description: `MX ${email.hasMx ? "funnet" : "mangler"}, SPF ${email.spf.present ? "funnet" : "mangler"}, DKIM ${email.dkim.present ? "funnet" : "ikke funnet med standard selectors"}, DMARC ${email.dmarc.present ? `funnet (${email.dmarc.policy || "ukjent policy"})` : "mangler"}.`,
-    recommendation: email.hasMx && email.spf.present && email.dkim.present && email.dmarc.present ? null : "Sett opp SPF, DKIM og DMARC. DMARC bør etter hvert ha quarantine eller reject-policy.",
-    evidence: email
-  });
-
-  const roundedScore = Math.max(0, Math.min(100, Math.round(score)));
-  const actions = findings
-    .filter((item) => item.recommendation)
-    .sort((a, b) => (severityRank[a.severity] ?? 9) - (severityRank[b.severity] ?? 9));
 
   return {
-    domain,
-    scannedAt: new Date().toISOString(),
+    ...report,
     scanner: runner,
     scanType: "passive",
-    score: roundedScore,
-    grade: gradeFromScore(roundedScore),
-    summary: roundedScore >= 75 ? "Grunnsikringen ser god ut. Se funn for mulige forbedringer." : "Flere viktige grunnsikringspunkter bør følges opp.",
-    categories: {
-      dns: { score: dns.a.length || dns.aaaa.length ? 12 : 0, max: 12 },
-      web: { score: web.httpsReachable ? 18 : 0, max: 18 },
-      tls: { score: tlsInfo.ok && tlsInfo.authorized ? 18 : 0, max: 18 },
-      headers: { score: Math.min(14, presentHeaders.length * 3), max: 14 },
-      email: { score: (email.hasMx ? 5 : 0) + (email.spf.present ? 8 : 0) + (email.dkim.present ? 7 : 0) + (email.dmarc.present && email.dmarc.policy !== "none" ? 10 : 0), max: 30 }
-    },
-    checks,
-    findings,
-    actions
   };
 }
 
 async function claimOldestQueuedJob() {
-  const query = supabase
-    .from("scan_jobs")
-    .select("*")
-    .eq("status", "queued");
+  const query = supabase.from("scan_jobs").select("*").eq("status", "queued");
 
   if (!runner.egressDedicated || !runner.allowActiveScan || runner.mode === "passive") {
     query.eq("scan_type", "passive");
@@ -320,12 +174,19 @@ async function claimOldestQueuedJob() {
   const metadata = {
     ...(queued.metadata || {}),
     runner,
-    runner_started_at: startedAt
+    runner_started_at: startedAt,
   };
 
   const { data: claimed, error: claimError } = await supabase
     .from("scan_jobs")
-    .update({ status: "running", started_at: startedAt, completed_at: null, error: null, error_message: null, metadata })
+    .update({
+      status: "running",
+      started_at: startedAt,
+      completed_at: null,
+      error: null,
+      error_message: null,
+      metadata,
+    })
     .eq("id", queued.id)
     .eq("status", "queued")
     .select("*")
@@ -338,17 +199,32 @@ async function claimOldestQueuedJob() {
 async function failJob(job, error) {
   const message = safeError(error);
   const failedAt = new Date().toISOString();
+  const isInvalidDomain = error?.code === "invalid_domain" || error instanceof InvalidDomainError;
   await supabase
     .from("scan_jobs")
     .update({
-      status: "failed",
+      status: isInvalidDomain ? "invalid_domain" : "failed",
       completed_at: failedAt,
       error: message,
       error_message: message,
-      metadata: { ...(job.metadata || {}), runner, runner_failed_at: failedAt }
+      metadata: {
+        ...(job.metadata || {}),
+        runner,
+        runner_failed_at: failedAt,
+        ...(isInvalidDomain
+          ? {
+              invalid_domain: error.domain || null,
+              suggestion: error.suggestion || null,
+            }
+          : {}),
+      },
     })
     .eq("id", job.id);
-  log("job failed", { jobId: job.id, error: message });
+  log(isInvalidDomain ? "job invalid_domain" : "job failed", {
+    jobId: job.id,
+    error: message,
+    suggestion: error.suggestion || null,
+  });
 }
 
 async function completeJob(job, domains) {
@@ -360,7 +236,12 @@ async function completeJob(job, domains) {
       completed_at: completedAt,
       error: null,
       error_message: null,
-      metadata: { ...(job.metadata || {}), runner, runner_completed_at: completedAt, passive_domains_scanned: domains }
+      metadata: {
+        ...(job.metadata || {}),
+        runner,
+        runner_completed_at: completedAt,
+        passive_domains_scanned: domains,
+      },
     })
     .eq("id", job.id);
 }
@@ -376,24 +257,24 @@ async function persist(job, authorization, report) {
       request_id: job.request_id || authorization.request_id || null,
       status: "completed",
       summary: report.summary,
-      raw_result: rawResult
+      raw_result: rawResult,
     })
     .select("*")
     .single();
 
   if (resultError) throw resultError;
 
-  const findings = report.findings.map((item) => ({
+  const findings = (report.findings || []).map((item) => ({
     result_id: result.id,
     job_id: job.id,
     authorization_id: authorization.id,
-    title: item.title,
-    description: item.description || null,
-    severity: dbSeverity(item.severity),
+    title: item.title || item.id || "Phoenix Scan-funn",
+    description: item.explain || item.description || null,
+    severity: dbSeverity(item.severity || item.status),
     category: item.category || null,
-    recommendation: item.recommendation || null,
-    evidence: { ...(item.evidence || {}), scanner: runner, finding_id: item.id },
-    status: "open"
+    recommendation: item.fix || item.recommendation || null,
+    evidence: item.evidence ?? null,
+    status: "open",
   }));
 
   if (findings.length) {
@@ -401,35 +282,19 @@ async function persist(job, authorization, report) {
     if (error) throw error;
   }
 
-  const { error: reportError } = await supabase
-    .from("scan_reports")
-    .insert({
-      job_id: job.id,
-      authorization_id: authorization.id,
-      customer_id: job.customer_id || authorization.customer_id || null,
-      contact_id: job.contact_id || authorization.contact_id || null,
-      request_id: job.request_id || authorization.request_id || null,
-      quote_id: job.quote_id || authorization.quote_id || null,
-      lead_id: job.lead_id || authorization.lead_id || null,
-      title: `Phoenix Security Report: ${report.domain}`,
-      report: rawResult
-    });
+  const { error: reportError } = await supabase.from("scan_reports").insert({
+    job_id: job.id,
+    authorization_id: authorization.id,
+    customer_id: job.customer_id || authorization.customer_id || null,
+    contact_id: job.contact_id || authorization.contact_id || null,
+    request_id: job.request_id || authorization.request_id || null,
+    quote_id: job.quote_id || authorization.quote_id || null,
+    lead_id: job.lead_id || authorization.lead_id || null,
+    title: `Phoenix Security Report: ${report.domain}`,
+    report: rawResult,
+  });
 
   if (reportError) throw reportError;
-}
-
-async function passiveScanDomain(domain) {
-  const normalized = normalizeDomain(domain);
-  if (!domainPattern.test(normalized)) throw new Error(`Invalid domain in scope: ${domain}`);
-
-  const dns = await checkDns(normalized);
-  const [web, tlsInfo, email] = await Promise.all([
-    fetchWeb(normalized),
-    checkTls(normalized),
-    checkEmail(normalized)
-  ]);
-
-  return buildReport(normalized, { dns, web, tlsInfo, email });
 }
 
 async function runJob(job) {
@@ -441,15 +306,23 @@ async function runJob(job) {
 
   if (authError || !authorization) throw new Error("Missing scan_authorization.");
   if (authorization.status !== "signed") throw new Error("Scan authorization is not signed.");
-  if (job.scan_type !== "passive") throw new Error(`Runner mode '${runner.mode}' supports only scan_type='passive'. Got '${job.scan_type}'.`);
+  if (job.scan_type !== "passive") {
+    throw new Error(
+      `Runner mode '${runner.mode}' supports only scan_type='passive'. Got '${job.scan_type}'.`
+    );
+  }
 
   const domains = (job.domains || []).map(normalizeDomain).filter(Boolean);
   if (!domains.length) throw new Error("Passive scan requires at least one domain.");
 
+  for (const domain of domains) {
+    await assertPublicTarget(domain);
+  }
+
   const completedDomains = [];
   for (const domain of domains) {
     log("scanning domain", { jobId: job.id, domain });
-    const report = await passiveScanDomain(domain);
+    const report = await passiveScanDomain(domain, { authorizationSigned: true });
     await persist(job, authorization, report);
     completedDomains.push(domain);
   }
@@ -495,8 +368,14 @@ if (runner.mode !== "passive" || !runner.egressDedicated || !runner.allowActiveS
   runner.mode = "passive";
 }
 
-if (process.env.SCANNER_MODE && process.env.SCANNER_MODE !== "passive" && (!egressDedicated || !allowActiveScan)) {
-  console.error("[phoenix-scanner] Active scanner mode blocked. Shared egress or SCANNER_ALLOW_ACTIVE_SCAN=false only permits passive scans.");
+if (
+  process.env.SCANNER_MODE &&
+  process.env.SCANNER_MODE !== "passive" &&
+  (!egressDedicated || !allowActiveScan)
+) {
+  console.error(
+    "[phoenix-scanner] Active scanner mode blocked. Shared egress or SCANNER_ALLOW_ACTIVE_SCAN=false only permits passive scans."
+  );
   process.exit(1);
 }
 

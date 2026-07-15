@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabaseServer";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export async function PATCH(req, { params }) {
   const { id } = params;
   const { role } = await req.json();
 
   try {
-    const supabase = getSupabaseServer();
+    const supabase = supabaseAdmin;
     const { data, error } = await supabase
       .from("employees")
       .update({ role })

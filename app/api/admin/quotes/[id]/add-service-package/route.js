@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireMe } from "@/lib/requireMe";
-import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasMinimumRole } from "@/lib/auth/roles";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 import { quoteResolveResponse, resolveQuoteId } from "@/lib/quotes/resolveQuoteId";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,9 @@ function packagePrice(pkg = {}) {
 export async function POST(request, { params }) {
   const me = requireMe();
   if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
+  if (!hasMinimumRole(me.role, "employee")) {
+    return NextResponse.json({ error: "Du har ikke tilgang til denne handlingen." }, { status: 403 });
+  }
   if (!hasSupabaseAdminConfig) return NextResponse.json({ error: "Supabase er ikke konfigurert." }, { status: 503 });
 
   const body = await request.json().catch(() => ({}));

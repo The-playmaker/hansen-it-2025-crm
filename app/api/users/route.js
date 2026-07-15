@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabaseServer";
+import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const auth = await requireAdmin({ minRole: "employee" });
+  if (!auth.ok) return adminErrorResponse(auth);
+
   try {
-    const supabase = getSupabaseServer();
+    const supabase = supabaseAdmin;
     const { data, error } = await supabase
       .from("employees")
       .select("id, name, email, role");

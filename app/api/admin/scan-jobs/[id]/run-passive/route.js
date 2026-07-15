@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireMe } from "@/lib/requireMe";
-import { runPassiveScanJob } from "@/lib/scannerRunner";
+import { hasMinimumRole } from "@/lib/auth/roles";
+import { runPassiveScanJob } from "@/lib/scanJobs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +10,9 @@ export const maxDuration = 60;
 export async function POST(_request, { params }) {
   const me = requireMe();
   if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
+  if (!hasMinimumRole(me.role, "employee")) {
+    return NextResponse.json({ error: "Du har ikke tilgang til denne handlingen." }, { status: 403 });
+  }
 
   try {
     const result = await runPassiveScanJob(params.id);

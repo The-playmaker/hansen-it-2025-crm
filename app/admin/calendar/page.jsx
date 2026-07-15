@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { RefreshCcw } from "lucide-react";
@@ -23,6 +22,11 @@ function toDayStr(value) {
   }
 }
 
+async function readApiError(res) {
+  const json = await res.json().catch(() => ({}));
+  return json.error || "Noe gikk galt.";
+}
+
 export default function CalendarPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,17 +41,14 @@ export default function CalendarPage() {
   const refresh = async () => {
     setLoading(true);
     try {
-      // ✅ Bruk felter vi vet finnes: start_date/due_date/inspection_date
-      const { data, error } = await supabase
-        .from("requests")
-        .select("id,name,email,status,created_at,start_date")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setRequests(data || []);
+      const res = await fetch("/api/admin/calendar", { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Kunne ikke hente forespørsler.");
+      setRequests(json.data || []);
     } catch (e) {
       console.error("calendar fetch error:", e);
       setRequests([]);
+      alert(e?.message || "Kunne ikke hente forespørsler.");
     } finally {
       setLoading(false);
     }
@@ -66,12 +67,12 @@ export default function CalendarPage() {
       // Lagre som timestamptz: date + tid (00:00:00Z)
       const iso = `${dateStr}T00:00:00.000Z`;
 
-      const { error } = await supabase
-        .from("requests")
-        .update({ start_date: iso })
-        .eq("id", id);
-
-      if (error) throw error;
+      const res = await fetch("/api/admin/calendar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, start_date: iso }),
+      });
+      if (!res.ok) throw new Error(await readApiError(res));
 
       setRequests((prev) =>
         prev.map((r) => (r.id === id ? { ...r, start_date: iso } : r))
@@ -84,12 +85,12 @@ export default function CalendarPage() {
 
   const clearScheduledDate = async (id) => {
     try {
-      const { error } = await supabase
-        .from("requests")
-        .update({ start_date: null })
-        .eq("id", id);
-
-      if (error) throw error;
+      const res = await fetch("/api/admin/calendar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, start_date: null }),
+      });
+      if (!res.ok) throw new Error(await readApiError(res));
 
       setRequests((prev) =>
         prev.map((r) => (r.id === id ? { ...r, start_date: null } : r))

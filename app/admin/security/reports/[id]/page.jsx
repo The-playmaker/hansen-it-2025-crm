@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Download, FileJson, FileText, Link as LinkIcon, MessageSquarePlus, PackagePlus } from "lucide-react";
 import { downloadSecurityReportJson, downloadSecurityReportPdf } from "@/lib/securityScan/exportClient";
-import { buildReportRecommendation, standardServicePackages } from "@/lib/securityScan/recommendations";
+import { buildReportRecommendation } from "@/lib/securityScan/recommendations";
 import { EmptyState, formatDate, MetricCard, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SecondaryButton, StatusBadge } from "@/components/phoenix/PhoenixUi";
 
 const severityLabels = { critical: "kritisk", high: "høy", medium: "middels", low: "lav", ok: "ok" };
@@ -68,9 +68,19 @@ export default function SecurityReportDetailPage({ params }) {
   const actions = report.actions || [];
   const recommendation = useMemo(() => buildReportRecommendation(report), [report]);
   const recommendedPackages = useMemo(() => {
-    const active = servicePackages.filter((pkg) => pkg.is_active !== false && recommendation.packageSlugs?.includes(pkg.slug));
-    if (active.length) return active;
-    return standardServicePackages.filter((pkg) => recommendation.packageSlugs?.includes(pkg.slug));
+    const inferred = Array.isArray(recommendation.packages) ? recommendation.packages.slice(0, 3) : [];
+    if (!inferred.length) return [];
+    return inferred.map((item) => {
+      const db = servicePackages.find((pkg) => pkg.slug === item.slug && pkg.is_active !== false);
+      if (db) return { ...db, reason: item.reason };
+      return {
+        slug: item.slug,
+        name: item.name,
+        reason: item.reason,
+        short_description: item.reason,
+        category: "anbefalt",
+      };
+    });
   }, [servicePackages, recommendation]);
 
   const createShareLink = async () => {
@@ -147,7 +157,7 @@ export default function SecurityReportDetailPage({ params }) {
       <PhoenixPageHeader
         eyebrow="Security Reports"
         title={row?.domain || "Rapportdetaljer"}
-        description="Executive summary, score, tekniske funn og Fix with Hansen IT-handlinger samlet på én side."
+        description="Sammendrag, score, tekniske funn og Fix with Hansen IT-handlinger samlet på én side."
         action={<Link href="/admin/security/reports" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"><ArrowLeft size={16} />Til rapporter</Link>}
       />
 
@@ -168,7 +178,7 @@ export default function SecurityReportDetailPage({ params }) {
             <MetricCard label="Kunde" value={row.customer_id ? "Koblet" : "Ikke koblet"} detail={`${customerLabel(row)} · ${formatDate(row.created_at)}`} tone="emerald" />
           </div>
 
-          <PhoenixPanel title="Executive summary" description={report.summary || "Ingen sammendrag lagret."}>
+          <PhoenixPanel title="Sammendrag" description={report.summary || "Ingen sammendrag lagret."}>
             <div className="flex flex-wrap gap-2">
               <StatusBadge>{row.grade}</StatusBadge>
               <StatusBadge>{row.score}/100</StatusBadge>
@@ -186,7 +196,7 @@ export default function SecurityReportDetailPage({ params }) {
           <PhoenixPanel title={recommendation.title} description={recommendation.text}>
             <div className="grid gap-3 md:grid-cols-3">
               <MetricCard label="Anbefalt prioritet" value={recommendation.priority} detail={recommendation.firstStep} tone={recommendation.level === "urgent" ? "rose" : recommendation.level === "scope_warning" ? "amber" : "emerald"} />
-              <MetricCard label="Estimert arbeid" value={recommendation.estimate} detail="Basert på toppfunn og tiltak." tone="cyan" />
+              <MetricCard label="Estimert arbeid" value={recommendation.estimate} detail="Summert fra funn som ikke er OK." tone="cyan" />
               <MetricCard label="Forslag" value={recommendation.suggestions?.length || 0} detail="Neste steg og pakker" tone="emerald" />
             </div>
             <div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4 text-sm text-cyan-100">
@@ -235,7 +245,7 @@ export default function SecurityReportDetailPage({ params }) {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h3 className="font-semibold text-white">{pkg.name}</h3>
-                      <p className="mt-1 text-sm text-slate-300">{pkg.short_description || "Anbefalt produktpakke basert på rapportfunn."}</p>
+                      <p className="mt-1 text-sm text-slate-300">{pkg.reason || pkg.short_description || "Anbefalt produktpakke basert på rapportfunn."}</p>
                     </div>
                     <StatusBadge>{pkg.category}</StatusBadge>
                   </div>

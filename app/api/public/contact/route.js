@@ -1,7 +1,7 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getClientIp, verifyTurnstileToken } from "@/lib/captcha/turnstile";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSessionServer } from "@/lib/getSessionServer";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +19,8 @@ async function createSignedUrl(filePath) {
 }
 
 export async function POST(req, { params }) {
-  const session = await getSessionServer();
-  if (!session) {
+  const { user } = await getSessionServer();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

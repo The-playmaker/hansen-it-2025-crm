@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireMe } from "@/lib/requireMe";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasMinimumRole } from "@/lib/auth/roles";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { quoteResolveResponse, resolveQuoteId } from "@/lib/quotes/resolveQuoteId";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
 export async function GET(req, { params }) {
   const me = requireMe();
   if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
+  if (!hasMinimumRole(me.role, "employee")) {
+    return NextResponse.json({ error: "Du har ikke tilgang til denne handlingen." }, { status: 403 });
+  }
 
   let quote = null;
   try {
@@ -42,6 +46,9 @@ export async function GET(req, { params }) {
 export async function POST(req, { params }) {
   const me = requireMe();
   if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
+  if (!hasMinimumRole(me.role, "employee")) {
+    return NextResponse.json({ error: "Du har ikke tilgang til denne handlingen." }, { status: 403 });
+  }
 
   const formData = await req.formData();
   const file = formData.get("file");
@@ -97,8 +104,7 @@ export async function POST(req, { params }) {
         filename: file.name,
         mime_type: file.type || "application/pdf",
         storage_path: uploadData.path,
-        is_portal_visible: false,
-        visible_in_portal: false
+        is_portal_visible: false
       })
       .select("*")
       .single();
