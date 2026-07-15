@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
 import { logAdminAudit } from "@/lib/adminAudit";
-import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 import { quoteResolveResponse, resolveQuoteId } from "@/lib/quotes/resolveQuoteId";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +46,6 @@ export async function PATCH(request, { params }) {
   if (Object.prototype.hasOwnProperty.call(body, "is_portal_visible")) {
     const visible = Boolean(body.is_portal_visible);
     patch.is_portal_visible = visible;
-    patch.visible_in_portal = visible;
   }
   if (clean(body.display_name) !== undefined) patch.display_name = clean(body.display_name) || null;
   if (clean(body.filename) !== undefined) patch.filename = clean(body.filename) || resolved.document.filename;
@@ -96,7 +95,6 @@ export async function DELETE(request, { params }) {
       deleted_at: now,
       deleted_by: auth.admin.id,
       is_portal_visible: false,
-      visible_in_portal: false,
       updated_at: now
     })
     .eq("id", params.documentId)

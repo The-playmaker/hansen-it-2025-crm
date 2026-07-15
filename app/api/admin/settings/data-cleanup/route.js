@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireMe } from "@/lib/requireMe";
-import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 

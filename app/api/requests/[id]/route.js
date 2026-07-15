@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabaseServer";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req, { params }) {
-  const supabase = getSupabaseServer();
+  const supabase = supabaseAdmin;
   const id = params.id;
 
   const { data, error } = await supabase
@@ -22,7 +22,7 @@ export async function GET(req, { params }) {
 }
 
 export async function PATCH(req, { params }) {
-  const supabase = getSupabaseServer();
+  const supabase = supabaseAdmin;
   const id = params.id;
   const body = await req.json();
 

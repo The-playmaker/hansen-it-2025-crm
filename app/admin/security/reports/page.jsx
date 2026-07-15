@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -173,7 +173,7 @@ export default function SecurityReportsPage() {
                 <p className="mt-1 text-xl font-bold text-white">{selected.domain}</p>
                 <p className="mt-1 text-sm text-slate-400">{customerLabel(selected)}</p>
                 <p className="mt-2 text-sm text-slate-300">Score {selected.score}/100, karakter {selected.grade}</p>
-                {selected.report?.spoofingRisk ? <p className="mt-2 text-sm text-amber-200">Spoofing-risk: {selected.report.spoofingRisk.level} - {selected.report.spoofingRisk.reason}</p> : null}
+                {selected.report?.spoofingRisk ? <p className="mt-2 text-sm text-amber-200">E-postrisiko: {{ low: "Lav", medium: "Middels", high: "Høy", critical: "Kritisk" }[selected.report.spoofingRisk.level] || selected.report.spoofingRisk.level} — {selected.report.spoofingRisk.reason}</p> : null}
                 {selected.report?.subdomains?.length ? <p className="mt-2 text-sm text-slate-400">Subdomener funnet: {selected.report.subdomains.length}</p> : null}
                 <div className="mt-4 flex flex-wrap gap-2">
                   <SecondaryButton type="button" onClick={() => downloadSecurityReportPdf(selected)}><Download size={16} />PDF</SecondaryButton>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 import { parseDomainList, validateScanDomains } from "@/lib/scanAuthorizationValidation";
 
 export const dynamic = "force-dynamic";

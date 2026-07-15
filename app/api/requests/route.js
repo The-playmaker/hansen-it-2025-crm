@@ -1,11 +1,17 @@
-﻿import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { NextResponse } from "next/server";
+import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
+import { getClientIp } from "@/lib/captcha/turnstile";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 /**
  * Hent alle forespørsler (GET /api/requests)
  */
 export async function GET() {
-  const { data, error } = await supabaseServer
+  const auth = await requireAdmin({ minRole: "employee" });
+  if (!auth.ok) return adminErrorResponse(auth);
+
+  const { data, error } = await supabaseAdmin
     .from("requests")
     .select("*")
     .order("created_at", { ascending: false });
@@ -23,6 +29,18 @@ export async function GET() {
  */
 export async function POST(request) {
   try {
+    const clientIp = getClientIp(request);
+    const rateLimit = checkRateLimit(`requests:${clientIp || "unknown"}`, {
+      limit: 10,
+      windowMs: 60_000,
+    });
+    if (!rateLimit.ok) {
+      return NextResponse.json(
+        { error: "For mange forespørsler. Prøv igjen om litt." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { name, email, company, message, priority = "normal" } = body;
 
@@ -33,7 +51,7 @@ export async function POST(request) {
       );
     }
 
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabaseAdmin
       .from("requests")
       .insert([{ name, email, company, message, priority }])
       .select()
@@ -50,4 +68,3 @@ export async function POST(request) {
     return NextResponse.json({ error: "Intern feil" }, { status: 500 });
   }
 }
-

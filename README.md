@@ -30,6 +30,19 @@ Phoenix er i aktiv utvikling. Flere moduler bruker Supabase som primær datakild
 - Scan Authorization
 - Developer Portal
 
+## Phoenix Scan – én scoringsmotor
+
+All scoring og findings-tekst kommer fra `lib/securityScan/score.js` (`buildSecurityReport`).
+
+| Sti | Fil | Rolle |
+|-----|-----|--------|
+| CRM API / admin | `lib/scanJobs.js` | Kjøre `scan_jobs` fra Next.js |
+| Scanner-node | `scripts/scanner-runner.mjs` | Poll/kjør jobber på scan01 (uten `@/`-alias) |
+
+`lib/scannerRunner.js` er kun et tynt alias mot `lib/scanJobs.js` (bakoverkompatibilitet).
+
+Regresjonslås for score: `npm run test:score` (`scripts/test-score.mjs`).
+
 ## Viktige routes
 
 Admin:
@@ -83,3 +96,16 @@ npm run dev
 - Aktiv scanning krever signert scan authorization.
 - RLS må fullføres før bred produksjon.
 - Originale `requests` skal konverteres, men ikke slettes.
+
+## security.txt (RFC 9116)
+
+crm.hansen-it.com er publikumsvendt (portaler + public API), derfor ligger også:
+
+- `/.well-known/security.txt`
+- `/security-policy`
+
+Canonical peker på `https://crm.hansen-it.com/.well-known/security.txt`. Hovedpolicy for merkevaren ligger også på hansen-it.com.
+
+**Manuelt (Microsoft 365):** Opprett alias `security@hansen-it.com` hvis den mangler, slik at Contact i security.txt når noen.
+
+**Kalender:** `Expires` er hardkodet til `2027-07-15T00:00:00.000Z`. Sett påminnelse før den datoen — ikke generer Expires med `new Date()` ved deploy.

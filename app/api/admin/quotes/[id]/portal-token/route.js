@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hasSupabaseAdminConfig } from "@/lib/supabaseAdmin";
+import { hasSupabaseAdminConfig } from "@/lib/supabase/admin";
 import { ensureQuotePortalToken } from "@/lib/portal/quotePortalTokens";
 
 export const dynamic = "force-dynamic";

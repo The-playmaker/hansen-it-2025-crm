@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireMe } from "@/lib/requireMe";
-import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasMinimumRole } from "@/lib/auth/roles";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 import { getSecurityScanReport } from "@/lib/securityScan/storage";
 import { buildReportRecommendation } from "@/lib/securityScan/recommendations";
 
@@ -21,6 +22,9 @@ function customerLabel(row = {}) {
 export async function POST(request, { params }) {
   const me = requireMe();
   if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
+  if (!hasMinimumRole(me.role, "employee")) {
+    return NextResponse.json({ error: "Du har ikke tilgang til denne handlingen." }, { status: 403 });
+  }
   if (!hasSupabaseAdminConfig) return NextResponse.json({ error: "Supabase er ikke konfigurert." }, { status: 503 });
 
   const body = await request.json().catch(() => ({}));

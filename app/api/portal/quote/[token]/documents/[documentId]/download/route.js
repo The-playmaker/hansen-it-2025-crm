@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 import { PortalTokenError, resolveQuotePortalToken } from "@/lib/portal/resolveQuotePortalToken";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,6 @@ export async function GET(request, { params }) {
     .select("id, quote_id, filename, storage_path, external_url, is_portal_visible, visible_in_portal")
     .eq("id", documentId)
     .eq("quote_id", quote.id)
-    .eq("is_portal_visible", true)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -61,7 +60,8 @@ export async function GET(request, { params }) {
     }, { status: 500 });
   }
 
-  if (!document) {
+  const isVisible = (document?.is_portal_visible ?? document?.visible_in_portal) === true;
+  if (!document || !isVisible) {
     const { count } = await supabaseAdmin
       .from("quote_documents")
       .select("id", { count: "exact", head: true })

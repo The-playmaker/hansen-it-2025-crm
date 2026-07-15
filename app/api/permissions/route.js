@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabaseServer";
+import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const supabase = getSupabaseServer();
+  const auth = await requireAdmin({ minRole: "admin" });
+  if (!auth.ok) return adminErrorResponse(auth);
+
+  const supabase = supabaseAdmin;
   const { data, error } = await supabase
     .from("permissions")
     .select("id,key,label,description,created_at")
@@ -15,7 +19,10 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  const supabase = getSupabaseServer();
+  const auth = await requireAdmin({ minRole: "owner" });
+  if (!auth.ok) return adminErrorResponse(auth);
+
+  const supabase = supabaseAdmin;
   const body = await req.json();
   const { key, label, description } = body || {};
 

@@ -7,8 +7,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
-import { supabase } from "@/lib/supabaseClient";
 import { Trash2, Plus, ArrowLeft } from "lucide-react";
+
+async function readApiError(res) {
+  const json = await res.json().catch(() => ({}));
+  return json.error || "Noe gikk galt.";
+}
 
 export default function ServicesPage() {
   const router = useRouter();
@@ -38,11 +42,13 @@ export default function ServicesPage() {
 
   const fetchServices = async () => {
     try {
-      const { data, error } = await supabase.from("services").select("*").order("sort_order");
-      if (error) throw error;
-      setServices(data || []);
+      const res = await fetch("/api/admin/services", { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Kunne ikke hente tjenester.");
+      setServices(json.data || []);
     } catch (error) {
       console.error("Error fetching services:", error);
+      alert(error?.message || "Kunne ikke hente tjenester.");
     } finally {
       setLoading(false);
     }
@@ -73,17 +79,25 @@ export default function ServicesPage() {
     const payload = { ...formData, features: featuresArray };
 
     try {
-      const q = editingId
-        ? supabase.from("services").update(payload).eq("id", editingId)
-        : supabase.from("services").insert([payload]);
+      const res = editingId
+        ? await fetch(`/api/admin/services/${editingId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await fetch("/api/admin/services", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
 
-      const { error } = await q;
-      if (error) throw error;
+      if (!res.ok) throw new Error(await readApiError(res));
 
       resetForm();
       fetchServices();
     } catch (error) {
       console.error("Error saving service:", error);
+      alert(error?.message || "Kunne ikke lagre tjeneste.");
     }
   };
 
@@ -91,11 +105,12 @@ export default function ServicesPage() {
     if (!confirm("Are you sure you want to delete this service?")) return;
 
     try {
-      const { error } = await supabase.from("services").delete().eq("id", id);
-      if (error) throw error;
+      const res = await fetch(`/api/admin/services/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await readApiError(res));
       fetchServices();
     } catch (error) {
       console.error("Error deleting service:", error);
+      alert(error?.message || "Kunne ikke slette tjeneste.");
     }
   };
 

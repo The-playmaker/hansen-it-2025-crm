@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
 import { logAdminAudit } from "@/lib/adminAudit";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { quoteResolveResponse, resolveQuoteId } from "@/lib/quotes/resolveQuoteId";
 
 export const dynamic = "force-dynamic";

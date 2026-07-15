@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabaseServer";
+import { requireAdmin, adminErrorResponse } from "@/lib/auth/requireAdmin";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export async function DELETE(req, { params }) {
+  const auth = await requireAdmin({ minRole: "admin" });
+  if (!auth.ok) return adminErrorResponse(auth);
+
   const { id } = params;
 
   try {
-    const supabase = getSupabaseServer();
+    const supabase = supabaseAdmin;
 
     // Hent bruker for e-post
     const { data: user } = await supabase

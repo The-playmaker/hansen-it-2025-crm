@@ -21,7 +21,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
-import { supabase } from "@/lib/supabaseClient";
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -57,7 +56,7 @@ function documentTypeLabel(type) {
 }
 
 function isDocumentVisible(document = {}) {
-  return document.is_portal_visible === true || document.visible_in_portal === true;
+  return (document.is_portal_visible ?? document.visible_in_portal) === true;
 }
 
 export default function QuoteDetailsPage() {
@@ -241,16 +240,35 @@ export default function QuoteDetailsPage() {
 
     loadAll();
 
-    const channel = supabase
-      .channel(`quotes-messages-${quoteId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "quote_messages", filter: `quote_id=eq.${quoteId}` }, (payload) => {
-        setMessages((prev) => [payload.new, ...prev]);
-        setHasNewMessage(true);
-        new Audio("/notification.mp3").play();
-      })
-      .subscribe();
+    // Poll for new messages (cookie-auth via /api/admin — no browser Supabase client)
+    let cancelled = false;
+    let knownCount = null;
+    const pollMessages = async () => {
+      try {
+        const res = await fetch(`/api/admin/quotes/${quoteId}/messages`, { cache: "no-store" });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || cancelled) return;
+        const next = json.data || [];
+        if (knownCount !== null && next.length > knownCount) {
+          setHasNewMessage(true);
+          try {
+            new Audio("/notification.mp3").play();
+          } catch {
+            /* ignore autoplay errors */
+          }
+        }
+        knownCount = next.length;
+        setMessages(next);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    const intervalId = setInterval(pollMessages, 5000);
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteId]);
 
@@ -524,7 +542,7 @@ export default function QuoteDetailsPage() {
       if (!res.ok) throw new Error(json?.error || "Kunne ikke oppdatere dokumentet.");
       setDocuments((prev) => prev.map((document) => (
         document.id === documentId
-          ? { ...document, ...json.data, is_portal_visible: visible, visible_in_portal: visible }
+          ? { ...document, ...json.data, is_portal_visible: visible }
           : document
       )));
     } catch (error) {
@@ -827,7 +845,7 @@ const handleCreatePortalLink = async () => {
     );
   }
 
-  const visibleDocuments = documents.filter((document) => document.is_portal_visible !== false && document.visible_in_portal !== false);
+  const visibleDocuments = documents.filter((document) => (document.is_portal_visible ?? document.visible_in_portal) !== false);
   const hasQuotePdf = visibleDocuments.some((document) => document.type === "quote_pdf" || /tilbud|quote|offer/i.test(document.filename || ""));
   const hasScanPdf = visibleDocuments.some((document) => document.type === "security_report_pdf" || /scan|security|sikkerhet/i.test(document.filename || ""));
   const quoteTotal = Number(quote.total_inc_vat || quote.total || quote.total_ex_vat || overallSubtotal || 0);
@@ -1265,7 +1283,7 @@ const handleCreatePortalLink = async () => {
                       <FileText size={14} /> {documentLabel(document)}
                     </div>
                     <div className="text-brand-500 text-[11px] mt-1">
-                      {document.type} · {document.visible_in_portal ? "Synlig i portal" : "Skjult"}
+                      {document.type} · {(document.is_portal_visible ?? document.visible_in_portal) ? "Synlig i portal" : "Skjult"}
                     </div>
                     <Button
                       variant="outline"
@@ -1296,7 +1314,7 @@ const handleCreatePortalLink = async () => {
                         <div>
                           <div className="text-sm font-semibold text-white">{documentLabel(document)}</div>
                           <div className="mt-1 text-xs text-brand-400">{document.type || "attachment"} · {document.storage_path ? "storage OK" : document.external_url ? "external URL" : "mangler fil/URL"}</div>
-                          <div className="mt-1 text-xs text-brand-400">{document.is_portal_visible !== false && document.visible_in_portal !== false ? "Synlig i portal" : "Skjult i portal"}</div>
+                          <div className="mt-1 text-xs text-brand-400">{(document.is_portal_visible ?? document.visible_in_portal) !== false ? "Synlig i portal" : "Skjult i portal"}</div>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <select value={document.type || "attachment"} onChange={(event) => handleChangeDocumentType(document, event.target.value)} className="rounded-lg border border-brand-700 bg-brand-950 px-2 py-1 text-xs text-white">
@@ -1316,7 +1334,7 @@ const handleCreatePortalLink = async () => {
                             className="gap-2"
                             onClick={() => handleToggleDocumentVisibility(document.id, !isDocumentVisible(document))}
                           >
-                            {document.is_portal_visible !== false && document.visible_in_portal !== false ? "Skjul i portal" : "Gjør synlig i portal"}
+                            {(document.is_portal_visible ?? document.visible_in_portal) !== false ? "Skjul i portal" : "Gjør synlig i portal"}
                           </Button>
                         </div>
                       </div>

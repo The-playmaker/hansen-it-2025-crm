@@ -1,11 +1,18 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { supabase } from '../../../lib/supabaseClient';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 const STATUSES = ['Ny', 'Pågår', 'Fullført'];
 
 export default function Kanban() {
+  const authConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+  const supabase = useMemo(
+    () => (authConfigured ? createSupabaseBrowserClient() : null),
+    [authConfigured]
+  );
   const [items, setItems] = useState([]);
 
   const fetchData = async () => {
@@ -16,6 +23,7 @@ export default function Kanban() {
   useEffect(() => { fetchData(); }, []);
 
   useEffect(() => {
+    if (!supabase) return;
     const channel = supabase
       .channel('requests-kanban')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, payload => {
@@ -29,7 +37,7 @@ export default function Kanban() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [supabase]);
 
   const cols = useMemo(() => {
     const map = Object.fromEntries(STATUSES.map(s => [s, []]));

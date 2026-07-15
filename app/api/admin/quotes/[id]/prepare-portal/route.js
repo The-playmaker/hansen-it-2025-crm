@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireMe } from "@/lib/requireMe";
-import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasMinimumRole } from "@/lib/auth/roles";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 import { ensureQuoteDocumentFromAttachment } from "@/lib/quoteDocuments";
 import { ensureQuotePortalToken } from "@/lib/portal/quotePortalTokens";
 import { quoteResolveResponse, resolveQuoteId } from "@/lib/quotes/resolveQuoteId";
@@ -127,6 +128,9 @@ async function loadVisibleDocuments(quoteId) {
 export async function POST(request, { params }) {
   const me = requireMe();
   if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
+  if (!hasMinimumRole(me.role, "employee")) {
+    return NextResponse.json({ error: "Du har ikke tilgang til denne handlingen." }, { status: 403 });
+  }
   if (!hasSupabaseAdminConfig) return NextResponse.json({ error: "Supabase er ikke konfigurert." }, { status: 503 });
 
   let quote = null;

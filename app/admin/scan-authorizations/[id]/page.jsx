@@ -243,7 +243,9 @@ export default function ScanAuthorizationDetailsPage() {
       summary: "Samlet rapport basert på passive eksterne kontroller."
     };
     const recommendation = savedCombined?.recommendation || buildReportRecommendation(combinedReport);
-    const packages = standardServicePackages.filter((pkg) => recommendation.packageSlugs?.includes(pkg.slug));
+    const packages = Array.isArray(recommendation.packages) && recommendation.packages.length
+      ? recommendation.packages.slice(0, 3)
+      : standardServicePackages.filter((pkg) => recommendation.packageSlugs?.includes(pkg.slug)).slice(0, 3);
 
     doc.setFillColor(21, 33, 73);
     doc.rect(0, 0, 210, 48, "F");
@@ -288,7 +290,7 @@ export default function ScanAuthorizationDetailsPage() {
     doc.setFont(undefined, "normal");
     cleanReports.forEach((report) => {
       ensure(12);
-      addWrapped(`${report.domain}: score ${report.score ?? "-"} / 100, grade ${report.grade || "-"}`);
+      addWrapped(`${report.domain}: score ${report.score ?? "-"} / 100, karakter ${report.grade || "-"}`);
     });
 
     ensure(40);
@@ -314,7 +316,11 @@ export default function ScanAuthorizationDetailsPage() {
     y += 8;
     doc.setFontSize(10);
     doc.setFont(undefined, "normal");
-    addWrapped(packages.length ? packages.map((pkg) => pkg.name).join(", ") : "Månedlig sikkerhetskontroll");
+    addWrapped(
+      packages.length
+        ? packages.map((pkg) => `${pkg.name}${pkg.reason ? ` — ${pkg.reason}` : ""}`).join("; ")
+        : "Månedlig sikkerhetskontroll"
+    );
 
     doc.addPage();
     y = 22;
@@ -563,7 +569,7 @@ export default function ScanAuthorizationDetailsPage() {
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <h3 className="font-semibold text-white">{reportDomain(report)}</h3>
-                          <p className="mt-1 text-sm text-slate-400">Score {report.report?.score ?? "-"} / 100 · Grade {report.report?.grade || "-"}</p>
+                          <p className="mt-1 text-sm text-slate-400">Score {report.report?.score ?? "-"} / 100 · Karakter {report.report?.grade || "-"}</p>
                         </div>
                         <StatusBadge>{report.report?.scanType || "passive"}</StatusBadge>
                       </div>

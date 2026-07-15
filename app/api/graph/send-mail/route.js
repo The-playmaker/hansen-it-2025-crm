@@ -2,9 +2,10 @@
 import { getSessionServer } from "@/lib/getSessionServer";
 
 export async function POST(req) {
-  const { session } = await getSessionServer();
-  if (!session) return new Response("Unauthorized", { status: 401 });
-  const accessToken = session.provider_token;
+  const { user, session } = await getSessionServer();
+  if (!user) return new Response("Unauthorized", { status: 401 });
+
+  const accessToken = session?.provider_token;
   if (!accessToken) return new Response("No provider token", { status: 401 });
 
   const { to, subject, body } = await req.json();

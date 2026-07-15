@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireMe } from "@/lib/requireMe";
-import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hasMinimumRole } from "@/lib/auth/roles";
+import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 import { servicePackageCategories } from "@/lib/securityScan/recommendations";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,9 @@ function cleanPayload(body = {}) {
 export async function GET(_request, { params }) {
   const me = requireMe();
   if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
+  if (!hasMinimumRole(me.role, "employee")) {
+    return NextResponse.json({ error: "Du har ikke tilgang til denne handlingen." }, { status: 403 });
+  }
   if (!hasSupabaseAdminConfig) return NextResponse.json({ configured: false, data: null });
 
   const { data, error } = await supabaseAdmin
@@ -46,6 +50,9 @@ export async function GET(_request, { params }) {
 export async function PATCH(request, { params }) {
   const me = requireMe();
   if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
+  if (!hasMinimumRole(me.role, "admin")) {
+    return NextResponse.json({ error: "Du har ikke tilgang til denne handlingen." }, { status: 403 });
+  }
   if (!hasSupabaseAdminConfig) return NextResponse.json({ error: "Supabase er ikke konfigurert." }, { status: 503 });
 
   const payload = cleanPayload(await request.json());
@@ -69,6 +76,9 @@ export async function PATCH(request, { params }) {
 export async function DELETE(_request, { params }) {
   const me = requireMe();
   if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
+  if (!hasMinimumRole(me.role, "admin")) {
+    return NextResponse.json({ error: "Du har ikke tilgang til denne handlingen." }, { status: 403 });
+  }
   if (!hasSupabaseAdminConfig) return NextResponse.json({ error: "Supabase er ikke konfigurert." }, { status: 503 });
 
   const { error } = await supabaseAdmin.from("service_packages").delete().eq("id", params.id);

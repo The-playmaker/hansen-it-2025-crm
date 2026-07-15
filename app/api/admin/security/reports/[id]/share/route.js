@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireMe } from "@/lib/requireMe";
+import { hasMinimumRole } from "@/lib/auth/roles";
 import { getOrCreateSecurityScanShare, getSecurityScanReport } from "@/lib/securityScan/storage";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,9 @@ function publicBaseUrl(request) {
 export async function POST(request, { params }) {
   const me = requireMe();
   if (!me) return NextResponse.json({ error: "Ikke innlogget." }, { status: 401 });
+  if (!hasMinimumRole(me.role, "admin")) {
+    return NextResponse.json({ error: "Du har ikke tilgang til denne handlingen." }, { status: 403 });
+  }
 
   const reportResult = await getSecurityScanReport(params.id);
   if (reportResult.error || !reportResult.data) {
