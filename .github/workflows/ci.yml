@@ -27,5 +27,12 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
           SUPABASE_URL: https://placeholder.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: placeholder
+      - name: Sjekk migrasjoner
+        run: npm run migrate:check
+        env:
+          # Sett disse som GitHub Actions secrets for å aktivere sjekken mot ekte DB.
+          # Uten secrets hopper scriptet over i CI (exit 0).
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       - run: npm audit --audit-level=high
         continue-on-error: true # ikke blokker deploy, men vis i loggen

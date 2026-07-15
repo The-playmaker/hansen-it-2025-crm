@@ -44,6 +44,17 @@ export async function POST(request, { params }) {
   const reportRequestId = row.request_id || row.authorization?.request_id || null;
   const reportLeadId = row.lead_id || row.authorization?.lead_id || null;
 
+  if (!reportCustomerId) {
+    return NextResponse.json(
+      {
+        error:
+          "Autorisasjonen/rapporten mangler kunde. Koble til en kunde først, deretter kan du opprette tilbud.",
+        needsCustomer: true,
+      },
+      { status: 400 }
+    );
+  }
+
   let query = supabaseAdmin
     .from("service_packages")
     .select("*, service_package_items(*)")
@@ -133,11 +144,26 @@ export async function POST(request, { params }) {
     quote = data;
   }
 
-  if (quote && isScanReport) {
-    await Promise.all([
-      supabaseAdmin.from("scan_reports").update({ quote_id: quote.id }).eq("id", row.id),
-      row.authorization_id ? supabaseAdmin.from("scan_authorizations").update({ quote_id: quote.id }).eq("id", row.authorization_id) : Promise.resolve()
-    ]);
+  if (quote) {
+    const linkUpdates = [];
+    if (isScanReport) {
+      linkUpdates.push(
+        supabaseAdmin
+          .from("scan_reports")
+          .update({ quote_id: quote.id, customer_id: reportCustomerId })
+          .eq("id", row.id)
+      );
+      if (row.authorization_id) {
+        linkUpdates.push(
+          supabaseAdmin
+            .from("scan_authorizations")
+            .update({ quote_id: quote.id, customer_id: reportCustomerId })
+            .eq("id", row.authorization_id)
+        );
+      }
+    }
+    // security_scan_reports har ikke quote_id-kolonne — koblingen ligger på quotes.security_report_id
+    await Promise.all(linkUpdates);
   }
 
   const { data: existingItems } = await supabaseAdmin

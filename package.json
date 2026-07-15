@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "test:score": "node scripts/test-score.mjs",
-    "scanner:run": "node scripts/scanner-runner.mjs"
+    "scanner:run": "node scripts/scanner-runner.mjs",
+    "migrate:check": "node scripts/check-migrations.mjs",
+    "migrate:apply": "node scripts/apply-migrations.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^16.5.0",
@@ -26,6 +28,7 @@
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.5",
     "postcss": "^8.4.47",
+    "postgres": "^3.4.7",
     "tailwindcss": "^3.4.12"
   }
 }

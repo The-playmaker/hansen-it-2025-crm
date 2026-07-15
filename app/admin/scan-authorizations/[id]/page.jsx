@@ -8,6 +8,7 @@ import { jsPDF } from "jspdf";
 import { downloadSecurityReportPdf } from "@/lib/securityScan/exportClient";
 import { buildReportRecommendation, standardServicePackages } from "@/lib/securityScan/recommendations";
 import { EmptyState, formatDate, PhoenixPageHeader, PhoenixPanel, SecondaryButton, StatusBadge } from "@/components/phoenix/PhoenixUi";
+import CrmLinkPicker from "@/components/admin/CrmLinkPicker";
 
 function dateTime(value) {
   return value ? new Date(value).toLocaleString("nb-NO") : "-";
@@ -60,6 +61,10 @@ export default function ScanAuthorizationDetailsPage() {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const [linkPicker, setLinkPicker] = useState(null); // "customer" | "request" | null
+  const [linkItems, setLinkItems] = useState([]);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkError, setLinkError] = useState("");
 
   const portalUrl = useMemo(() => {
     if (!item?.token || typeof window === "undefined") return "";
@@ -196,18 +201,70 @@ export default function ScanAuthorizationDetailsPage() {
 
   const syncQuoteFromReport = async (report) => {
     if (!report?.id) return;
+    if (!item?.customer_id) {
+      setError("Koble til en kunde først. Et tilbud uten kunde gir ingen mening.");
+      openLinkPicker("customer");
+      return;
+    }
     setBusy(`sync-quote-${report.id}`);
     setError("");
     setMessage("");
     try {
-      const response = await fetch(`/api/admin/scan-reports/${report.id}/sync-quote`, { method: "POST" });
+      const response = await fetch(`/api/admin/security/reports/${report.id}/service-package-quote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Kunne ikke opprette eller oppdatere tilbud.");
       setMessage("Tilbud er opprettet/oppdatert fra anbefalte pakker.");
       if (result.url) router.push(result.url);
       else await load();
     } catch (err) {
+      console.error("Opprett tilbud feilet:", err);
       setError(err.message || "Kunne ikke opprette eller oppdatere tilbud.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const openLinkPicker = async (type) => {
+    setLinkPicker(type);
+    setLinkError("");
+    setLinkLoading(true);
+    setLinkItems([]);
+    try {
+      const path = type === "customer" ? "/api/admin/customers" : "/api/admin/requests";
+      const response = await fetch(path, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Kunne ikke hente liste.");
+      setLinkItems(result.data || []);
+    } catch (err) {
+      console.error("Link-picker feilet:", err);
+      setLinkError(err.message || "Kunne ikke hente liste.");
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
+  const patchLinks = async (payload) => {
+    setBusy("link");
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/scan-authorizations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Kunne ikke oppdatere koblingen.");
+      setItem(result.data);
+      setMessage("Koblingen er lagret.");
+      setLinkPicker(null);
+    } catch (err) {
+      console.error("PATCH forretningskobling feilet:", err);
+      setError(err.message || "Kunne ikke oppdatere koblingen.");
     } finally {
       setBusy("");
     }
@@ -411,10 +468,38 @@ export default function ScanAuthorizationDetailsPage() {
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              {item.quote_id ? <Link href={`/admin/quotes/${item.quote_id}`}><SecondaryButton type="button">Åpne tilbud</SecondaryButton></Link> : null}
-              {!item.quote_id && primaryReport ? <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => syncQuoteFromReport(primaryReport)}>Opprett tilbud fra denne scannen</SecondaryButton> : null}
-              {!item.customer_id ? <SecondaryButton type="button" disabled>Koble til kunde</SecondaryButton> : null}
-              {!item.request_id ? <SecondaryButton type="button" disabled>Koble til henvendelse</SecondaryButton> : null}
+              {item.quote_id ? (
+                <Link href={`/admin/quotes/${item.quote_id}`}>
+                  <SecondaryButton type="button">Åpne tilbud</SecondaryButton>
+                </Link>
+              ) : null}
+              {!item.quote_id && primaryReport ? (
+                <SecondaryButton
+                  type="button"
+                  disabled={Boolean(busy)}
+                  onClick={() => syncQuoteFromReport(primaryReport)}
+                >
+                  {busy.startsWith("sync-quote") ? "Oppretter..." : "Opprett tilbud fra denne scannen"}
+                </SecondaryButton>
+              ) : null}
+              {!item.customer_id ? (
+                <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => openLinkPicker("customer")}>
+                  Koble til kunde
+                </SecondaryButton>
+              ) : (
+                <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => openLinkPicker("customer")}>
+                  Bytt kunde
+                </SecondaryButton>
+              )}
+              {!item.request_id ? (
+                <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => openLinkPicker("request")}>
+                  Koble til henvendelse
+                </SecondaryButton>
+              ) : (
+                <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => openLinkPicker("request")}>
+                  Bytt henvendelse
+                </SecondaryButton>
+              )}
             </div>
           </PhoenixPanel>
 
@@ -588,6 +673,33 @@ export default function ScanAuthorizationDetailsPage() {
           </PhoenixPanel>
         </>
       ) : null}
+
+      <CrmLinkPicker
+        open={linkPicker === "customer"}
+        title="Koble til kunde"
+        description="Velg kunden som eier denne scannen."
+        items={linkItems}
+        loading={linkLoading}
+        error={linkError}
+        searchKeys={["company_name", "email", "name", "organization_number"]}
+        labelFor={(item) => item.company_name || item.name || item.email || item.id}
+        detailFor={(item) => [item.email, item.organization_number].filter(Boolean).join(" · ")}
+        onClose={() => setLinkPicker(null)}
+        onSelect={(customer) => patchLinks({ customer_id: customer.id, customer_name: customer.company_name || item?.customer_name || null })}
+      />
+      <CrmLinkPicker
+        open={linkPicker === "request"}
+        title="Koble til henvendelse"
+        description="Velg request/henvendelse som hører til scannen."
+        items={linkItems}
+        loading={linkLoading}
+        error={linkError}
+        searchKeys={["company", "name", "email", "status"]}
+        labelFor={(item) => item.company || item.name || item.email || item.id}
+        detailFor={(item) => [item.email, item.status].filter(Boolean).join(" · ")}
+        onClose={() => setLinkPicker(null)}
+        onSelect={(request) => patchLinks({ request_id: request.id })}
+      />
     </div>
   );
 }

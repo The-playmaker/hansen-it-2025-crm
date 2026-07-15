@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Download, FileJson, FileText, Link as LinkIcon, MessageSquarePlus, PackagePlus } from "lucide-react";
 import { downloadSecurityReportJson, downloadSecurityReportPdf } from "@/lib/securityScan/exportClient";
-import { buildReportRecommendation } from "@/lib/securityScan/recommendations";
+import { buildReportRecommendation, servicePackageCategoryLabels } from "@/lib/securityScan/recommendations";
 import { EmptyState, formatDate, MetricCard, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SecondaryButton, StatusBadge } from "@/components/phoenix/PhoenixUi";
+import CrmLinkPicker from "@/components/admin/CrmLinkPicker";
 
 const severityLabels = { critical: "kritisk", high: "høy", medium: "middels", low: "lav", ok: "ok" };
 
@@ -29,6 +31,7 @@ function customerLabel(row = {}) {
 }
 
 export default function SecurityReportDetailPage({ params }) {
+  const router = useRouter();
   const [row, setRow] = useState(null);
   const [state, setState] = useState("loading");
   const [error, setError] = useState("");
@@ -36,6 +39,18 @@ export default function SecurityReportDetailPage({ params }) {
   const [actionMessage, setActionMessage] = useState("");
   const [shareUrl, setShareUrl] = useState("");
   const [servicePackages, setServicePackages] = useState([]);
+  const [linkPicker, setLinkPicker] = useState(null);
+  const [linkItems, setLinkItems] = useState([]);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkError, setLinkError] = useState("");
+
+  const reload = async () => {
+    const response = await fetch(`/api/admin/security/reports/${params.id}`, { cache: "no-store" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Kunne ikke hente rapport.");
+    setRow(result.data);
+    return result.data;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -78,7 +93,7 @@ export default function SecurityReportDetailPage({ params }) {
         name: item.name,
         reason: item.reason,
         short_description: item.reason,
-        category: "anbefalt",
+        category: item.category || "anbefalt",
       };
     });
   }, [servicePackages, recommendation]);
@@ -103,6 +118,11 @@ export default function SecurityReportDetailPage({ params }) {
 
   const createCrmAction = async (type, finding) => {
     if (!row || !finding) return;
+    if ((type === "quote" || type === "note") && !row.customer_id) {
+      setError("Koble til en kunde først.");
+      openLinkPicker("customer");
+      return;
+    }
     const key = `${type}-${finding.id}`;
     setActionBusy(key);
     setActionMessage("");
@@ -125,6 +145,7 @@ export default function SecurityReportDetailPage({ params }) {
       if (!response.ok) throw new Error(result.error || "Kunne ikke opprette CRM-handling.");
       setActionMessage(type === "task" ? "Oppgave opprettet." : type === "quote" ? "Tilbudskladd opprettet." : "Kundenotat lagt til.");
     } catch (err) {
+      console.error("CRM-handling feilet:", err);
       setError(err.message || "Kunne ikke opprette CRM-handling.");
     } finally {
       setActionBusy("");
@@ -133,6 +154,11 @@ export default function SecurityReportDetailPage({ params }) {
 
   const createPackageQuote = async (packageIds = []) => {
     if (!row) return;
+    if (!row.customer_id) {
+      setError("Koble til en kunde først. Et tilbud uten kunde gir ingen mening.");
+      openLinkPicker("customer");
+      return;
+    }
     setActionBusy(packageIds.length === 1 ? `package-${packageIds[0]}` : "packages");
     setActionMessage("");
     setError("");
@@ -144,9 +170,54 @@ export default function SecurityReportDetailPage({ params }) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Kunne ikke lage tilbudskladd fra produktpakker.");
-      setActionMessage(`Tilbud oppdatert: ${result.data?.title || result.data?.id}${result.url ? ` (${result.url})` : ""}`);
+      setActionMessage(`Tilbud oppdatert: ${result.data?.title || result.data?.id}`);
+      if (result.url) router.push(result.url);
+      else await reload();
     } catch (err) {
+      console.error("Opprett tilbud fra pakker feilet:", err);
       setError(err.message || "Kunne ikke lage tilbudskladd fra produktpakker.");
+    } finally {
+      setActionBusy("");
+    }
+  };
+
+  const openLinkPicker = async (type) => {
+    setLinkPicker(type);
+    setLinkError("");
+    setLinkLoading(true);
+    setLinkItems([]);
+    try {
+      const path = type === "customer" ? "/api/admin/customers" : "/api/admin/requests";
+      const response = await fetch(path, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Kunne ikke hente liste.");
+      setLinkItems(result.data || []);
+    } catch (err) {
+      console.error("Link-picker feilet:", err);
+      setLinkError(err.message || "Kunne ikke hente liste.");
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
+  const patchLinks = async (payload) => {
+    setActionBusy("link");
+    setError("");
+    setActionMessage("");
+    try {
+      const response = await fetch(`/api/admin/security/reports/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Kunne ikke oppdatere koblingen.");
+      setRow(result.data);
+      setActionMessage("Koblingen er lagret.");
+      setLinkPicker(null);
+    } catch (err) {
+      console.error("PATCH rapportkobling feilet:", err);
+      setError(err.message || "Kunne ikke oppdatere koblingen.");
     } finally {
       setActionBusy("");
     }
@@ -177,6 +248,31 @@ export default function SecurityReportDetailPage({ params }) {
             <MetricCard label="Low" value={counts.low} detail="Lav severity" tone="cyan" />
             <MetricCard label="Kunde" value={row.customer_id ? "Koblet" : "Ikke koblet"} detail={`${customerLabel(row)} · ${formatDate(row.created_at)}`} tone="emerald" />
           </div>
+
+          <PhoenixPanel title="Forretningskobling" description="Koble rapporten til kunde og henvendelse før du lager tilbud.">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <p className="text-sm text-slate-400">Kunde</p>
+                <p className="mt-1 font-semibold text-white">{row.customer?.company_name || "Ikke koblet"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <p className="text-sm text-slate-400">Henvendelse</p>
+                <p className="mt-1 font-semibold text-white">{row.request?.company || row.request?.name || row.request_id || "Ikke koblet"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+                <p className="text-sm text-slate-400">Lead</p>
+                <p className="mt-1 font-semibold text-white">{row.lead?.title || row.lead_id || "Ikke koblet"}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <SecondaryButton type="button" disabled={Boolean(actionBusy)} onClick={() => openLinkPicker("customer")}>
+                {row.customer_id ? "Bytt kunde" : "Koble til kunde"}
+              </SecondaryButton>
+              <SecondaryButton type="button" disabled={Boolean(actionBusy)} onClick={() => openLinkPicker("request")}>
+                {row.request_id ? "Bytt henvendelse" : "Koble til henvendelse"}
+              </SecondaryButton>
+            </div>
+          </PhoenixPanel>
 
           <PhoenixPanel title="Sammendrag" description={report.summary || "Ingen sammendrag lagret."}>
             <div className="flex flex-wrap gap-2">
@@ -247,7 +343,7 @@ export default function SecurityReportDetailPage({ params }) {
                       <h3 className="font-semibold text-white">{pkg.name}</h3>
                       <p className="mt-1 text-sm text-slate-300">{pkg.reason || pkg.short_description || "Anbefalt produktpakke basert på rapportfunn."}</p>
                     </div>
-                    <StatusBadge>{pkg.category}</StatusBadge>
+                    <StatusBadge>{servicePackageCategoryLabels[pkg.category] || pkg.category}</StatusBadge>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     {pkg.id ? <SecondaryButton disabled={Boolean(actionBusy)} onClick={() => createPackageQuote([pkg.id])}><PackagePlus size={15} />Legg anbefalt pakke til tilbud</SecondaryButton> : null}
@@ -284,6 +380,33 @@ export default function SecurityReportDetailPage({ params }) {
           </PhoenixPanel>
         </>
       ) : null}
+
+      <CrmLinkPicker
+        open={linkPicker === "customer"}
+        title="Koble til kunde"
+        description="Velg kunden som eier denne rapporten."
+        items={linkItems}
+        loading={linkLoading}
+        error={linkError}
+        searchKeys={["company_name", "email", "name", "organization_number"]}
+        labelFor={(item) => item.company_name || item.name || item.email || item.id}
+        detailFor={(item) => [item.email, item.organization_number].filter(Boolean).join(" · ")}
+        onClose={() => setLinkPicker(null)}
+        onSelect={(customer) => patchLinks({ customer_id: customer.id })}
+      />
+      <CrmLinkPicker
+        open={linkPicker === "request"}
+        title="Koble til henvendelse"
+        description="Velg request/henvendelse som hører til rapporten."
+        items={linkItems}
+        loading={linkLoading}
+        error={linkError}
+        searchKeys={["company", "name", "email", "status"]}
+        labelFor={(item) => item.company || item.name || item.email || item.id}
+        detailFor={(item) => [item.email, item.status].filter(Boolean).join(" · ")}
+        onClose={() => setLinkPicker(null)}
+        onSelect={(request) => patchLinks({ request_id: request.id })}
+      />
     </div>
   );
 }
