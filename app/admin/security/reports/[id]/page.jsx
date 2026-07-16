@@ -8,6 +8,7 @@ import { downloadSecurityReportJson, downloadSecurityReportPdf } from "@/lib/sec
 import { buildReportRecommendation, servicePackageCategoryLabels } from "@/lib/securityScan/recommendations";
 import { EmptyState, formatDate, MetricCard, PhoenixPageHeader, PhoenixPanel, PrimaryButton, SecondaryButton, StatusBadge } from "@/components/phoenix/PhoenixUi";
 import CrmLinkPicker from "@/components/admin/CrmLinkPicker";
+import ForretningskoblingPanel from "@/components/admin/ForretningskoblingPanel";
 
 const severityLabels = { critical: "kritisk", high: "høy", medium: "middels", low: "lav", ok: "ok" };
 
@@ -181,12 +182,52 @@ export default function SecurityReportDetailPage({ params }) {
     }
   };
 
+  const syncQuoteFromReport = async () => {
+    if (!row?.id) return;
+    if (!row.customer_id) {
+      setError("Koble til en kunde først. Et tilbud uten kunde gir ingen mening.");
+      openLinkPicker("customer");
+      return;
+    }
+    setActionBusy("sync-quote");
+    setActionMessage("");
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/security/reports/${row.id}/service-package-quote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Kunne ikke opprette eller oppdatere tilbud.");
+      setActionMessage("Tilbud er opprettet/oppdatert fra rapporten.");
+      if (result.url) router.push(result.url);
+      else await reload();
+    } catch (err) {
+      console.error("Opprett tilbud feilet:", err);
+      setError(err.message || "Kunne ikke opprette eller oppdatere tilbud.");
+    } finally {
+      setActionBusy("");
+    }
+  };
+
   const openLinkPicker = async (type) => {
     setLinkPicker(type);
     setLinkError("");
     setLinkLoading(true);
     setLinkItems([]);
     try {
+      if (type === "contact") {
+        if (!row?.customer_id) {
+          setLinkLoading(false);
+          return;
+        }
+        const response = await fetch(`/api/admin/customers/${row.customer_id}`, { cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Kunne ikke hente kontakter.");
+        setLinkItems(result.data?.contacts || []);
+        return;
+      }
       const path = type === "customer" ? "/api/admin/customers" : "/api/admin/requests";
       const response = await fetch(path, { cache: "no-store" });
       const result = await response.json();
@@ -249,30 +290,17 @@ export default function SecurityReportDetailPage({ params }) {
             <MetricCard label="Kunde" value={row.customer_id ? "Koblet" : "Ikke koblet"} detail={`${customerLabel(row)} · ${formatDate(row.created_at)}`} tone="emerald" />
           </div>
 
-          <PhoenixPanel title="Forretningskobling" description="Koble rapporten til kunde og henvendelse før du lager tilbud.">
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-                <p className="text-sm text-slate-400">Kunde</p>
-                <p className="mt-1 font-semibold text-white">{row.customer?.company_name || "Ikke koblet"}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-                <p className="text-sm text-slate-400">Henvendelse</p>
-                <p className="mt-1 font-semibold text-white">{row.request?.company || row.request?.name || row.request_id || "Ikke koblet"}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-                <p className="text-sm text-slate-400">Lead</p>
-                <p className="mt-1 font-semibold text-white">{row.lead?.title || row.lead_id || "Ikke koblet"}</p>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <SecondaryButton type="button" disabled={Boolean(actionBusy)} onClick={() => openLinkPicker("customer")}>
-                {row.customer_id ? "Bytt kunde" : "Koble til kunde"}
-              </SecondaryButton>
-              <SecondaryButton type="button" disabled={Boolean(actionBusy)} onClick={() => openLinkPicker("request")}>
-                {row.request_id ? "Bytt henvendelse" : "Koble til henvendelse"}
-              </SecondaryButton>
-            </div>
-          </PhoenixPanel>
+          <ForretningskoblingPanel
+            row={row}
+            busy={actionBusy}
+            description="Koble rapporten til kunde, kontakt og henvendelse før du lager tilbud."
+            onLinkCustomer={() => openLinkPicker("customer")}
+            onLinkContact={() => openLinkPicker("contact")}
+            onLinkRequest={() => openLinkPicker("request")}
+            onCreateQuote={syncQuoteFromReport}
+            createQuoteLabel="Opprett tilbud fra denne rapporten"
+            createQuoteBusy={actionBusy === "sync-quote"}
+          />
 
           <PhoenixPanel title="Sammendrag" description={report.summary || "Ingen sammendrag lagret."}>
             <div className="flex flex-wrap gap-2">
@@ -393,6 +421,20 @@ export default function SecurityReportDetailPage({ params }) {
         detailFor={(item) => [item.email, item.organization_number].filter(Boolean).join(" · ")}
         onClose={() => setLinkPicker(null)}
         onSelect={(customer) => patchLinks({ customer_id: customer.id })}
+      />
+      <CrmLinkPicker
+        open={linkPicker === "contact"}
+        title="Koble kontaktperson"
+        description={row?.customer_id ? "Velg kontaktperson for kunden." : "Velg kunde først."}
+        items={linkItems}
+        loading={linkLoading}
+        error={linkError}
+        emptyMessage={row?.customer_id ? "Ingen kontakter for valgt kunde." : "Velg kunde først."}
+        searchKeys={["name", "email", "phone", "title"]}
+        labelFor={(item) => item.name || item.email || item.id}
+        detailFor={(item) => [item.email, item.phone].filter(Boolean).join(" · ")}
+        onClose={() => setLinkPicker(null)}
+        onSelect={(contact) => patchLinks({ contact_id: contact.id })}
       />
       <CrmLinkPicker
         open={linkPicker === "request"}

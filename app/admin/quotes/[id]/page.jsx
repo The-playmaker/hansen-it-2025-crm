@@ -59,6 +59,44 @@ function isDocumentVisible(document = {}) {
   return (document.is_portal_visible ?? document.visible_in_portal) === true;
 }
 
+const QUOTE_STATUS_SELECT_OPTIONS = [
+  { value: "kladd", label: "Kladd" },
+  { value: "Ny", label: "Ny" },
+  { value: "pågår", label: "Pågår" },
+  { value: "Pågår", label: "Pågår" },
+  { value: "sendt", label: "Sendt" },
+  { value: "godkjent", label: "Godkjent" },
+  { value: "avslått", label: "Avslått" },
+  { value: "avslatt", label: "Avslått" },
+  { value: "Fullført", label: "Fullført" },
+  { value: "endringer ønsket", label: "Endringer ønsket" },
+  { value: "endringer onsket", label: "Endringer ønsket" },
+];
+
+function quoteStatusLabel(status) {
+  if (!status) return "Ny";
+  const portalLabels = {
+    approved: "Godkjent",
+    changes_requested: "Endringer ønsket",
+    declined: "Avslått",
+  };
+  if (portalLabels[status]) return portalLabels[status];
+  const match = QUOTE_STATUS_SELECT_OPTIONS.find((opt) => opt.value === status);
+  if (match) return match.label;
+  const lower = String(status).toLowerCase();
+  const lowerMatch = QUOTE_STATUS_SELECT_OPTIONS.find((opt) => opt.value.toLowerCase() === lower);
+  if (lowerMatch) return lowerMatch.label;
+  return status;
+}
+
+function quoteStatusSelectOptions(currentStatus) {
+  const options = [...QUOTE_STATUS_SELECT_OPTIONS];
+  if (currentStatus && !options.some((opt) => opt.value === currentStatus)) {
+    options.unshift({ value: currentStatus, label: quoteStatusLabel(currentStatus) });
+  }
+  return options;
+}
+
 export default function QuoteDetailsPage() {
   const { id } = useParams();
   const quoteId = String(id || "");
@@ -362,7 +400,7 @@ export default function QuoteDetailsPage() {
       cancelEditNote();
     } catch (e) {
       console.error(e);
-      alert(e.message || "Could not edit note");
+      alert(e.message || "Kunne ikke redigere notat.");
     }
   };
 
@@ -476,11 +514,11 @@ export default function QuoteDetailsPage() {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         alert([
-          "Portal download feilet.",
+          "Portal-nedlasting feilet.",
           `Token finnes: ja`,
-          `Document id: ${document.id}`,
-          `Quote id: ${document.quote_id || quoteId}`,
-          `Storage object: ${document.storage_path ? "registrert" : "mangler storage_path"}`,
+          `Dokument-ID: ${document.id}`,
+          `Tilbuds-ID: ${document.quote_id || quoteId}`,
+          `Lagringsobjekt: ${document.storage_path ? "registrert" : "mangler storage_path"}`,
           `Feil: ${json?.error || res.statusText}`,
         ].join("\n"));
         return;
@@ -489,11 +527,11 @@ export default function QuoteDetailsPage() {
     } catch (error) {
       console.error(error);
       alert([
-        "Portal download-test feilet.",
+        "Portal-nedlastingstest feilet.",
         `Token finnes: ja`,
-        `Document id: ${document.id}`,
-        `Quote id: ${document.quote_id || quoteId}`,
-        `Storage object: ${document.storage_path ? "registrert" : "mangler storage_path"}`,
+        `Dokument-ID: ${document.id}`,
+        `Tilbuds-ID: ${document.quote_id || quoteId}`,
+        `Lagringsobjekt: ${document.storage_path ? "registrert" : "mangler storage_path"}`,
       ].join("\n"));
     }
   };
@@ -683,7 +721,7 @@ const handleCreatePortalLink = async () => {
       setNewMessage("");
     } catch (err) {
       console.error(err);
-      alert(err.message || "Could not send message");
+      alert(err.message || "Kunne ikke sende melding.");
     }
   };
 
@@ -850,13 +888,13 @@ const handleCreatePortalLink = async () => {
   const hasScanPdf = visibleDocuments.some((document) => document.type === "security_report_pdf" || /scan|security|sikkerhet/i.test(document.filename || ""));
   const quoteTotal = Number(quote.total_inc_vat || quote.total || quote.total_ex_vat || overallSubtotal || 0);
   const localReadiness = [
-    { label: "Quote har minst én linje/timeføring", ok: timeEntries.length > 0 || quoteTotal > 0 },
-    { label: "Quote total er større enn 0", ok: quoteTotal > 0 },
-    { label: "Portal token finnes", ok: Boolean(portalUrl) },
-    { label: "Quote PDF finnes", ok: hasQuotePdf },
-    { label: "Scan PDF finnes hvis scan er koblet", ok: hasScanPdf || !(quote.security_report_id || quote.scan_report_id) },
+    { label: "Tilbudet har minst én linje eller timeføring", ok: timeEntries.length > 0 || quoteTotal > 0 },
+    { label: "Tilbudssum er større enn 0", ok: quoteTotal > 0 },
+    { label: "Portal-token finnes", ok: Boolean(portalUrl) },
+    { label: "Tilbud-PDF finnes", ok: hasQuotePdf },
+    { label: "Skann-PDF finnes hvis skann er koblet", ok: hasScanPdf || !(quote.security_report_id || quote.scan_report_id) },
     { label: "Dokumenter er synlige i portal", ok: visibleDocuments.length > 0 },
-    { label: "Approval actions er tilgjengelig", ok: Boolean(portalUrl) },
+    { label: "Godkjenningshandlinger er tilgjengelige", ok: Boolean(portalUrl) },
     { label: "Meldingsskjema er tilgjengelig", ok: Boolean(portalUrl) }
   ];
   const readiness = Array.isArray(prepareChecks) && prepareChecks.length
@@ -871,7 +909,7 @@ const handleCreatePortalLink = async () => {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={() => router.push("/admin/quotes")} className="gap-2">
-            <ArrowLeft size={16} /> Back
+            <ArrowLeft size={16} /> Tilbake
           </Button>
 
           <div>
@@ -957,7 +995,7 @@ const handleCreatePortalLink = async () => {
         <div className="grid gap-4 md:grid-cols-3">
           <div>
             <div className="text-xs uppercase text-brand-400">Tilbudsstatus</div>
-            <div className="mt-1 text-white font-semibold">{quote.portal_status || quote.status || "Ny"}</div>
+            <div className="mt-1 text-white font-semibold">{quoteStatusLabel(quote.portal_status || quote.status)}</div>
           </div>
           <div>
             <div className="text-xs uppercase text-brand-400">Dokumentstatus</div>
@@ -981,7 +1019,7 @@ const handleCreatePortalLink = async () => {
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div className="space-y-1">
                 <div className="text-white font-semibold flex items-center gap-2">
-                  <User size={16} /> Customer
+                  <User size={16} /> Kunde
                 </div>
                 <div className="text-brand-300 text-sm">{quote.customer_name || quote.name}</div>
                 <div className="text-brand-300 text-sm">{quote.address || "-"}</div>
@@ -989,7 +1027,7 @@ const handleCreatePortalLink = async () => {
 
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="space-y-1">
-                  <div className="text-xs text-brand-400">Assigned</div>
+                  <div className="text-xs text-brand-400">Tildelt</div>
                   <select
                     value={quote.employee_id ?? ""}
                     onChange={(e) => handleAssignChange(e.target.value)}
@@ -1008,17 +1046,16 @@ const handleCreatePortalLink = async () => {
                 <div className="space-y-1">
                   <div className="text-xs text-brand-400">Status</div>
                   <select
-                    value={quote.status || "Ny"}
+                    value={quote.status || "kladd"}
                     onChange={(e) => handleStatusChange(e.target.value)}
                     className="bg-brand-900 border border-brand-700 rounded-lg px-3 py-2 text-white text-sm"
                     disabled={saving}
                   >
-                    <option value="Ny">Ny</option>
-                    <option value="Pågår">Pågår</option>
-                    <option value="Fullført">Fullført</option>
-                    <option value="sendt">Sendt</option>
-                    <option value="godkjent">Godkjent</option>
-                    <option value="endringer ønsket">Endringer ønsket</option>
+                    {quoteStatusSelectOptions(quote.status).map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -1027,7 +1064,7 @@ const handleCreatePortalLink = async () => {
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <div className="text-xs text-brand-400 flex items-center gap-2">
-                  <CalendarIcon size={14} /> Inspection
+                  <CalendarIcon size={14} /> Befaring
                 </div>
                 <Input type="date" value={inspectionDate} onChange={(e) => setInspectionDate(e.target.value)} />
               </div>
@@ -1041,7 +1078,7 @@ const handleCreatePortalLink = async () => {
 
               <div className="space-y-2">
                 <div className="text-xs text-brand-400 flex items-center gap-2">
-                  <CalendarIcon size={14} /> Due
+                  <CalendarIcon size={14} /> Frist
                 </div>
                 <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
               </div>
@@ -1049,12 +1086,12 @@ const handleCreatePortalLink = async () => {
 
             <div className="mt-4">
               <Button onClick={handleDatesSave} disabled={saving} variant="outline">
-                {saving ? "Saving…" : "Save dates"}
+                {saving ? "Lagrer..." : "Lagre datoer"}
               </Button>
             </div>
 
             <div className="mt-6">
-              <div className="text-white font-semibold mb-2">Customer message</div>
+              <div className="text-white font-semibold mb-2">Melding fra kunde</div>
               <div className="text-brand-300 text-sm whitespace-pre-wrap">
                 {quote.message || "-"}
               </div>
@@ -1139,7 +1176,7 @@ const handleCreatePortalLink = async () => {
           {/* Notes */}
           <Card>
             <div className="flex items-center justify-between">
-              <div className="text-white font-semibold">Notes</div>
+              <div className="text-white font-semibold">Notater</div>
               <div className="text-xs text-brand-400">{notes.length}</div>
             </div>
 
@@ -1147,16 +1184,16 @@ const handleCreatePortalLink = async () => {
               <Textarea
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Write internal note…"
+                placeholder="Skriv internt notat…"
               />
               <Button type="submit" className="gap-2">
-                <Plus size={16} /> Add note
+                <Plus size={16} /> Legg til notat
               </Button>
             </form>
 
             <div className="mt-5 space-y-3">
               {notes.length === 0 ? (
-                <div className="text-brand-400 text-sm">No notes yet.</div>
+                <div className="text-brand-400 text-sm">Ingen notater ennå.</div>
               ) : (
                 notes.map((n) => (
                   <div key={n.id} className="border border-brand-800 rounded-lg p-3 bg-brand-900/30">
@@ -1164,8 +1201,8 @@ const handleCreatePortalLink = async () => {
                       <div className="space-y-2">
                         <Textarea value={editingText} onChange={(e) => setEditingText(e.target.value)} />
                         <div className="flex gap-2">
-                          <Button type="button" onClick={saveEditNote}>Save</Button>
-                          <Button type="button" variant="outline" onClick={cancelEditNote}>Cancel</Button>
+                          <Button type="button" onClick={saveEditNote}>Lagre</Button>
+                          <Button type="button" variant="outline" onClick={cancelEditNote}>Avbryt</Button>
                         </div>
                       </div>
                     ) : (
@@ -1176,7 +1213,7 @@ const handleCreatePortalLink = async () => {
                             {n.created_at ? new Date(n.created_at).toLocaleString() : ""}
                           </div>
                           <Button type="button" variant="outline" onClick={() => startEditNote(n)}>
-                            Edit
+                            Rediger
                           </Button>
                         </div>
                       </>
@@ -1196,7 +1233,7 @@ const handleCreatePortalLink = async () => {
               <Textarea
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Write a message to the customer…"
+                placeholder="Skriv en melding til kunden…"
               />
               <Button type="submit" className="gap-2">
                 <Plus size={16} /> Send melding
@@ -1227,15 +1264,15 @@ const handleCreatePortalLink = async () => {
           <Card>
             <div className="flex items-center justify-between">
               <div className="text-white font-semibold flex items-center gap-2">
-                <Clock size={16} /> Time
+                <Clock size={16} /> Timeføring
               </div>
               <div className="text-sm text-white">{totalCost.toFixed(2)} kr</div>
             </div>
 
             <form onSubmit={handleAddTime} className="mt-4 space-y-3">
-              <Input value={hours} onChange={(e) => setHours(e.target.value)} placeholder="Hours (e.g. 1.5)" />
-              <Input value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Rate (e.g. 100)" />
-              <Input value={timeDescription} onChange={(e) => setTimeDescription(e.target.value)} placeholder="Description (optional)" />
+              <Input value={hours} onChange={(e) => setHours(e.target.value)} placeholder="Timer (f.eks. 1,5)" />
+              <Input value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Timepris (f.eks. 1050)" />
+              <Input value={timeDescription} onChange={(e) => setTimeDescription(e.target.value)} placeholder="Beskrivelse (valgfritt)" />
               <Button type="submit" className="gap-2">
                 <Plus size={16} /> Legg til tid
               </Button>
@@ -1283,7 +1320,7 @@ const handleCreatePortalLink = async () => {
                       <FileText size={14} /> {documentLabel(document)}
                     </div>
                     <div className="text-brand-500 text-[11px] mt-1">
-                      {document.type} · {(document.is_portal_visible ?? document.visible_in_portal) ? "Synlig i portal" : "Skjult"}
+                      {documentTypeLabel(document.type)} · {(document.is_portal_visible ?? document.visible_in_portal) ? "Synlig i portal" : "Skjult"}
                     </div>
                     <Button
                       variant="outline"
@@ -1313,7 +1350,7 @@ const handleCreatePortalLink = async () => {
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-semibold text-white">{documentLabel(document)}</div>
-                          <div className="mt-1 text-xs text-brand-400">{document.type || "attachment"} · {document.storage_path ? "storage OK" : document.external_url ? "external URL" : "mangler fil/URL"}</div>
+                          <div className="mt-1 text-xs text-brand-400">{documentTypeLabel(document.type)} · {document.storage_path ? "lagring OK" : document.external_url ? "ekstern URL" : "mangler fil/URL"}</div>
                           <div className="mt-1 text-xs text-brand-400">{(document.is_portal_visible ?? document.visible_in_portal) !== false ? "Synlig i portal" : "Skjult i portal"}</div>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -1324,10 +1361,10 @@ const handleCreatePortalLink = async () => {
                             Navngi
                           </Button>
                           <Button variant="outline" className="gap-2" onClick={() => openDocument(document.id)}>
-                            Test download
+                            Test nedlasting
                           </Button>
                           <Button variant="outline" className="gap-2" onClick={() => testPortalDocumentDownload(document)}>
-                            Test portal download
+                            Test portal-nedlasting
                           </Button>
                           <Button
                             variant="outline"
@@ -1345,7 +1382,21 @@ const handleCreatePortalLink = async () => {
             ) : null}
 
             <div className="mt-4 space-y-3">
-              <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  id="quote-attachment-file"
+                  type="file"
+                  className="sr-only"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+                <label
+                  htmlFor="quote-attachment-file"
+                  className="inline-flex cursor-pointer items-center rounded-lg border border-brand-700 bg-brand-900 px-3 py-2 text-sm text-white hover:bg-brand-800"
+                >
+                  Velg fil
+                </label>
+                <span className="text-sm text-brand-300">{file ? file.name : "Ingen fil valgt"}</span>
+              </div>
               <Button onClick={handleUpload} disabled={busyUpload || !file} className="gap-2">
                 <Plus size={16} /> {busyUpload ? "Laster opp..." : "Last opp"}
               </Button>
@@ -1354,7 +1405,7 @@ const handleCreatePortalLink = async () => {
             {attachments.some((attachment) => !documentStoragePaths.has(attachment.file_path)) ? (
               <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">
                 <div className="font-semibold">Vedlegg mangler portal-kobling</div>
-                <div className="mt-1">Disse ligger i gammel attachment-tabell. Koble dem til quote_documents for kundeportalen.</div>
+                <div className="mt-1">Disse ligger i gammel vedleggstabell. Koble dem til portaldokumenter for kundeportalen.</div>
                 <div className="mt-3 space-y-2">
                   {attachments.filter((attachment) => !documentStoragePaths.has(attachment.file_path)).map((attachment) => (
                     <div key={`legacy-${attachment.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/20 bg-brand-950/40 p-2">

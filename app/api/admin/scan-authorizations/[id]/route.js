@@ -6,7 +6,7 @@ import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 const DETAIL_SELECT =
-  "*, customer:customers(id,company_name,email), contact:contacts(id,name,email), request:requests(id,name,company,email,status), quote:quotes(id,title,status,total_inc_vat), scan_scopes(*), scan_jobs(*), scan_reports(*)";
+  "*, customer:customers(id,company_name,email), contact:contacts(id,name,email), request:requests(id,name,company,email,status), lead:leads(id,title,status), quote:quotes(id,title,status,total_inc_vat), scan_scopes(*), scan_jobs(*), scan_reports(*)";
 
 const LINK_KEYS = ["customer_id", "request_id", "lead_id", "contact_id", "quote_id"];
 const META_KEYS = ["status", "terms_text", "expires_at", "signer_name", "signer_email", "signer_role", "customer_name"];

@@ -9,6 +9,7 @@ import { downloadSecurityReportPdf } from "@/lib/securityScan/exportClient";
 import { buildReportRecommendation, standardServicePackages } from "@/lib/securityScan/recommendations";
 import { EmptyState, formatDate, PhoenixPageHeader, PhoenixPanel, SecondaryButton, StatusBadge } from "@/components/phoenix/PhoenixUi";
 import CrmLinkPicker from "@/components/admin/CrmLinkPicker";
+import ForretningskoblingPanel from "@/components/admin/ForretningskoblingPanel";
 
 function dateTime(value) {
   return value ? new Date(value).toLocaleString("nb-NO") : "-";
@@ -234,6 +235,17 @@ export default function ScanAuthorizationDetailsPage() {
     setLinkLoading(true);
     setLinkItems([]);
     try {
+      if (type === "contact") {
+        if (!item?.customer_id) {
+          setLinkLoading(false);
+          return;
+        }
+        const response = await fetch(`/api/admin/customers/${item.customer_id}`, { cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Kunne ikke hente kontakter.");
+        setLinkItems(result.data?.contacts || []);
+        return;
+      }
       const path = type === "customer" ? "/api/admin/customers" : "/api/admin/requests";
       const response = await fetch(path, { cache: "no-store" });
       const result = await response.json();
@@ -448,60 +460,18 @@ export default function ScanAuthorizationDetailsPage() {
             </div>
           </PhoenixPanel>
 
-          <PhoenixPanel title="Forretningskobling" description="Koblingen som driver flyten videre til tilbud, dokumenter og kundeportal.">
-            <div className="grid gap-3 md:grid-cols-4">
-              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-                <p className="text-sm text-slate-400">Kunde</p>
-                <p className="mt-1 font-semibold text-white">{item.customer?.company_name || item.customer_name || "Ikke koblet"}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-                <p className="text-sm text-slate-400">Kontaktperson</p>
-                <p className="mt-1 font-semibold text-white">{item.contact?.name || item.signer_name || "Ikke koblet"}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-                <p className="text-sm text-slate-400">Henvendelse</p>
-                <p className="mt-1 font-semibold text-white">{item.request?.company || item.request?.name || item.request_id || "Ikke koblet"}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-                <p className="text-sm text-slate-400">Tilbud / portal</p>
-                <p className="mt-1 font-semibold text-white">{item.quote?.title || item.quote_id || "Mangler tilbud"}</p>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {item.quote_id ? (
-                <Link href={`/admin/quotes/${item.quote_id}`}>
-                  <SecondaryButton type="button">Åpne tilbud</SecondaryButton>
-                </Link>
-              ) : null}
-              {!item.quote_id && primaryReport ? (
-                <SecondaryButton
-                  type="button"
-                  disabled={Boolean(busy)}
-                  onClick={() => syncQuoteFromReport(primaryReport)}
-                >
-                  {busy.startsWith("sync-quote") ? "Oppretter..." : "Opprett tilbud fra denne scannen"}
-                </SecondaryButton>
-              ) : null}
-              {!item.customer_id ? (
-                <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => openLinkPicker("customer")}>
-                  Koble til kunde
-                </SecondaryButton>
-              ) : (
-                <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => openLinkPicker("customer")}>
-                  Bytt kunde
-                </SecondaryButton>
-              )}
-              {!item.request_id ? (
-                <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => openLinkPicker("request")}>
-                  Koble til henvendelse
-                </SecondaryButton>
-              ) : (
-                <SecondaryButton type="button" disabled={Boolean(busy)} onClick={() => openLinkPicker("request")}>
-                  Bytt henvendelse
-                </SecondaryButton>
-              )}
-            </div>
-          </PhoenixPanel>
+          <ForretningskoblingPanel
+            row={item}
+            busy={busy}
+            customerFallback={item.customer_name}
+            contactFallback={item.signer_name}
+            onLinkCustomer={() => openLinkPicker("customer")}
+            onLinkContact={() => openLinkPicker("contact")}
+            onLinkRequest={() => openLinkPicker("request")}
+            onCreateQuote={primaryReport ? () => syncQuoteFromReport(primaryReport) : null}
+            createQuoteLabel="Opprett tilbud fra denne scannen"
+            createQuoteBusy={busy.startsWith("sync-quote")}
+          />
 
           <div className="grid gap-6 xl:grid-cols-2">
             <PhoenixPanel title="Scope">
@@ -686,6 +656,20 @@ export default function ScanAuthorizationDetailsPage() {
         detailFor={(item) => [item.email, item.organization_number].filter(Boolean).join(" · ")}
         onClose={() => setLinkPicker(null)}
         onSelect={(customer) => patchLinks({ customer_id: customer.id, customer_name: customer.company_name || item?.customer_name || null })}
+      />
+      <CrmLinkPicker
+        open={linkPicker === "contact"}
+        title="Koble kontaktperson"
+        description={item?.customer_id ? "Velg kontaktperson for kunden." : "Velg kunde først."}
+        items={linkItems}
+        loading={linkLoading}
+        error={linkError}
+        emptyMessage={item?.customer_id ? "Ingen kontakter for valgt kunde." : "Velg kunde først."}
+        searchKeys={["name", "email", "phone", "title"]}
+        labelFor={(item) => item.name || item.email || item.id}
+        detailFor={(item) => [item.email, item.phone].filter(Boolean).join(" · ")}
+        onClose={() => setLinkPicker(null)}
+        onSelect={(contact) => patchLinks({ contact_id: contact.id })}
       />
       <CrmLinkPicker
         open={linkPicker === "request"}

@@ -18,6 +18,7 @@ export default function CrmLinkPicker({
   detailFor = () => "",
   onSelect,
   onClose,
+  emptyMessage = "Ingen treff.",
 }) {
   const [query, setQuery] = useState("");
 
@@ -61,7 +62,7 @@ export default function CrmLinkPicker({
 
         <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
           {!loading && !filtered.length ? (
-            <p className="text-sm text-slate-400">Ingen treff.</p>
+            <p className="text-sm text-slate-400">{emptyMessage}</p>
           ) : null}
           {filtered.map((item) => (
             <button
